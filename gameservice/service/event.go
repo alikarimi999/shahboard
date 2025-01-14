@@ -51,8 +51,8 @@ func (gs *Service) handleEventPlayersMatched(d *event.EventPlayersMatched) {
 	// publish the game created event
 	if err := gs.p.Publish(event.EventGameCreated{
 		ID:        g.ID(),
-		Player1:   g.Player1().ID,
-		Player2:   g.Player2().ID,
+		Player1:   g.Player1(),
+		Player2:   g.Player2(),
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
 		gs.l.Error(err.Error())

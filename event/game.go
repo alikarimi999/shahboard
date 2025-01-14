@@ -12,8 +12,8 @@ var (
 
 type EventGameCreated struct {
 	ID        types.ObjectId `json:"id"`
-	Player1   types.ObjectId `json:"player1"`
-	Player2   types.ObjectId `json:"player2"`
+	Player1   types.Player   `json:"player1"`
+	Player2   types.Player   `json:"player2"`
 	Timestamp int64          `json:"timestamp"`
 }
 

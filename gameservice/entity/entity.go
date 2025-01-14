@@ -34,25 +34,6 @@ const (
 	Draw GameOutcome = "1/2-1/2"
 )
 
-type Color uint8
-
-const (
-	ColorWhite Color = 1
-	ColorBlack Color = 2
-)
-
-func (c Color) String() string {
-	if c == ColorWhite {
-		return "white"
-	}
-	return "black"
-}
-
-type Player struct {
-	ID    types.ObjectId
-	Color Color
-}
-
 type GameSettings struct {
 	Time time.Duration
 }
@@ -61,8 +42,8 @@ type Game struct {
 	id     types.ObjectId
 	status GameStatus
 
-	player1 Player
-	player2 Player
+	player1 types.Player
+	player2 types.Player
 
 	setting GameSettings
 
@@ -80,8 +61,8 @@ func NewGame(player1 types.ObjectId, player2 types.ObjectId, s GameSettings) *Ga
 	g := &Game{
 		id:        types.NewObjectId(),
 		status:    GameStatusActive,
-		player1:   Player{ID: p1, Color: c1},
-		player2:   Player{ID: p2, Color: c2},
+		player1:   types.Player{ID: p1, Color: c1},
+		player2:   types.Player{ID: p2, Color: c2},
 		setting:   s,
 		game:      chess.NewGame(chess.UseNotation(defaultNotation)),
 		CreatedAt: t,
@@ -105,11 +86,11 @@ func (g *Game) Status() GameStatus {
 	return g.status
 }
 
-func (g *Game) Player1() Player {
+func (g *Game) Player1() types.Player {
 	return g.player1
 }
 
-func (g *Game) Player2() Player {
+func (g *Game) Player2() types.Player {
 	return g.player2
 }
 
@@ -121,7 +102,7 @@ func (g *Game) Move(m string) error {
 	return nil
 }
 
-func (g *Game) Turn() Player {
+func (g *Game) Turn() types.Player {
 	if g.game.Position().Turn() == chess.White {
 		return g.white()
 	}
@@ -137,15 +118,15 @@ func (g *Game) FEN() string {
 	return g.game.FEN()
 }
 
-func (g *Game) white() Player {
-	if g.player1.Color == ColorWhite {
+func (g *Game) white() types.Player {
+	if g.player1.Color == types.ColorWhite {
 		return g.player1
 	}
 	return g.player2
 }
 
-func (g *Game) black() Player {
-	if g.player1.Color == ColorBlack {
+func (g *Game) black() types.Player {
+	if g.player1.Color == types.ColorBlack {
 		return g.player1
 	}
 	return g.player2
@@ -190,8 +171,8 @@ func (g *Game) Decode(data []byte) error {
 
 	g.id = types.ObjectId(id)
 	g.status = GameStatus(status)
-	g.player1 = Player{ID: types.ObjectId(player1), Color: Color(color1)}
-	g.player2 = Player{ID: types.ObjectId(player2), Color: Color(color2)}
+	g.player1 = types.Player{ID: types.ObjectId(player1), Color: types.Color(color1)}
+	g.player2 = types.Player{ID: types.ObjectId(player2), Color: types.Color(color2)}
 
 	g.game = chess.NewGame(chess.UseNotation(defaultNotation))
 
@@ -209,12 +190,12 @@ func setPlayersId(pa, pb types.ObjectId) (p1, p2 types.ObjectId) {
 	return pb, pa
 }
 
-func setColors() (Color, Color) {
+func setColors() (types.Color, types.Color) {
 
-	color := Color(rand.Intn(2) + 1)
+	color := types.Color(rand.Intn(2) + 1)
 
-	if color == ColorWhite {
-		return ColorWhite, ColorBlack
+	if color == types.ColorWhite {
+		return types.ColorWhite, types.ColorBlack
 	}
-	return ColorBlack, ColorWhite
+	return types.ColorBlack, types.ColorWhite
 }
