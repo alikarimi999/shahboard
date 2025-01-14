@@ -99,7 +99,7 @@ func (
 	for message := range claim.Messages() {
 		var action string
 		for _, header := range message.Headers {
-			if string(header.Key) == "action" {
+			if string(header.Key) == headerAction {
 				action = string(header.Value)
 			}
 		}

@@ -30,7 +30,7 @@ func (kp *kafkaPublisher) Publish(data ...event.Event) error {
 			Topic: e.GetTopic().Domain().String(),
 			Headers: []sarama.RecordHeader{
 				{
-					Key:   []byte("action"),
+					Key:   []byte(headerAction),
 					Value: []byte(e.GetAction().String()),
 				},
 			},

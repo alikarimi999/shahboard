@@ -5,6 +5,10 @@ import (
 	"github.com/alikarimi999/shahboard/pkg/log"
 )
 
+const (
+	headerAction = "action"
+)
+
 type Config struct {
 	Brokers []string `json:"brokers"`
 	GroupID string   `json:"group_id"`
