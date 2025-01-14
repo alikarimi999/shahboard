@@ -13,12 +13,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = gameservice.SetupApplication(config)
+	app, err := gameservice.SetupApplication(config)
 	if err != nil {
 		panic(err)
 	}
 
-	select {}
+	if err := app.Run(); err != nil {
+		panic(err)
+	}
 }
 func loadConfig(file string) (gameservice.Config, error) {
 	configFile, err := os.Open(file)

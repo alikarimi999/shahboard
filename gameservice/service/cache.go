@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alikarimi999/shahboard/gameservice/entity"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	keyPlayerGamePrefix = "game:player:"
+	keyPlayerGamePrefix = "player_game:"
 	keyGamePrefix       = "game:"
 )
 
@@ -44,7 +45,7 @@ func newRedisGameCache(sercviceID string, rc *redis.Client, deactivedTTL time.Du
 // Returns:
 //   - bool: true if the game was successfully added, false if the game already exists.
 //   - error: An error if the Redis operation fails.
-func (c *redisGameCache) AddGame(ctx context.Context, g *entity.Game) (bool, error) {
+func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, error) {
 
 	script := `
 	local serviceID = KEYS[1]
@@ -92,7 +93,7 @@ func (c *redisGameCache) AddGame(ctx context.Context, g *entity.Game) (bool, err
 	}).Bool()
 }
 
-func (c *redisGameCache) PlayerHasGame(ctx context.Context, p types.ObjectId) (bool, error) {
+func (c *redisGameCache) playerHasGame(ctx context.Context, p types.ObjectId) (bool, error) {
 	res, err := c.rc.Get(ctx, fmt.Sprintf("%s%d", keyPlayerGamePrefix, p)).Result()
 	if err == redis.Nil {
 		return false, nil
@@ -104,7 +105,7 @@ func (c *redisGameCache) PlayerHasGame(ctx context.Context, p types.ObjectId) (b
 }
 
 // need more optimizations here
-func (c *redisGameCache) UpdateGameMove(ctx context.Context, g *entity.Game) error {
+func (c *redisGameCache) updateGameMove(ctx context.Context, g *entity.Game) error {
 	cGame := &inCacheGame{
 		Status: g.Status(),
 		Game:   g.Encode(),
@@ -114,7 +115,7 @@ func (c *redisGameCache) UpdateGameMove(ctx context.Context, g *entity.Game) err
 	return c.rc.Set(ctx, fmt.Sprintf("%s%d", keyGamePrefix, g.ID()), bGame, 0).Err()
 }
 
-func (c *redisGameCache) UpdateAndDeactivateGame(ctx context.Context, g *entity.Game) error {
+func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, g *entity.Game) error {
 	// delete the players game so they can join a new game
 	c.rc.Del(ctx, fmt.Sprintf("%s%d", keyPlayerGamePrefix, g.Player1()))
 	c.rc.Del(ctx, fmt.Sprintf("%s%d", keyPlayerGamePrefix, g.Player2()))
@@ -129,7 +130,120 @@ func (c *redisGameCache) UpdateAndDeactivateGame(ctx context.Context, g *entity.
 	return c.rc.Set(ctx, fmt.Sprintf("%s%d", keyGamePrefix, g.ID()), bGame, c.deactivedTTL).Err()
 }
 
-func (c *redisGameCache) GetGamesByServiceID(ctx context.Context, id string) ([]*entity.Game, error) {
+func (c *redisGameCache) getGamesIDs(ctx context.Context) ([]types.ObjectId, error) {
+	maxCount := 1000
+	var cursor uint64
+	var gamesIDs []types.ObjectId
+	for {
+		keys, nextCursor, err := c.rc.Scan(ctx, cursor, fmt.Sprintf("%s*", keyGamePrefix), int64(maxCount)).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, k := range keys {
+			parts := strings.Split(k, ":")
+			if len(parts) != 2 {
+				continue
+			}
+			id, err := types.ParseObjectId(parts[1])
+			if err != nil {
+				continue
+			}
+			gamesIDs = append(gamesIDs, id)
+		}
+
+		if nextCursor == 0 {
+			break
+		}
+
+		cursor = nextCursor
+	}
+
+	return gamesIDs, nil
+}
+
+func (c *redisGameCache) getGames(ctx context.Context) ([]*entity.Game, error) {
+	maxCount := 100
+	var cursor uint64
+	var games []*entity.Game
+
+	for {
+		keys, nextCursor, err := c.rc.Scan(ctx, cursor, fmt.Sprintf("%s*", keyGamePrefix), int64(maxCount)).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		gameData, err := c.rc.MGet(ctx, keys...).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, i := range gameData {
+			if i == nil {
+				continue
+			}
+
+			g := &inCacheGame{}
+			if err := g.decode([]byte(i.(string))); err != nil {
+				continue
+			}
+
+			game := &entity.Game{}
+			if err := game.Decode(g.Game); err != nil {
+				continue
+			}
+
+			games = append(games, game)
+
+		}
+
+		if nextCursor == 0 {
+			break
+		}
+
+		cursor = nextCursor
+	}
+
+	return games, nil
+}
+
+func (c *redisGameCache) getGamesByID(ctx context.Context, ids []types.ObjectId) ([]*entity.Game, error) {
+	keys := make([]string, len(ids))
+
+	for i, id := range ids {
+		keys[i] = fmt.Sprintf("%s%s", keyGamePrefix, id.String())
+	}
+
+	gameData, err := c.rc.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	gs := []*entity.Game{}
+	for _, i := range gameData {
+		if i == nil {
+			continue
+		}
+
+		g := &inCacheGame{}
+		if err := g.decode([]byte(i.(string))); err != nil {
+			continue
+		}
+
+		game := &entity.Game{}
+		if err := game.Decode(g.Game); err != nil {
+			continue
+		}
+
+		gs = append(gs, game)
+
+	}
+
+	return gs, nil
+
+}
+
+func (c *redisGameCache) getGamesByServiceID(ctx context.Context, id string) ([]*entity.Game, error) {
 	if id == "" {
 		id = c.serviceID
 	}
@@ -174,6 +288,28 @@ func (c *redisGameCache) GetGamesByServiceID(ctx context.Context, id string) ([]
 	}
 
 	return gs, nil
+}
+
+func (c *redisGameCache) getGameByID(ctx context.Context, id types.ObjectId) (*entity.Game, error) {
+	gameData, err := c.rc.Get(ctx, fmt.Sprintf("%s%s", keyGamePrefix, id.String())).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if gameData == "" {
+		return nil, nil
+	}
+
+	g := &inCacheGame{}
+	if err := g.decode([]byte(gameData)); err != nil {
+		return nil, err
+	}
+
+	game := &entity.Game{}
+	if err := game.Decode(g.Game); err != nil {
+		return nil, err
+	}
+	return game, nil
 }
 
 type inCacheGame struct {

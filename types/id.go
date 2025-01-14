@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"math/rand"
@@ -24,4 +25,12 @@ func NewObjectId() ObjectId {
 
 func (id ObjectId) String() string {
 	return fmt.Sprintf("%d", id)
+}
+
+func ParseObjectId(s string) (ObjectId, error) {
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return ObjectId(id), nil
 }

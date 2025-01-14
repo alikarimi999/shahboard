@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/gameservice/delivery/http"
 	game "github.com/alikarimi999/shahboard/gameservice/service"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/redis/go-redis/v9"
 )
 
 type application struct {
-	gameService *game.Service
+	GameService *game.Service
+	Router      *http.Router
 }
 
 func SetupApplication(cfg Config) (*application, error) {
@@ -37,7 +39,17 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
+	router, err := http.NewRouter(cfg.Http, gs)
+	if err != nil {
+		return nil, err
+	}
+
 	return &application{
-		gameService: gs,
+		GameService: gs,
+		Router:      router,
 	}, nil
+}
+
+func (a *application) Run() error {
+	return a.Router.Run()
 }

@@ -67,21 +67,34 @@ type Game struct {
 	setting GameSettings
 
 	game *chess.Game
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func NewGame(player1 types.ObjectId, player2 types.ObjectId, s GameSettings) *Game {
 
 	p1, p2 := setPlayersId(player1, player2)
 	c1, c2 := setColors()
-
-	return &Game{
-		id:      types.NewObjectId(),
-		status:  GameStatusActive,
-		player1: Player{ID: p1, Color: c1},
-		player2: Player{ID: p2, Color: c2},
-		setting: s,
-		game:    chess.NewGame(chess.UseNotation(defaultNotation)),
+	t := time.Now()
+	g := &Game{
+		id:        types.NewObjectId(),
+		status:    GameStatusActive,
+		player1:   Player{ID: p1, Color: c1},
+		player2:   Player{ID: p2, Color: c2},
+		setting:   s,
+		game:      chess.NewGame(chess.UseNotation(defaultNotation)),
+		CreatedAt: t,
+		UpdatedAt: t,
 	}
+
+	g.game.AddTagPair("ID", g.id.String())
+	g.game.AddTagPair("White", g.white().ID.String())
+	g.game.AddTagPair("Black", g.black().ID.String())
+	g.game.AddTagPair("created_at", t.Format(time.RFC3339))
+	g.game.AddTagPair("updated_at", t.Format(time.RFC3339))
+
+	return g
 }
 
 func (g *Game) ID() types.ObjectId {
@@ -101,7 +114,11 @@ func (g *Game) Player2() Player {
 }
 
 func (g *Game) Move(m string) error {
-	return g.game.MoveStr(m)
+	if err := g.game.MoveStr(m); err != nil {
+		return err
+	}
+	g.UpdatedAt = time.Now()
+	return nil
 }
 
 func (g *Game) Turn() Player {
@@ -109,6 +126,15 @@ func (g *Game) Turn() Player {
 		return g.white()
 	}
 	return g.black()
+}
+
+func (g *Game) PGN() string {
+	g.game.AddTagPair("updated_at", g.UpdatedAt.Format(time.RFC3339))
+	return g.game.String()
+}
+
+func (g *Game) FEN() string {
+	return g.game.FEN()
 }
 
 func (g *Game) white() Player {

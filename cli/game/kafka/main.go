@@ -138,6 +138,6 @@ func sendEventToKafka(brokerAddress string, event event.Event) error {
 
 // go run cli/game/kafka/main.go players_matched
 
-// gameID: 7459441962659385396  w:7459441963612512014 b:7459441963682923400
+// gameID: 7459482787527157217  w:7459482787110426337 b:7459482787355485654
 
-// go run cli/game/kafka/main.go player_moved --gameId 7459441962659385396 --playerId 7459441963612512014 --move Rb1
+// go run cli/game/kafka/main.go player_moved --gameId 7459482787527157217 --playerId 7459482787355485654 --move Na6
