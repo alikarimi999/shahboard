@@ -34,6 +34,7 @@ func (kp *kafkaPublisher) Publish(data ...event.Event) error {
 					Value: []byte(e.GetAction().String()),
 				},
 			},
+			Key:   sarama.ByteEncoder(e.GetTopic().String()),
 			Value: sarama.ByteEncoder(e.Encode()),
 		}
 		if _, _, err := kp.p.SendMessage(msg); err != nil {

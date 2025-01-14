@@ -123,6 +123,7 @@ func sendEventToKafka(brokerAddress string, event event.Event) error {
 				Value: []byte(event.GetAction().String()),
 			},
 		},
+		Key:   sarama.ByteEncoder(event.GetTopic().String()),
 		Value: sarama.ByteEncoder(eventBytes),
 	}
 
