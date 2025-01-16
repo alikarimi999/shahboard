@@ -20,16 +20,16 @@ func (gs *Service) subscribeEvents(topics ...event.Topic) {
 // and creates a new game if both players do not have any active games.
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
-func (gs *Service) handleEventPlayersMatched(d *event.EventPlayersMatched) {
+func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
 
 	// check if player is already in a game
-	if gs.checkByPlayer(d.Player1) || gs.checkByPlayer(d.Player2) {
+	if gs.checkByPlayer(d.User1.ID) || gs.checkByPlayer(d.User2.ID) {
 		gs.l.Debug("player is already in a game")
 		return
 	}
 
 	// create a new game
-	g := entity.NewGame(d.Player1, d.Player2, gs.cfg.DefaultGameSettings)
+	g := entity.NewGame(d.User1.ID, d.User2.ID, gs.cfg.DefaultGameSettings)
 
 	// add the game to the cache
 	if ok, err := gs.cache.addGame(context.Background(), g); err != nil {
@@ -160,7 +160,7 @@ func (gs *Service) handleEvents(e event.Event) {
 	case event.DomainMatch:
 		switch e.GetAction() {
 		case event.ActionPlayersMatched:
-			gs.handleEventPlayersMatched(e.(*event.EventPlayersMatched))
+			gs.handleEventPlayersMatched(e.(*event.EventUsersMatched))
 		}
 	}
 }

@@ -16,5 +16,6 @@ func (c Color) String() string {
 
 type Player struct {
 	ID    ObjectId
+	Level Level
 	Color Color
 }

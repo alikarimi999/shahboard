@@ -10,25 +10,26 @@ var (
 	TopicMatch Topic = NewTopic("match", "")
 )
 
-type EventPlayersMatched struct {
-	Player1   types.ObjectId `json:"player1"`
-	Player2   types.ObjectId `json:"player2"`
+type EventUsersMatched struct {
+	ID        types.ObjectId `json:"id"`
+	User1     types.User     `json:"user1"`
+	User2     types.User     `json:"user2"`
 	Timestamp int64          `json:"timestamp"`
 }
 
-func (e EventPlayersMatched) GetTopic() Topic {
+func (e EventUsersMatched) GetTopic() Topic {
 	return TopicMatch
 }
 
-func (e EventPlayersMatched) GetAction() Action {
+func (e EventUsersMatched) GetAction() Action {
 	return ActionPlayersMatched
 }
 
-func (e EventPlayersMatched) TimeStamp() int64 {
+func (e EventUsersMatched) TimeStamp() int64 {
 	return e.Timestamp
 }
 
-func (e EventPlayersMatched) Encode() []byte {
+func (e EventUsersMatched) Encode() []byte {
 	b, _ := json.Marshal(e)
 	return b
 }

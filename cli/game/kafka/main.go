@@ -41,9 +41,9 @@ func newPlayersMatchedCommand(brokerAddress *string) *cobra.Command {
 		Use:   "players_matched",
 		Short: "Send a PlayersMatched event",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			event := event.EventPlayersMatched{
-				Player1:   types.ObjectId(player1),
-				Player2:   types.ObjectId(player2),
+			event := event.EventUsersMatched{
+				User1:     types.User{ID: types.ObjectId(player1)},
+				User2:     types.User{ID: types.ObjectId(player2)},
 				Timestamp: time.Now().Unix(),
 			}
 			return sendEventToKafka(*brokerAddress, event)

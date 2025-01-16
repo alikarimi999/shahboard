@@ -1,0 +1,18 @@
+{
+    "match_service": {
+        "engine_ticker": 5
+    },
+    "kafka": {
+        "brokers": [
+            "localhost:9092"
+        ],
+        "group_id": "match_service_0"
+    },
+    "log": {
+        "file": "./data/log/match_service.log",
+        "verbose": true
+    },
+    "http": {
+        "port": 8082
+    }
+}
