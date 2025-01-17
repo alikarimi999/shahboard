@@ -12,6 +12,7 @@ var (
 
 type EventGameCreated struct {
 	ID        types.ObjectId `json:"id"`
+	MatchID   types.ObjectId `json:"match_id"`
 	Player1   types.Player   `json:"player1"`
 	Player2   types.Player   `json:"player2"`
 	Timestamp int64          `json:"timestamp"`

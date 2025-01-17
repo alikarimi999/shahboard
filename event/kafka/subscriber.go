@@ -21,8 +21,6 @@ type kafkaSubscriber struct {
 	g                   *consumerGroup
 	subscriptionManager *subscriptionManager // Subscription manager for managing subscriptions.
 
-	newTopicCh chan event.Topic // Channel for new topics.
-
 	closeSignal chan struct{}  // Channel to signal shutdown.
 	wg          sync.WaitGroup // WaitGroup to synchronize goroutines.
 
@@ -42,7 +40,6 @@ func newKafkaSubscriber(brokers []string, groupID string, l log.Logger) (*kafkaS
 
 		g:                   g,
 		subscriptionManager: newSubscriptionManager(),
-		newTopicCh:          make(chan event.Topic),
 		closeSignal:         make(chan struct{}),
 		l:                   l,
 	}
@@ -150,14 +147,26 @@ func (sm *subscriptionManager) removeSub(sub *feedSub) {
 }
 
 // Sends an event to all subscribers of the event's topic.
-func (sm *subscriptionManager) send(event ...event.Event) {
+func (sm *subscriptionManager) send(events ...event.Event) {
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	for _, e := range event {
+	subscribers := make([]chan event.Event, 0)
+	for _, e := range events {
 		if subs, exists := sm.subs[e.GetTopic().String()]; exists {
 			for _, sub := range subs {
-				sub.ch <- e // Sends the event to each subscriber's channel.
+				subscribers = append(subscribers, sub.ch)
 			}
+		}
+	}
+	sm.mu.Unlock()
+
+	for _, ch := range subscribers {
+		for _, e := range events {
+			select {
+			case ch <- e:
+			default:
+				fmt.Println("event dropped: ", e.GetTopic().String())
+			}
+
 		}
 	}
 }
@@ -177,8 +186,8 @@ func newFeedSub(topic event.Topic, kc *kafkaSubscriber) *feedSub {
 	return &feedSub{
 		topic: topic,
 		kc:    kc,
-		ch:    make(chan event.Event),
-		err:   make(chan error),
+		ch:    make(chan event.Event, 1000),
+		err:   make(chan error, 1000),
 	}
 }
 
@@ -231,6 +240,7 @@ func decodeEvent(topicStr, action string, data []byte) (event.Event, error) {
 
 	// Decode the JSON data into the event struct
 	if err := json.Unmarshal(data, e); err != nil {
+		fmt.Println(err)
 		return nil, fmt.Errorf("failed to unmarshal event data: %v", err)
 	}
 

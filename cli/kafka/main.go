@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	"github.com/IBM/sarama"
+	"github.com/alikarimi999/shahboard/types"
 	"github.com/spf13/cobra"
 )
 
-const groupID = "cli-tool"
-
 func main() {
-	var brokerAddress string
+	var brokerAddress, groupID string
 
 	var rootCmd = &cobra.Command{
 		Use:   "cli-tool",
@@ -19,15 +18,16 @@ func main() {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&brokerAddress, "broker", "localhost:9092", "Kafka broker address")
+	rootCmd.PersistentFlags().StringVar(&groupID, "group", types.NewObjectId().String(), "Kafka group ID")
 
-	rootCmd.AddCommand(listenCommand(newConsumerGroup(brokerAddress)))
+	rootCmd.AddCommand(listenCommand(newConsumerGroup(brokerAddress, groupID)))
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println("Error:", err)
 	}
 }
 
-func newConsumerGroup(brokerAddress string) sarama.ConsumerGroup {
+func newConsumerGroup(brokerAddress, groupID string) sarama.ConsumerGroup {
 	c, err := sarama.NewConsumerGroup([]string{brokerAddress}, groupID, sarama.NewConfig())
 	if err != nil {
 		panic(err)

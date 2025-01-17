@@ -21,7 +21,6 @@ func (gs *Service) subscribeEvents(topics ...event.Topic) {
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
 func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
-
 	// check if player is already in a game
 	if gs.checkByPlayer(d.User1.ID) || gs.checkByPlayer(d.User2.ID) {
 		gs.l.Debug("player is already in a game")
@@ -34,6 +33,7 @@ func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
 	// add the game to the cache
 	if ok, err := gs.cache.addGame(context.Background(), g); err != nil {
 		gs.l.Error(err.Error())
+		return
 	} else if !ok {
 		gs.l.Debug(fmt.Sprintf("game already exists in cache: '%s'", g.ID()))
 		return
@@ -42,15 +42,16 @@ func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
 
 	gm := newGameManager(gs, g)
 	gs.addGame(gm)
-
-	// subscribe to the game
 	topic := event.TopicGame.WithResource(gm.ID().String())
-	gm.addSub(gs.s.Subscribe(topic))
+	subsctiption := gs.s.Subscribe(topic)
+	gm.addSub(subsctiption)
+
 	gs.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", topic))
 
 	// publish the game created event
 	if err := gs.p.Publish(event.EventGameCreated{
 		ID:        g.ID(),
+		MatchID:   d.ID,
 		Player1:   g.Player1(),
 		Player2:   g.Player2(),
 		Timestamp: time.Now().Unix(),
@@ -59,7 +60,7 @@ func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
 	}
 	gs.l.Debug(fmt.Sprintf("published game created event: '%s'", g.ID()))
 
-	gs.l.Debug(fmt.Sprintf("game '%s' created by player '%s' as '%s' and player '%s' as '%s'",
+	gs.l.Info(fmt.Sprintf("game '%s' created by player '%s' as '%s' and player '%s' as '%s'",
 		g.ID(), g.Player1().ID, g.Player1().Color, g.Player2().ID, g.Player2().Color))
 
 	// TODO: add to repository concurrency control
