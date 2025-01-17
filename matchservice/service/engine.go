@@ -90,8 +90,6 @@ func (e *engine) findMatches() []*Match {
 		currentQueue := append(leftover, e.queue[l]...)
 		leftover = nil
 
-		fmt.Println(fmt.Sprintf("start %d  %v", l, currentQueue))
-
 		for len(currentQueue) > 1 {
 			u1 := currentQueue[0]
 			u2 := currentQueue[1]
