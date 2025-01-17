@@ -12,7 +12,8 @@ import (
 )
 
 type Config struct {
-	EngineTicker int `json:"engine_ticker"`
+	EngineTicker       int `json:"engine_ticker"`
+	MatchRequestTicker int `json:"match_request_ticker"`
 }
 
 type Service struct {
@@ -44,6 +45,8 @@ func NewService(cfg Config, p event.Publisher, score ScoreService, l log.Logger)
 }
 
 func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*Match, error) {
+	t := time.NewTicker(time.Duration(s.cfg.MatchRequestTicker) * time.Second)
+
 	level, err := s.score.GetUserLevel(userId)
 	if err != nil {
 		return nil, err
@@ -57,6 +60,9 @@ func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*
 		return nil, ctx.Err()
 	case res := <-req.response():
 		return res, nil
+	case <-t.C:
+		s.e.cancelRequest(req)
+		return nil, fmt.Errorf("request timeout")
 	}
 
 }
