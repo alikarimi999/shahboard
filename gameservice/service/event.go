@@ -7,6 +7,7 @@ import (
 
 	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/gameservice/entity"
+	"github.com/alikarimi999/shahboard/types"
 )
 
 func (gs *Service) subscribeEvents(topics ...event.Topic) {
@@ -16,11 +17,11 @@ func (gs *Service) subscribeEvents(topics ...event.Topic) {
 	}
 }
 
-// handleEventPlayersMatched handles the event of two players being matched
+// handleEventUsersMatched handles the event of two players being matched
 // and creates a new game if both players do not have any active games.
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
-func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
+func (gs *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
 	// check if player is already in a game
 	if gs.checkByPlayer(d.User1.ID) || gs.checkByPlayer(d.User2.ID) {
 		gs.l.Debug("player is already in a game")
@@ -50,7 +51,7 @@ func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
 
 	// publish the game created event
 	if err := gs.p.Publish(event.EventGameCreated{
-		ID:        g.ID(),
+		GameID:    g.ID(),
 		MatchID:   d.ID,
 		Player1:   g.Player1(),
 		Player2:   g.Player2(),
@@ -67,7 +68,7 @@ func (gs *Service) handleEventPlayersMatched(d *event.EventUsersMatched) {
 }
 
 func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
-	g := gs.getGame(d.ID)
+	g := gs.getGame(d.GameID)
 	// if game is not manging by this instance, do nothing
 	if g == nil {
 		return
@@ -79,7 +80,7 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 	}
 
 	if err := g.Move(d.Move); err != nil {
-		gs.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.ID))
+		gs.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.GameID))
 		return
 	}
 
@@ -90,13 +91,15 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			return
 		}
 		gs.p.Publish(event.EventGameMoveApproved{
+			ID:        types.NewObjectId(),
 			PlayerID:  d.PlayerID,
-			ID:        d.ID,
+			GameID:    d.GameID,
 			Move:      d.Move,
 			Timestamp: time.Now().Unix(),
 		},
 			event.EventGameEnded{
-				ID:        g.ID(),
+				ID:        types.NewObjectId(),
+				GameID:    g.ID(),
 				Player1:   g.Player1().ID,
 				Player2:   g.Player2().ID,
 				Timestamp: time.Now().Unix(),
@@ -114,8 +117,9 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		gs.l.Debug(fmt.Sprintf("player '%s' made move '%s' on game '%s'", d.PlayerID, d.Move, g.ID()))
 
 		gs.p.Publish(event.EventGameMoveApproved{
+			ID:        types.NewObjectId(),
 			PlayerID:  d.PlayerID,
-			ID:        d.ID,
+			GameID:    d.GameID,
 			Move:      d.Move,
 			Timestamp: time.Now().Unix(),
 		})
@@ -126,7 +130,7 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 }
 
 func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
-	g := gs.getGame(d.ID)
+	g := gs.getGame(d.GameID)
 	if g == nil {
 		return
 	}
@@ -136,16 +140,17 @@ func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 		gs.l.Error(err.Error())
 		return
 	}
-	gs.removeGame(d.ID)
-	gs.l.Debug(fmt.Sprintf("removed game: '%s'", d.ID))
+	gs.removeGame(d.GameID)
+	gs.l.Debug(fmt.Sprintf("removed game: '%s'", d.GameID))
 
 	gs.p.Publish(event.EventGameEnded{
-		ID:        d.ID,
+		ID:        types.NewObjectId(),
+		GameID:    d.GameID,
 		Player1:   g.Player1().ID,
 		Player2:   g.Player2().ID,
 		Timestamp: time.Now().Unix(),
 	})
-	gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.ID))
+	gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.GameID))
 
 }
 
@@ -161,7 +166,7 @@ func (gs *Service) handleEvents(e event.Event) {
 	case event.DomainMatch:
 		switch e.GetAction() {
 		case event.ActionPlayersMatched:
-			gs.handleEventPlayersMatched(e.(*event.EventUsersMatched))
+			gs.handleEventUsersMatched(e.(*event.EventUsersMatched))
 		}
 	}
 }

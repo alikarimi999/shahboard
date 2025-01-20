@@ -78,7 +78,7 @@ func (gs *Service) start() {
 func (gs *Service) init() error {
 
 	// subscribe to events
-	gs.subscribeEvents(event.TopicMatch)
+	gs.subscribeEvents(event.TopicUsersMatched)
 
 	// load games from cache
 	games, err := gs.cache.getGamesByServiceID(context.Background(), gs.cfg.InstanceID)

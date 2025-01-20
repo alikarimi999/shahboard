@@ -1,7 +1,6 @@
 package match
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -19,7 +18,6 @@ type engine struct {
 }
 
 func newEngine(ticker time.Duration) *engine {
-	fmt.Println("ticker ", ticker)
 	e := &engine{
 		t:       *time.NewTicker(ticker),
 		queue:   make(map[types.Level][]*matchRequest, 0),
@@ -119,7 +117,6 @@ func (e *engine) findMatches() []*Match {
 			}
 		}
 	}
-	fmt.Println()
 
 	return matches
 }

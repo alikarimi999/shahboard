@@ -7,20 +7,29 @@ import (
 )
 
 var (
-	TopicGame Topic = NewTopic(DomainGame, "{gameID}")
+	TopicGame             = NewTopic(DomainGame, ActionAny, "")
+	TopicGameCreated      = NewTopic(DomainGame, ActionCreated, "{gameID}")
+	TopicGamePlayerMoved  = NewTopic(DomainGame, ActionGamePlayerMoved, "{gameID}")
+	TopicGameMoveApproved = NewTopic(DomainGame, ActionGameMoveApprove, "{gameID}")
+	TopicGameEnded        = NewTopic(DomainGame, ActionEnded, "{gameID}")
+	TopicGamePlayerLeft   = NewTopic(DomainGame, ActionGamePlayerLeft, "{gameID}")
 )
 
 type EventGameCreated struct {
 	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
 	MatchID   types.ObjectId `json:"match_id"`
 	Player1   types.Player   `json:"player1"`
 	Player2   types.Player   `json:"player2"`
 	Timestamp int64          `json:"timestamp"`
 }
 
+func (e EventGameCreated) GetResource() string {
+	return e.GameID.String()
+}
+
 func (e EventGameCreated) GetTopic() Topic {
-	t := TopicGame.WithResource(e.ID.String())
-	return t
+	return TopicGameCreated.WithResource(e.GetResource())
 }
 
 func (e EventGameCreated) GetAction() Action {
@@ -38,14 +47,18 @@ func (e EventGameCreated) Encode() []byte {
 
 type EventGamePlayerMoved struct {
 	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"playerId"`
 	Move      string         `json:"move"`
 	Timestamp int64          `json:"timestamp"`
 }
 
+func (e EventGamePlayerMoved) GetResource() string {
+	return e.GameID.String()
+}
+
 func (e EventGamePlayerMoved) GetTopic() Topic {
-	t := TopicGame.WithResource(e.ID.String())
-	return t
+	return TopicGamePlayerMoved.WithResource(e.GetResource())
 }
 
 func (e EventGamePlayerMoved) GetAction() Action {
@@ -63,14 +76,18 @@ func (e EventGamePlayerMoved) Encode() []byte {
 
 type EventGameMoveApproved struct {
 	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"playerId"`
 	Move      string         `json:"move"`
 	Timestamp int64          `json:"timestamp"`
 }
 
+func (e EventGameMoveApproved) GetResource() string {
+	return e.GameID.String()
+}
+
 func (e EventGameMoveApproved) GetTopic() Topic {
-	t := TopicGame.WithResource(e.ID.String())
-	return t
+	return TopicGameMoveApproved.WithResource(e.GetResource())
 }
 
 func (e EventGameMoveApproved) GetAction() Action {
@@ -88,15 +105,19 @@ func (e EventGameMoveApproved) Encode() []byte {
 
 type EventGameEnded struct {
 	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
 	Player1   types.ObjectId `json:"player1"`
 	Player2   types.ObjectId `json:"player2"`
 	Desc      string         `json:"desc"`
 	Timestamp int64          `json:"timestamp"`
 }
 
+func (e EventGameEnded) GetResource() string {
+	return e.GameID.String()
+}
+
 func (e EventGameEnded) GetTopic() Topic {
-	t := TopicGame.WithResource(e.ID.String())
-	return t
+	return TopicGameEnded.WithResource(e.GetResource())
 }
 
 func (e EventGameEnded) GetAction() Action {
@@ -114,13 +135,17 @@ func (e EventGameEnded) Encode() []byte {
 
 type EventGamePlayerLeft struct {
 	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"playerId"`
 	Timestamp int64          `json:"timestamp"`
 }
 
+func (e EventGamePlayerLeft) GetResource() string {
+	return e.GameID.String()
+}
+
 func (e EventGamePlayerLeft) GetTopic() Topic {
-	t := TopicGame.WithResource(e.ID.String())
-	return t
+	return TopicGamePlayerLeft.WithResource(e.GetResource())
 }
 
 func (e EventGamePlayerLeft) GetAction() Action {

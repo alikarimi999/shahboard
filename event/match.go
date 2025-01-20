@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	TopicMatch Topic = NewTopic("match", "")
+	TopicUsersMatched = NewTopic(DomainMatch, ActionPlayersMatched, "")
 )
 
 type EventUsersMatched struct {
@@ -18,7 +18,7 @@ type EventUsersMatched struct {
 }
 
 func (e EventUsersMatched) GetTopic() Topic {
-	return TopicMatch
+	return TopicUsersMatched
 }
 
 func (e EventUsersMatched) GetAction() Action {

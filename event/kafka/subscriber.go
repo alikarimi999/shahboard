@@ -118,13 +118,13 @@ type index uint64
 
 // subscriptionManager handles subscriptions for topics and broadcasts events to subscribers.
 type subscriptionManager struct {
-	subs map[string]map[index]*feedSub
+	subs map[event.Domain]map[index]*feedSub
 	mu   sync.Mutex
 }
 
 func newSubscriptionManager() *subscriptionManager {
 	return &subscriptionManager{
-		subs: make(map[string]map[index]*feedSub),
+		subs: make(map[event.Domain]map[index]*feedSub),
 	}
 }
 
@@ -132,18 +132,18 @@ func newSubscriptionManager() *subscriptionManager {
 func (sm *subscriptionManager) addSub(sub *feedSub) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	if _, exists := sm.subs[sub.topic.String()]; !exists {
-		sm.subs[sub.topic.String()] = make(map[index]*feedSub)
+	if _, exists := sm.subs[sub.topic.Domain()]; !exists {
+		sm.subs[sub.topic.Domain()] = make(map[index]*feedSub)
 	}
-	sub.i = index(len(sm.subs[sub.topic.String()])) // Sets a unique index for the subscriber.
-	sm.subs[sub.topic.String()][sub.i] = sub
+	sub.i = index(len(sm.subs[sub.topic.Domain()])) // Sets a unique index for the subscriber.
+	sm.subs[sub.topic.Domain()][sub.i] = sub
 }
 
 // Removes a subscriber from a topic.
 func (sm *subscriptionManager) removeSub(sub *feedSub) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	delete(sm.subs[sub.topic.String()], sub.i)
+	delete(sm.subs[sub.topic.Domain()], sub.i)
 }
 
 // Sends an event to all subscribers of the event's topic.
@@ -151,9 +151,11 @@ func (sm *subscriptionManager) send(events ...event.Event) {
 	sm.mu.Lock()
 	subscribers := make([]chan event.Event, 0)
 	for _, e := range events {
-		if subs, exists := sm.subs[e.GetTopic().String()]; exists {
+		if subs, exists := sm.subs[e.GetTopic().Domain()]; exists {
 			for _, sub := range subs {
-				subscribers = append(subscribers, sub.ch)
+				if e.GetTopic().Match(sub.topic) {
+					subscribers = append(subscribers, sub.ch)
+				}
 			}
 		}
 	}
@@ -204,14 +206,9 @@ func (s *feedSub) Unsubscribe() {
 	close(s.err)
 }
 
-func decodeEvent(topicStr, action string, data []byte) (event.Event, error) {
-	t, err := event.DecodeTopic(topicStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode topic: %v", err)
-	}
-
+func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 	var e event.Event
-	switch t.Domain() {
+	switch domain {
 	case event.DomainGame:
 		switch event.Action(action) {
 		case event.ActionCreated:
@@ -225,17 +222,17 @@ func decodeEvent(topicStr, action string, data []byte) (event.Event, error) {
 		case event.ActionEnded:
 			e = &event.EventGameEnded{}
 		default:
-			return nil, fmt.Errorf("unknown event type for topic: %s", topicStr)
+			return nil, fmt.Errorf("unknown event type for topic: %s", domain)
 		}
 	case event.DomainMatch:
 		switch event.Action(action) {
 		case event.ActionPlayersMatched:
 			e = &event.EventUsersMatched{}
 		default:
-			return nil, fmt.Errorf("unknown event type for topic: %s", topicStr)
+			return nil, fmt.Errorf("unknown event type for topic: %s", domain)
 		}
 	default:
-		return nil, fmt.Errorf("unknown event type for topic: %s", topicStr)
+		return nil, fmt.Errorf("unknown event type for topic: %s", domain)
 	}
 
 	// Decode the JSON data into the event struct

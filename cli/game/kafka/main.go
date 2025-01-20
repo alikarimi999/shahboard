@@ -66,7 +66,8 @@ func newPlayerMovedCommand(brokerAddress *string) *cobra.Command {
 		Short: "Send a GamePlayerMoved event",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			event := event.EventGamePlayerMoved{
-				ID:        types.ObjectId(gameId),
+				ID:        types.NewObjectId(),
+				GameID:    types.ObjectId(gameId),
 				PlayerID:  types.ObjectId(playerId),
 				Move:      move,
 				Timestamp: time.Now().Unix(),

@@ -3,6 +3,7 @@ package event
 type Action string
 
 const (
+	ActionAny             Action = ""
 	ActionCreated         Action = "created"
 	ActionEnded           Action = "ended"
 	ActionGamePlayerMoved Action = "playerMoved"

@@ -18,7 +18,7 @@
     },
     "log": {
         "file": "./data/log/game_service.log",
-        "verbose": false
+        "verbose": true
     },
     "http": {
         "port": 8081
