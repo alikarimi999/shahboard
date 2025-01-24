@@ -7,9 +7,11 @@ toolchain go1.22.10
 require (
 	github.com/IBM/sarama v1.45.0
 	github.com/gin-gonic/gin v1.10.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/notnil/chess v1.10.0
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/spf13/cobra v1.8.1
+	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
 )
 
