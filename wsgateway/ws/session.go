@@ -110,7 +110,7 @@ func (s *session) eventHandler() event.EventHandler {
 
 		case event.DomainMatch:
 			switch e.GetAction() {
-			case event.ActionPlayersMatched:
+			case event.ActionUsersMatched:
 				if s.matchRequesteId.Load() != 0 {
 					eve := e.(*event.EventUsersMatched)
 					if s.userId == eve.User1.ID || s.userId == eve.User2.ID {

@@ -9,7 +9,7 @@ const (
 	ActionGamePlayerMoved Action = "playerMoved"
 	ActionGameMoveApprove Action = "moveApproved"
 	ActionGamePlayerLeft  Action = "playerLeft"
-	ActionPlayersMatched  Action = "playersMatched"
+	ActionUsersMatched    Action = "usersMatched"
 )
 
 func (a Action) String() string {

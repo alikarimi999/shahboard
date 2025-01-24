@@ -165,7 +165,7 @@ func (gs *Service) handleEvents(e event.Event) {
 		}
 	case event.DomainMatch:
 		switch e.GetAction() {
-		case event.ActionPlayersMatched:
+		case event.ActionUsersMatched:
 			gs.handleEventUsersMatched(e.(*event.EventUsersMatched))
 		}
 	}
