@@ -7,16 +7,19 @@ import (
 type msgType string
 
 const (
-	msgTypePlay msgType = "play"
-	msgTypeView msgType = "view"
-	msgTypeData msgType = "data"
-	msgTypeErr  msgType = "err"
+	msgTypeWelcome msgType = "welcome"
+	msgTypePlay    msgType = "play"
+	msgTypeView    msgType = "view"
+	msgTypeData    msgType = "data"
+	msgTypeErr     msgType = "err"
+	msgTypePing    msgType = "ping"
+	msgTypePong    msgType = "pong"
 )
 
 type msgBase struct {
 	ID        types.ObjectId `json:"id"`
-	Timestamp int64          `json:"timestamp"`
 	Type      msgType        `json:"type"`
+	Timestamp int64          `json:"timestamp"`
 }
 
 type clientMsg struct {

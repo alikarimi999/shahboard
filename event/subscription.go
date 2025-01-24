@@ -45,10 +45,10 @@ func (m *SubscriptionManager) AddSubscription(sub Subscription) {
 	m.newSubCh <- sub
 }
 
-func (m *SubscriptionManager) RemoveSubscription(sub Subscription) {
+func (m *SubscriptionManager) RemoveSubscription(t Topic) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.subs, sub.Topic().String())
+	delete(m.subs, t.String())
 }
 
 func (m *SubscriptionManager) run() {
