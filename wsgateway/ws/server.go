@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -53,7 +54,12 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 
 	e.GET("/ws", middleware.ParsUserHeader(), func(ctx *gin.Context) {
 		u, _ := ctx.Get("user")
-		user := u.(types.User)
+		user, ok := u.(types.User)
+		if !ok {
+			ctx.JSON(401, gin.H{"error": "unauthorized"})
+			return
+		}
+
 		if user.ID == 0 {
 			ctx.JSON(401, gin.H{"error": "unauthorized"})
 			return
@@ -71,9 +77,69 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 		go server.sessionWriter(sess)
 		sess.sendWelcome()
 
+		l.Info(fmt.Sprintf("session '%d' created for user '%d'", sess.id, user.ID))
+
+	})
+
+	e.GET("/ws/reconnect/:id", middleware.ParsUserHeader(), func(ctx *gin.Context) {
+		id := ctx.Param("id")
+		sessId, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			ctx.JSON(400, gin.H{"error": "invalid session id"})
+			return
+		}
+
+		u, _ := ctx.Get("user")
+		user, ok := u.(types.User)
+		if !ok {
+			ctx.JSON(401, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		if user.ID == 0 {
+			ctx.JSON(401, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		sess, err := server.findSession(user.ID, types.ObjectId(sessId))
+		if err != nil {
+			fmt.Println(err)
+			ctx.JSON(400, gin.H{"error": "session not found"})
+			return
+		}
+
+		conn, er := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+		if er != nil {
+			ctx.JSON(400, gin.H{"error": "failed to upgrade connection"})
+			return
+		}
+
+		if !sess.reconnect(conn) {
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
+			return
+		}
+
+		go server.sessionReader(sess)
+		go server.sessionWriter(sess)
+		sess.sendWelcome()
+
+		l.Info(fmt.Sprintf("session '%d' reconnected for user '%d'", sess.id, user.ID))
 	})
 
 	return server, nil
+}
+
+func (s *Server) findSession(userId types.ObjectId, sessId types.ObjectId) (*session, error) {
+	s.connsMux.RLock()
+	defer s.connsMux.RUnlock()
+
+	for _, sess := range s.sessions[userId] {
+		if sess.id == sessId {
+			return sess, nil
+		}
+	}
+
+	return nil, fmt.Errorf("session not found")
 }
 
 func (s *Server) addSession(sess *session, userId types.ObjectId) {
@@ -97,23 +163,36 @@ func (s *Server) removeSession(sess *session) {
 	}
 }
 
-func (s *Server) stopSession(sess ...*session) {
+func (s *Server) stopSessions(remove bool, sess ...*session) {
 	for _, se := range sess {
-		if se.closed.Load() {
+		if se.isClosed() {
+			if remove {
+				s.removeSession(se)
+				s.l.Info(fmt.Sprintf("session '%d' removed from cache", se.id))
+			}
 			continue
 		}
-		se.closed.Store(true)
-		close(se.stopCh)
-		se.Close()
-		s.removeSession(se)
+		if err := se.close(); err != nil {
+			s.l.Error(fmt.Sprintf("session '%d' close error: '%s'", se.id, err))
+			continue
+		}
+		s.l.Info(fmt.Sprintf("session '%d' closed", se.id))
+		if remove {
+			s.removeSession(se)
+			s.l.Info(fmt.Sprintf("session '%d' removed from cache", se.id))
+		}
 	}
 }
 
 func (s *Server) sessionReader(sess *session) {
+	defer func() {
+		s.l.Debug(fmt.Sprintf("session '%d' reader stopped", sess.id))
+	}()
+
 	for {
 		_, recievedMsg, err := sess.ReadMessage()
 		if err != nil {
-			s.l.Debug(fmt.Sprintf("session '%d' read error: %s", sess.id, err))
+			s.stopSessions(false, sess)
 			return
 		}
 		var msg ClientMsg
@@ -126,13 +205,17 @@ func (s *Server) sessionReader(sess *session) {
 }
 
 func (s *Server) sessionWriter(sess *session) {
+	defer func() {
+		s.l.Debug(fmt.Sprintf("session '%d' writer stopped", sess.id))
+	}()
+
 	for {
 		select {
 		case <-sess.stopCh:
 			return
 		case message := <-sess.msgCh:
 			if err := sess.WriteMessage(websocket.TextMessage, message); err != nil {
-				s.stopSession(sess)
+				s.stopSessions(false, sess)
 				return
 			}
 		}

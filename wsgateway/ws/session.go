@@ -282,3 +282,24 @@ func (s *session) isSubscribedToGame() bool {
 	defer s.mu.Unlock()
 	return s.currentGame != nil || s.matchReq != nil
 }
+
+func (s *session) close() error {
+	s.closed.Store(true)
+	close(s.stopCh)
+	return s.Conn.Close()
+}
+
+func (s *session) isClosed() bool {
+	return s.closed.Load()
+}
+
+func (s *session) reconnect(conn *websocket.Conn) bool {
+	if s.isClosed() {
+		s.closed.Store(false)
+		s.stopCh = make(chan struct{})
+		s.Conn = conn
+		return true
+	}
+
+	return false
+}

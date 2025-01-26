@@ -20,8 +20,6 @@ func (s *Server) checkHeartbeat() {
 		}
 		s.connsMux.RUnlock()
 
-		for _, c := range deadSessions {
-			s.stopSession(c)
-		}
+		s.stopSessions(true, deadSessions...)
 	}
 }

@@ -24,6 +24,7 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
+	gin.SetMode(gin.ReleaseMode)
 	e := gin.Default()
 
 	server, err := ws.NewServer(e, s, p, nil, l)
