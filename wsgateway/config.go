@@ -1,0 +1,22 @@
+package wsgateway
+
+import (
+	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/wsgateway/ws"
+)
+
+type Config struct {
+	Ws    ws.WsConfigs `json:"ws"`
+	Kafka kafka.Config `json:"kafka"`
+	Log   LogConfig    `json:"log"`
+	Http  HttpConfig   `json:"http"`
+}
+
+type LogConfig struct {
+	File    string `json:"file"`
+	Verbose bool   `json:"verbose"`
+}
+
+type HttpConfig struct {
+	Port string `json:"port"`
+}

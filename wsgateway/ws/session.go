@@ -2,6 +2,8 @@ package ws
 
 import (
 	"encoding/json"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
@@ -22,14 +24,21 @@ type gameSubscription struct {
 	role      uint8
 }
 
+type matchRequest struct {
+	matchId types.ObjectId
+	msgId   types.ObjectId
+}
+
 type session struct {
 	*websocket.Conn
 	id     types.ObjectId
 	userId types.ObjectId
 	msgCh  chan []byte
 
-	currentGame     gameSubscription
-	matchRequesteId *atomic.Uint64
+	mu                  sync.Mutex
+	subscribedTopicGame event.Topic
+	currentGame         *gameSubscription
+	matchReq            *matchRequest
 
 	lastHeartBeat *atomic.Time
 
@@ -40,6 +49,8 @@ type session struct {
 	closed *atomic.Bool
 	stopCh chan struct{}
 	pongCh chan string
+
+	l log.Logger
 }
 
 func newSession(conn *websocket.Conn, userId types.ObjectId,
@@ -51,8 +62,6 @@ func newSession(conn *websocket.Conn, userId types.ObjectId,
 		userId: userId,
 		msgCh:  make(chan []byte, 100),
 
-		matchRequesteId: atomic.NewUint64(0),
-
 		lastHeartBeat: atomic.NewTime(time.Now()),
 
 		s: s,
@@ -61,10 +70,9 @@ func newSession(conn *websocket.Conn, userId types.ObjectId,
 		closed: atomic.NewBool(false),
 		stopCh: make(chan struct{}),
 		pongCh: make(chan string),
+		l:      l,
 	}
 	sess.sm = event.NewManager(l, sess.eventHandler())
-	// sess.sm.AddSubscription(s.Subscribe(event.TopicGame))
-	// sess.sm.AddSubscription(s.Subscribe(event.TopicUsersMatched))
 
 	return sess
 }
@@ -72,128 +80,205 @@ func newSession(conn *websocket.Conn, userId types.ObjectId,
 func (s *session) eventHandler() event.EventHandler {
 	return func(e event.Event) {
 
-		var msgId types.ObjectId
+		var msg *ServerMsg
+		s.mu.Lock()
+		defer func() {
+			// first unlock then send message to avoid deadlock
+			s.mu.Unlock()
+			if msg != nil {
+				s.send(*msg)
+			}
+		}()
+
 		switch e.GetTopic().Domain() {
 		case event.DomainGame:
 			switch e.GetAction() {
 			case event.ActionCreated:
 				eve := e.(*event.EventGameCreated)
-				if s.matchRequesteId.Load() != 0 && (s.userId == eve.Player1.ID || s.userId == eve.Player2.ID) {
-					s.currentGame = gameSubscription{
-						requestID: types.ObjectId(s.matchRequesteId.Load()),
+				if s.matchReq != nil && s.matchReq.matchId == eve.MatchID {
+					s.currentGame = &gameSubscription{
+						requestID: s.matchReq.msgId,
 						gameID:    eve.GameID,
 						role:      gamePlayerRole,
 					}
-					msgId = types.ObjectId(s.matchRequesteId.Load())
-					s.matchRequesteId.Store(0)
-					break
-				}
-
-				return
-			case event.ActionEnded:
-				if e.GetTopic().Resource() == s.currentGame.gameID.String() {
-					msgId = s.currentGame.requestID
-					s.currentGame = gameSubscription{}
-					s.sm.RemoveSubscription(event.TopicGame)
-					break
-				}
-
-				return
-			default:
-				if e.GetTopic().Resource() == s.currentGame.gameID.String() {
-					msgId = s.currentGame.requestID
-					break
-				}
-
-				return
-			}
-
-		case event.DomainMatch:
-			switch e.GetAction() {
-			case event.ActionUsersMatched:
-				if s.matchRequesteId.Load() != 0 {
-					eve := e.(*event.EventUsersMatched)
-					if s.userId == eve.User1.ID || s.userId == eve.User2.ID {
-						msgId = types.ObjectId(s.matchRequesteId.Load())
-						s.sm.RemoveSubscription(event.TopicUsersMatched)
-						break
+					msg = &ServerMsg{
+						MsgBase: MsgBase{
+							ID:        s.matchReq.msgId,
+							Type:      MsgTypeEvent,
+							Timestamp: time.Now().Unix(),
+						},
+						Data: DataGameEvent{
+							Domain: event.DomainGame,
+							Action: event.ActionCreated.String(),
+							Event:  eve,
+						},
 					}
+
+					s.matchReq = nil
+					s.sm.RemoveSubscription(s.subscribedTopicGame)
+					sub := s.s.Subscribe(event.TopicGame.WithResource(eve.GameID.String()))
+					s.subscribedTopicGame = sub.Topic()
+					s.sm.AddSubscription(sub)
 				}
 
-				return
+			case event.ActionEnded:
+				s.currentGame = nil
+				s.sm.RemoveSubscription(s.subscribedTopicGame)
+				msg = &ServerMsg{
+					MsgBase: MsgBase{
+						ID:        s.currentGame.requestID,
+						Type:      MsgTypeEvent,
+						Timestamp: time.Now().Unix(),
+					},
+					Data: DataGameEvent{
+						Domain: event.DomainGame,
+						Action: event.ActionEnded.String(),
+						Event:  e,
+					},
+				}
 			default:
-				return
-			}
-		default:
-			return
-		}
+				msg = &ServerMsg{
+					MsgBase: MsgBase{
+						ID:        s.currentGame.requestID,
+						Type:      MsgTypeEvent,
+						Timestamp: time.Now().Unix(),
+					},
+					Data: DataGameEvent{
+						Domain: event.DomainGame,
+						Action: e.GetAction().String(),
+						Event:  e,
+					},
+				}
 
-		s.send(serverMsg{
-			msgBase: msgBase{
-				ID:        msgId,
-				Type:      msgTypeView,
-				Timestamp: time.Now().Unix(),
-			},
-			Data: e.Encode(),
-		})
+			}
+
+		}
 	}
 }
 
-func (s *session) send(msg serverMsg) {
-	b, _ := json.Marshal(msg)
-	s.msgCh <- b
+func (s *session) handlerFindMatchRequest(msgId types.ObjectId, data DataFindMatchRequest) {
+	var errMsg string
+	s.mu.Lock()
+	defer func() {
+		s.mu.Unlock()
+		if errMsg != "" {
+			s.sendErr(msgId, errMsg)
+		}
+	}()
+
+	if s.matchReq == nil && s.currentGame == nil && (s.userId == data.User1 || s.userId == data.User2) {
+
+		s.matchReq = &matchRequest{
+			matchId: data.MatchID,
+			msgId:   msgId,
+		}
+
+		sub := s.s.Subscribe(event.TopicGame)
+		s.subscribedTopicGame = sub.Topic()
+		s.sm.AddSubscription(sub)
+
+		return
+	}
+
+	errMsg = "already subscribed to a game"
 }
 
-func (s *session) viewGame(msgId, gameId types.ObjectId) {
-	if s.currentGame.gameID != 0 {
-		s.currentGame = gameSubscription{
+func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRequest) {
+	var errMsg string
+	var msg *ServerMsg
+	s.mu.Lock()
+	defer func() {
+		s.mu.Unlock()
+		if msg != nil {
+			s.send(*msg)
+		}
+		if errMsg != "" {
+			s.sendErr(msgId, errMsg)
+		}
+	}()
+
+	if s.currentGame == nil && s.matchReq == nil {
+		s.currentGame = &gameSubscription{
 			requestID: msgId,
-			gameID:    gameId,
+			gameID:    req.GameId,
 			role:      gameViewerRole,
 		}
 
-		s.send(serverMsg{
-			msgBase: msgBase{
+		msg = &ServerMsg{
+			MsgBase: MsgBase{
 				ID:        msgId,
-				Type:      msgTypeView,
+				Type:      MsgTypeView,
 				Timestamp: time.Now().Unix(),
-			},
-		})
+			}}
+
+		sub := s.s.Subscribe(event.TopicGame.WithResource(req.GameId.String()))
+		s.subscribedTopicGame = sub.Topic()
+		s.sm.AddSubscription(sub)
+
 		return
 	}
-	s.sendErr(msgId, "already subscribed to a game")
+
+	errMsg = "already subscribed to a game"
 }
 
-func (s *session) gameSubscribed() types.ObjectId {
-	return s.currentGame.gameID
+func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMoveRequest) {
+	var errMsg string
+	s.mu.Lock()
+	defer func() {
+		s.mu.Unlock()
+		if errMsg != "" {
+			s.sendErr(msgId, errMsg)
+		}
+	}()
+
+	if s.currentGame != nil && s.currentGame.role == gamePlayerRole && s.currentGame.gameID == req.GameID {
+		s.p.Publish(event.EventGamePlayerMoved{
+			ID:        req.ID,
+			GameID:    req.GameID,
+			PlayerID:  req.PlayerID,
+			Move:      req.Move,
+			Timestamp: req.Timestamp,
+		})
+
+		return
+	}
+
+	errMsg = "not allowd"
 }
 
-func (s *session) gameUnsubscribe() {
-	s.currentGame = gameSubscription{}
-}
-
-func (s *session) isPlaying() bool {
-	return s.currentGame.role == gamePlayerRole
+func (s *session) send(msg ServerMsg) {
+	b, err := json.Marshal(msg)
+	if err != nil {
+		s.l.Error(fmt.Sprintf("failed to marshal message: %v", err))
+		return
+	}
+	s.msgCh <- b
 }
 
 func (s *session) sendErr(id types.ObjectId, err string) {
-	s.send(serverMsg{
-		msgBase: msgBase{
+	s.send(ServerMsg{
+		MsgBase: MsgBase{
 			ID:        id,
-			Type:      msgTypeErr,
+			Type:      MsgTypeError,
 			Timestamp: time.Now().Unix(),
 		},
-		Data: []byte(err),
+		Data: DataError(err),
 	})
 }
 
 func (s *session) sendWelcome() {
-	s.send(serverMsg{
-		msgBase: msgBase{
+	s.send(ServerMsg{
+		MsgBase: MsgBase{
 			ID:        0,
-			Type:      msgTypeWelcome,
+			Type:      MsgTypeWelcome,
 			Timestamp: time.Now().Unix(),
 		},
-		Data: []byte("welcome"),
+		Data: DataWelcodme("welcome"),
 	})
+}
+
+func (s *session) isSubscribedToGame() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.currentGame != nil || s.matchReq != nil
 }

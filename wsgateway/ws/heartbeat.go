@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-func (s *WSServer) checkHeartbeat() {
+func (s *Server) checkHeartbeat() {
 	tick := time.NewTicker(time.Minute)
 
 	for t := range tick.C {

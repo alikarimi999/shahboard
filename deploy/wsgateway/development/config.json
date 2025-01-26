@@ -1,0 +1,15 @@
+{
+    "kafka": {
+        "brokers": [
+            "localhost:9092"
+        ],
+        "group_id": "wsgateway_0"
+    },
+    "log": {
+        "file": "logs/wsgateway.log",
+        "verbose": true
+    },
+    "http": {
+        "port": "8080"
+    }
+}

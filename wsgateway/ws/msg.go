@@ -4,48 +4,37 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-type msgType string
-
-const (
-	msgTypeWelcome msgType = "welcome"
-	msgTypePlay    msgType = "play"
-	msgTypeView    msgType = "view"
-	msgTypeData    msgType = "data"
-	msgTypeErr     msgType = "err"
-	msgTypePing    msgType = "ping"
-	msgTypePong    msgType = "pong"
-)
-
-type msgBase struct {
-	ID        types.ObjectId `json:"id"`
-	Type      msgType        `json:"type"`
-	Timestamp int64          `json:"timestamp"`
-}
-
-type clientMsg struct {
-	msgBase
-	Data []byte `json:"data"`
-}
-
-type serverMsg struct {
-	msgBase
-	Data []byte `json:"data"`
-}
-
-type serverMsgData interface {
+type MsgData interface {
+	Type() MsgType
 	Encode() []byte
 }
 
-type serverMsgErr string
+type MsgType string
 
-func (e serverMsgErr) Encode() []byte {
-	return []byte(e)
+const (
+	MsgTypeWelcome   MsgType = "welcome"
+	MsgTypeFindMatch MsgType = "find_match"
+	MsgTypeView      MsgType = "view"
+	MsgTypeData      MsgType = "data"
+	MsgTypeError     MsgType = "err"
+	MsgTypePing      MsgType = "ping"
+	MsgTypePong      MsgType = "pong"
+	MsgTypeEvent     MsgType = "event"
+	MsgTypeMove      MsgType = "move"
+)
+
+type MsgBase struct {
+	ID        types.ObjectId `json:"id"`
+	Type      MsgType        `json:"type"`
+	Timestamp int64          `json:"timestamp"`
 }
 
-type playCmdData struct {
-	GameId types.ObjectId `json:"game_id"`
+type ClientMsg struct {
+	MsgBase
+	Data MsgData `json:"data"`
 }
 
-type viewCmdData struct {
-	GameId types.ObjectId `json:"game_id"`
+type ServerMsg struct {
+	MsgBase
+	Data MsgData `json:"data"`
 }

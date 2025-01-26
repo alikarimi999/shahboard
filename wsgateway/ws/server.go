@@ -23,8 +23,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// WSServer is an implementation of entity.StreamIn
-type WSServer struct {
+// Server is an implementation of entity.StreamIn
+type Server struct {
 	cfg *WsConfigs
 
 	connsMux sync.RWMutex
@@ -35,13 +35,13 @@ type WSServer struct {
 	l      log.Logger
 }
 
-func NewWSServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
-	cfg *WsConfigs, l log.Logger) (*WSServer, error) {
+func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
+	cfg *WsConfigs, l log.Logger) (*Server, error) {
 	if cfg == nil {
 		cfg = defaultConfigs
 	}
 
-	server := &WSServer{
+	server := &Server{
 		cfg:      cfg,
 		sessions: make(map[types.ObjectId][]*session),
 		counter:  atomic.NewInt64(0),
@@ -76,7 +76,7 @@ func NewWSServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 	return server, nil
 }
 
-func (s *WSServer) addSession(sess *session, userId types.ObjectId) {
+func (s *Server) addSession(sess *session, userId types.ObjectId) {
 	s.connsMux.Lock()
 	defer s.connsMux.Unlock()
 
@@ -84,7 +84,7 @@ func (s *WSServer) addSession(sess *session, userId types.ObjectId) {
 	s.counter.Add(1)
 }
 
-func (s *WSServer) removeSession(sess *session) {
+func (s *Server) removeSession(sess *session) {
 	s.connsMux.Lock()
 	defer s.connsMux.Unlock()
 
@@ -97,7 +97,7 @@ func (s *WSServer) removeSession(sess *session) {
 	}
 }
 
-func (s *WSServer) stopSession(sess ...*session) {
+func (s *Server) stopSession(sess ...*session) {
 	for _, se := range sess {
 		if se.closed.Load() {
 			continue
@@ -109,27 +109,15 @@ func (s *WSServer) stopSession(sess ...*session) {
 	}
 }
 
-func (s *WSServer) isUserPlaying(userId types.ObjectId) bool {
-	s.connsMux.Lock()
-	defer s.connsMux.Unlock()
-	for _, cs := range s.sessions[userId] {
-		if cs.isPlaying() {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *WSServer) sessionReader(sess *session) {
+func (s *Server) sessionReader(sess *session) {
 	for {
 		_, recievedMsg, err := sess.ReadMessage()
 		if err != nil {
 			s.l.Debug(fmt.Sprintf("session '%d' read error: %s", sess.id, err))
 			return
 		}
-		var msg clientMsg
+		var msg ClientMsg
 		if err := json.Unmarshal(recievedMsg, &msg); err != nil {
-			sess.sendErr(0, "invalid message")
 			continue
 		}
 
@@ -137,7 +125,7 @@ func (s *WSServer) sessionReader(sess *session) {
 	}
 }
 
-func (s *WSServer) sessionWriter(sess *session) {
+func (s *Server) sessionWriter(sess *session) {
 	for {
 		select {
 		case <-sess.stopCh:
@@ -145,43 +133,68 @@ func (s *WSServer) sessionWriter(sess *session) {
 		case message := <-sess.msgCh:
 			if err := sess.WriteMessage(websocket.TextMessage, message); err != nil {
 				s.stopSession(sess)
+				return
 			}
 		}
 	}
 }
 
-func (s *WSServer) handleMsg(sess *session, msg *clientMsg) {
-	switch msg.Type {
-	case msgTypePlay:
-		if s.isUserPlaying(sess.userId) {
-			sess.sendErr(msg.ID, "already playing a game")
-			return
+func (s *Server) isUserSubscribedToGame(user types.ObjectId) bool {
+	s.connsMux.RLock()
+	defer s.connsMux.RUnlock()
+
+	for _, se := range s.sessions[user] {
+		if se.isSubscribedToGame() {
+			return true
 		}
-		if sess.gameSubscribed() != 0 {
+	}
+
+	return false
+}
+
+func (s *Server) handleMsg(sess *session, msg *ClientMsg) {
+	switch msg.Type {
+	case MsgTypeFindMatch:
+		if s.isUserSubscribedToGame(sess.userId) {
 			sess.sendErr(msg.ID, "already subscribed to a game")
 			return
 		}
-	case msgTypeView:
 
-		var data viewCmdData
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
+		d, ok := msg.Data.(DataFindMatchRequest)
+		if !ok {
 			sess.sendErr(msg.ID, "invalid data")
 			return
 		}
 
-		sess.viewGame(msg.ID, data.GameId)
-	case msgTypePing:
+		sess.handlerFindMatchRequest(msg.ID, d)
+	case MsgTypeView:
+		d, ok := msg.Data.(DataGameViewRequest)
+		if !ok {
+			sess.sendErr(msg.ID, "invalid data")
+			return
+		}
+
+		sess.handleViewGameRequest(msg.ID, d)
+	case MsgTypeMove:
+		d, ok := msg.Data.(DataGamePlayerMoveRequest)
+		if !ok {
+			sess.sendErr(msg.ID, "invalid data")
+			return
+		}
+
+		sess.handleMoveRequest(msg.ID, d)
+
+	case MsgTypePing:
 		t := time.Now()
 		sess.lastHeartBeat.Store(t)
-		resp := serverMsg{
-			msgBase: msgBase{
+		resp := ServerMsg{
+			MsgBase: MsgBase{
 				ID:        msg.ID,
 				Timestamp: t.Unix(),
-				Type:      msgTypePong,
+				Type:      MsgTypePong,
 			}}
 		sess.send(resp)
-
-	case msgTypeData:
+	case MsgTypeData:
 
 		// handle data message
 	}
