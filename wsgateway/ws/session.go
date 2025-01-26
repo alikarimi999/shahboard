@@ -48,7 +48,6 @@ type session struct {
 
 	closed *atomic.Bool
 	stopCh chan struct{}
-	pongCh chan string
 
 	l log.Logger
 }
@@ -69,7 +68,6 @@ func newSession(conn *websocket.Conn, userId types.ObjectId,
 
 		closed: atomic.NewBool(false),
 		stopCh: make(chan struct{}),
-		pongCh: make(chan string),
 		l:      l,
 	}
 	sess.sm = event.NewManager(l, sess.eventHandler())
@@ -293,13 +291,8 @@ func (s *session) isClosed() bool {
 	return s.closed.Load()
 }
 
-func (s *session) reconnect(conn *websocket.Conn) bool {
-	if s.isClosed() {
-		s.closed.Store(false)
-		s.stopCh = make(chan struct{})
-		s.Conn = conn
-		return true
-	}
-
-	return false
+func (s *session) reconnect(conn *websocket.Conn) {
+	s.closed.Store(false)
+	s.stopCh = make(chan struct{})
+	s.Conn = conn
 }

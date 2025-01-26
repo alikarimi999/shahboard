@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -29,7 +28,7 @@ type Server struct {
 	cfg *WsConfigs
 
 	connsMux sync.RWMutex
-	sessions map[types.ObjectId][]*session
+	sessions map[types.ObjectId]*session
 	counter  *atomic.Int64
 
 	stopCh chan struct{}
@@ -44,7 +43,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 
 	server := &Server{
 		cfg:      cfg,
-		sessions: make(map[types.ObjectId][]*session),
+		sessions: make(map[types.ObjectId]*session),
 		counter:  atomic.NewInt64(0),
 		stopCh:   make(chan struct{}),
 		l:        l,
@@ -71,7 +70,22 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			return
 		}
 
-		sess := newSession(conn, user.ID, s, p, l)
+		sess := server.findSession(user.ID)
+		if sess != nil {
+			if sess.isClosed() {
+				sess.reconnect(conn)
+				go server.sessionReader(sess)
+				go server.sessionWriter(sess)
+				sess.sendWelcome()
+				l.Info(fmt.Sprintf("session '%d' reconnected for user '%d'", sess.id, user.ID))
+
+				return
+			}
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
+			return
+		}
+
+		sess = newSession(conn, user.ID, s, p, l)
 		server.addSession(sess, user.ID)
 		go server.sessionReader(sess)
 		go server.sessionWriter(sess)
@@ -81,71 +95,21 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 
 	})
 
-	e.GET("/ws/reconnect/:id", middleware.ParsUserHeader(), func(ctx *gin.Context) {
-		id := ctx.Param("id")
-		sessId, err := strconv.ParseInt(id, 10, 64)
-		if err != nil {
-			ctx.JSON(400, gin.H{"error": "invalid session id"})
-			return
-		}
-
-		u, _ := ctx.Get("user")
-		user, ok := u.(types.User)
-		if !ok {
-			ctx.JSON(401, gin.H{"error": "unauthorized"})
-			return
-		}
-
-		if user.ID == 0 {
-			ctx.JSON(401, gin.H{"error": "unauthorized"})
-			return
-		}
-
-		sess, err := server.findSession(user.ID, types.ObjectId(sessId))
-		if err != nil {
-			ctx.JSON(400, gin.H{"error": "session not found"})
-			return
-		}
-
-		conn, er := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
-		if er != nil {
-			ctx.JSON(400, gin.H{"error": "failed to upgrade connection"})
-			return
-		}
-
-		if !sess.reconnect(conn) {
-			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
-			return
-		}
-
-		go server.sessionReader(sess)
-		go server.sessionWriter(sess)
-		sess.sendWelcome()
-
-		l.Info(fmt.Sprintf("session '%d' reconnected for user '%d'", sess.id, user.ID))
-	})
-
 	return server, nil
 }
 
-func (s *Server) findSession(userId types.ObjectId, sessId types.ObjectId) (*session, error) {
+func (s *Server) findSession(userId types.ObjectId) *session {
 	s.connsMux.RLock()
 	defer s.connsMux.RUnlock()
 
-	for _, sess := range s.sessions[userId] {
-		if sess.id == sessId {
-			return sess, nil
-		}
-	}
-
-	return nil, fmt.Errorf("session not found")
+	return s.sessions[userId]
 }
 
 func (s *Server) addSession(sess *session, userId types.ObjectId) {
 	s.connsMux.Lock()
 	defer s.connsMux.Unlock()
 
-	s.sessions[userId] = append(s.sessions[userId], sess)
+	s.sessions[userId] = sess
 	s.counter.Add(1)
 }
 
@@ -153,13 +117,8 @@ func (s *Server) removeSession(sess *session) {
 	s.connsMux.Lock()
 	defer s.connsMux.Unlock()
 
-	for i, c := range s.sessions[sess.userId] {
-		if c.id == sess.id {
-			s.sessions[sess.userId] = append(s.sessions[sess.userId][:i], s.sessions[sess.userId][i+1:]...)
-			s.counter.Add(-1)
-			break
-		}
-	}
+	delete(s.sessions, sess.userId)
+	s.counter.Add(-1)
 }
 
 func (s *Server) stopSessions(remove bool, sess ...*session) {
@@ -221,23 +180,10 @@ func (s *Server) sessionWriter(sess *session) {
 	}
 }
 
-func (s *Server) isUserSubscribedToGame(user types.ObjectId) bool {
-	s.connsMux.RLock()
-	defer s.connsMux.RUnlock()
-
-	for _, se := range s.sessions[user] {
-		if se.isSubscribedToGame() {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (s *Server) handleMsg(sess *session, msg *ClientMsg) {
 	switch msg.Type {
 	case MsgTypeFindMatch:
-		if s.isUserSubscribedToGame(sess.userId) {
+		if sess.isSubscribedToGame() {
 			sess.sendErr(msg.ID, "already subscribed to a game")
 			return
 		}

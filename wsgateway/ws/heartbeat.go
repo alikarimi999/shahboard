@@ -10,13 +10,12 @@ func (s *Server) checkHeartbeat() {
 	for t := range tick.C {
 		deadSessions := []*session{}
 		s.connsMux.RLock()
-		for _, cs := range s.sessions {
-			for _, c := range cs {
-				if c.lastHeartBeat.Load().Before(t.Add(-s.cfg.PingInterval)) {
-					deadSessions = append(deadSessions, c)
+		for _, sess := range s.sessions {
+			if sess.lastHeartBeat.Load().Before(t.Add(-s.cfg.PingInterval)) {
+				deadSessions = append(deadSessions, sess)
 
-				}
 			}
+
 		}
 		s.connsMux.RUnlock()
 
