@@ -103,7 +103,6 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 
 		sess, err := server.findSession(user.ID, types.ObjectId(sessId))
 		if err != nil {
-			fmt.Println(err)
 			ctx.JSON(400, gin.H{"error": "session not found"})
 			return
 		}
