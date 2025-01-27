@@ -5,7 +5,7 @@ import (
 )
 
 func (s *Server) checkHeartbeat() {
-	tick := time.NewTicker(time.Minute)
+	tick := time.NewTicker(time.Second * 5)
 
 	for t := range tick.C {
 		deadSessions := []*session{}
@@ -15,10 +15,12 @@ func (s *Server) checkHeartbeat() {
 				deadSessions = append(deadSessions, sess)
 
 			}
-
 		}
 		s.connsMux.RUnlock()
 
-		s.stopSessions(true, deadSessions...)
+		if len(deadSessions) > 0 {
+			s.stopSessions(true, deadSessions...)
+		}
 	}
+
 }

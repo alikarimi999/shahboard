@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 )
 
 var upgrader = websocket.Upgrader{
@@ -31,18 +33,21 @@ type Server struct {
 	sessions map[types.ObjectId]*session
 	counter  *atomic.Int64
 
+	cache *redisCache
+
 	stopCh chan struct{}
 	l      log.Logger
 }
 
 func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
-	cfg *WsConfigs, l log.Logger) (*Server, error) {
+	cfg *WsConfigs, c *redis.Client, l log.Logger) (*Server, error) {
 	if cfg == nil {
 		cfg = defaultConfigs
 	}
 
 	server := &Server{
 		cfg:      cfg,
+		cache:    newRedisCache(c),
 		sessions: make(map[types.ObjectId]*session),
 		counter:  atomic.NewInt64(0),
 		stopCh:   make(chan struct{}),
@@ -70,10 +75,17 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			return
 		}
 
-		sess := server.findSession(user.ID)
+		// check if user has a session in memory
+		sess := server.getSession(user.ID)
 		if sess != nil {
 			if sess.isClosed() {
 				sess.reconnect(conn)
+				if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
+					l.Error(fmt.Sprintf("failed to save session state: %v", err))
+					conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
+					conn.Close()
+					return
+				}
 				go server.sessionReader(sess)
 				go server.sessionWriter(sess)
 				sess.sendWelcome()
@@ -82,11 +94,43 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 				return
 			}
 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
+			conn.Close()
 			return
 		}
 
-		sess = newSession(conn, user.ID, s, p, l)
+		// check if user has a session in redis
+		csess, err := server.cache.GetSession(context.Background(), user.ID)
+		if err != nil {
+			l.Error(fmt.Sprintf("failed to check if user has session: %v", err))
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
+			conn.Close()
+			return
+		}
+
+		// this means that user has an open session in another wsgateway instance
+		if csess != nil && !csess.Closed {
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
+			conn.Close()
+			return
+		}
+
+		// this means that user has a closed session in another wsgateway instance
+		// don't need to save session state if it's closed,it will be replaced by a new session
+		// in future we should be able to retrieve the session state from redis and reconnect the session instead of creating a new one
+		// if csess != nil && csess.Closed {
+		// 	server.cache.DeleteSession(context.Background(), user.ID)
+		// }
+
+		sess = newSession(conn, server.cache, user.ID, s, p, l)
+		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
+			l.Error(fmt.Sprintf("failed to save session state: %v", err))
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
+			conn.Close()
+			return
+		}
+
 		server.addSession(sess, user.ID)
+
 		go server.sessionReader(sess)
 		go server.sessionWriter(sess)
 		sess.sendWelcome()
@@ -98,7 +142,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 	return server, nil
 }
 
-func (s *Server) findSession(userId types.ObjectId) *session {
+func (s *Server) getSession(userId types.ObjectId) *session {
 	s.connsMux.RLock()
 	defer s.connsMux.RUnlock()
 
@@ -126,7 +170,6 @@ func (s *Server) stopSessions(remove bool, sess ...*session) {
 		if se.isClosed() {
 			if remove {
 				s.removeSession(se)
-				s.l.Info(fmt.Sprintf("session '%d' removed from cache", se.id))
 			}
 			continue
 		}
@@ -134,11 +177,26 @@ func (s *Server) stopSessions(remove bool, sess ...*session) {
 			s.l.Error(fmt.Sprintf("session '%d' close error: '%s'", se.id, err))
 			continue
 		}
-		s.l.Info(fmt.Sprintf("session '%d' closed", se.id))
+		s.l.Debug(fmt.Sprintf("session '%d' closed", se.id))
 		if remove {
 			s.removeSession(se)
-			s.l.Info(fmt.Sprintf("session '%d' removed from cache", se.id))
+			s.l.Debug(fmt.Sprintf("session '%d' removed from cache", se.id))
 		}
+	}
+
+	if len(sess) > 0 {
+		// Preserves session state in Redis by marking as 'closed' rather than deleting
+		// - Enables session resumption across WS gateway instances by retaining full state data
+		// - Maintains cluster-wide visibility of disconnected sessions for coordination
+		// - Supports future session recovery workflows without data reconstruction
+		if err := s.cache.SaveSessionsState(context.Background(), sess...); err != nil {
+			s.l.Error(fmt.Sprintf("failed to save sessions state: %v", err))
+		}
+		ids := []types.ObjectId{}
+		for _, s := range sess {
+			ids = append(ids, s.userId)
+		}
+		s.l.Debug(fmt.Sprintf("sessions '%v' closed on redis", ids))
 	}
 }
 

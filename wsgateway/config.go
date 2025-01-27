@@ -10,6 +10,7 @@ type Config struct {
 	Kafka kafka.Config `json:"kafka"`
 	Log   LogConfig    `json:"log"`
 	Http  HttpConfig   `json:"http"`
+	Redis RedisConfig  `json:"redis"`
 }
 
 type LogConfig struct {
@@ -19,4 +20,10 @@ type LogConfig struct {
 
 type HttpConfig struct {
 	Port string `json:"port"`
+}
+
+type RedisConfig struct {
+	Addr     string `json:"addr"`
+	Password string `json:"password"`
+	DB       int    `json:"db"`
 }

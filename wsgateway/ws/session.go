@@ -42,6 +42,8 @@ type session struct {
 
 	lastHeartBeat *atomic.Time
 
+	cache *redisCache
+
 	s  event.Subscriber
 	p  event.Publisher
 	sm *event.SubscriptionManager
@@ -52,11 +54,13 @@ type session struct {
 	l log.Logger
 }
 
-func newSession(conn *websocket.Conn, userId types.ObjectId,
+func newSession(conn *websocket.Conn, cache *redisCache, userId types.ObjectId,
 	s event.Subscriber, p event.Publisher, l log.Logger) *session {
 	sess := &session{
 		Conn: conn,
 		id:   types.NewObjectId(),
+
+		cache: cache,
 
 		userId: userId,
 		msgCh:  make(chan []byte, 100),
@@ -117,6 +121,7 @@ func (s *session) eventHandler() event.EventHandler {
 					sub := s.s.Subscribe(event.TopicGame.WithResource(eve.GameID.String()))
 					s.subscribedTopicGame = sub.Topic()
 					s.sm.AddSubscription(sub)
+
 				}
 
 			case event.ActionEnded:
@@ -134,6 +139,7 @@ func (s *session) eventHandler() event.EventHandler {
 						Event:  e,
 					},
 				}
+
 			default:
 				msg = &ServerMsg{
 					MsgBase: MsgBase{
