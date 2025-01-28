@@ -12,15 +12,18 @@ type MsgData interface {
 type MsgType string
 
 const (
-	MsgTypeWelcome   MsgType = "welcome"
-	MsgTypeFindMatch MsgType = "find_match"
-	MsgTypeView      MsgType = "view"
-	MsgTypeData      MsgType = "data"
-	MsgTypeError     MsgType = "err"
-	MsgTypePing      MsgType = "ping"
-	MsgTypePong      MsgType = "pong"
-	MsgTypeEvent     MsgType = "event"
-	MsgTypeMove      MsgType = "move"
+	MsgTypeWelcome      MsgType = "welcome"
+	MsgTypeFindMatch    MsgType = "find_match"
+	MsgTypeView         MsgType = "view"
+	MsgTypeData         MsgType = "data"
+	MsgTypeError        MsgType = "err"
+	MsgTypePing         MsgType = "ping"
+	MsgTypePong         MsgType = "pong"
+	MsgTypeGameCreate   MsgType = "game_create"
+	MsgTypePlayerMove   MsgType = "player_move"
+	MsgTypeMoveApproved MsgType = "move_approved"
+	MsgTypeGameEnd      MsgType = "game_end"
+	MsgTypeMove         MsgType = "move"
 )
 
 type MsgBase struct {
@@ -36,5 +39,5 @@ type ClientMsg struct {
 
 type ServerMsg struct {
 	MsgBase
-	Data MsgData `json:"data"`
+	Data []byte `json:"data"`
 }

@@ -5,7 +5,7 @@ import "time"
 var (
 	defaultMaxConnections     = 1000
 	defaultMaxUserConnections = 3
-	defaultPingInterval       = 10 * time.Second
+	defaultPingInterval       = 30 * time.Second
 )
 
 type WsConfigs struct {

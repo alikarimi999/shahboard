@@ -59,31 +59,7 @@ type DataGameEvent struct {
 	Event  event.Event `json:"event"`
 }
 
-func (d DataGameEvent) Type() MsgType {
-	return MsgTypeEvent
-}
-
 func (d DataGameEvent) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
-}
-
-type DataError string
-
-func (d DataError) Type() MsgType {
-	return MsgTypeError
-}
-
-func (d DataError) Encode() []byte {
-	return []byte(d)
-}
-
-type DataWelcodme string
-
-func (d DataWelcodme) Type() MsgType {
-	return MsgTypeWelcome
-}
-
-func (d DataWelcodme) Encode() []byte {
-	return []byte(d)
 }

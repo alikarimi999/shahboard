@@ -106,14 +106,14 @@ func (s *session) eventHandler() event.EventHandler {
 					msg = &ServerMsg{
 						MsgBase: MsgBase{
 							ID:        s.matchReq.msgId,
-							Type:      MsgTypeEvent,
+							Type:      MsgTypeGameCreate,
 							Timestamp: time.Now().Unix(),
 						},
 						Data: DataGameEvent{
 							Domain: event.DomainGame,
 							Action: event.ActionCreated.String(),
 							Event:  eve,
-						},
+						}.Encode(),
 					}
 
 					s.matchReq = nil
@@ -130,28 +130,37 @@ func (s *session) eventHandler() event.EventHandler {
 				msg = &ServerMsg{
 					MsgBase: MsgBase{
 						ID:        s.currentGame.requestID,
-						Type:      MsgTypeEvent,
+						Type:      MsgTypeGameEnd,
 						Timestamp: time.Now().Unix(),
 					},
 					Data: DataGameEvent{
 						Domain: event.DomainGame,
 						Action: event.ActionEnded.String(),
 						Event:  e,
-					},
+					}.Encode(),
 				}
 
 			default:
+				var mt MsgType
+				switch e.GetAction() {
+				case event.ActionCreated:
+					mt = MsgTypeGameCreate
+				case event.ActionGameMoveApprove:
+					mt = MsgTypeMoveApproved
+				default:
+					return
+				}
 				msg = &ServerMsg{
 					MsgBase: MsgBase{
 						ID:        s.currentGame.requestID,
-						Type:      MsgTypeEvent,
+						Type:      mt,
 						Timestamp: time.Now().Unix(),
 					},
 					Data: DataGameEvent{
 						Domain: event.DomainGame,
 						Action: e.GetAction().String(),
 						Event:  e,
-					},
+					}.Encode(),
 				}
 
 			}
@@ -266,7 +275,7 @@ func (s *session) sendErr(id types.ObjectId, err string) {
 			Type:      MsgTypeError,
 			Timestamp: time.Now().Unix(),
 		},
-		Data: DataError(err),
+		Data: []byte(err),
 	})
 }
 
@@ -277,7 +286,7 @@ func (s *session) sendWelcome() {
 			Type:      MsgTypeWelcome,
 			Timestamp: time.Now().Unix(),
 		},
-		Data: DataWelcodme("welcome"),
+		Data: []byte("welcome"),
 	})
 }
 
