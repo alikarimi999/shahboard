@@ -4,11 +4,6 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-type MsgData interface {
-	Type() MsgType
-	Encode() []byte
-}
-
 type MsgType string
 
 const (
@@ -19,11 +14,10 @@ const (
 	MsgTypeError        MsgType = "err"
 	MsgTypePing         MsgType = "ping"
 	MsgTypePong         MsgType = "pong"
-	MsgTypeGameCreate   MsgType = "game_create"
-	MsgTypePlayerMove   MsgType = "player_move"
+	MsgTypeGameCreate   MsgType = "game_created"
+	MsgTypePlayerMove   MsgType = "player_moved"
 	MsgTypeMoveApproved MsgType = "move_approved"
-	MsgTypeGameEnd      MsgType = "game_end"
-	MsgTypeMove         MsgType = "move"
+	MsgTypeGameEnd      MsgType = "game_ended"
 )
 
 type MsgBase struct {
@@ -32,12 +26,7 @@ type MsgBase struct {
 	Timestamp int64          `json:"timestamp"`
 }
 
-type ClientMsg struct {
-	MsgBase
-	Data MsgData `json:"data"`
-}
-
-type ServerMsg struct {
+type Msg struct {
 	MsgBase
 	Data []byte `json:"data"`
 }

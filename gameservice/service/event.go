@@ -100,8 +100,9 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			event.EventGameEnded{
 				ID:        types.NewObjectId(),
 				GameID:    g.ID(),
-				Player1:   g.Player1().ID,
-				Player2:   g.Player2().ID,
+				Player1:   g.Player1(),
+				Player2:   g.Player2(),
+				Outcome:   string(g.Outcome()),
 				Timestamp: time.Now().Unix(),
 			})
 
@@ -146,8 +147,9 @@ func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 	gs.p.Publish(event.EventGameEnded{
 		ID:        types.NewObjectId(),
 		GameID:    d.GameID,
-		Player1:   g.Player1().ID,
-		Player2:   g.Player2().ID,
+		Player1:   g.Player1(),
+		Player2:   g.Player2(),
+		Outcome:   string(g.Outcome()),
 		Timestamp: time.Now().Unix(),
 	})
 	gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.GameID))

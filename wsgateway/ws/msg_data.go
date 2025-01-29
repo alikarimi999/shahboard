@@ -3,7 +3,6 @@ package ws
 import (
 	"encoding/json"
 
-	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/types"
 )
 
@@ -45,7 +44,7 @@ type DataGamePlayerMoveRequest struct {
 }
 
 func (d DataGamePlayerMoveRequest) Type() MsgType {
-	return MsgTypeMove
+	return MsgTypePlayerMove
 }
 
 func (d DataGamePlayerMoveRequest) Encode() []byte {
@@ -54,9 +53,9 @@ func (d DataGamePlayerMoveRequest) Encode() []byte {
 }
 
 type DataGameEvent struct {
-	Domain string      `json:"domain"`
-	Action string      `json:"action"`
-	Event  event.Event `json:"event"`
+	Domain string `json:"domain"`
+	Action string `json:"action"`
+	Event  []byte `json:"event"`
 }
 
 func (d DataGameEvent) Encode() []byte {

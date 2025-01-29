@@ -106,8 +106,9 @@ func (e EventGameMoveApproved) Encode() []byte {
 type EventGameEnded struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
-	Player1   types.ObjectId `json:"player1"`
-	Player2   types.ObjectId `json:"player2"`
+	Player1   types.Player   `json:"player1"`
+	Player2   types.Player   `json:"player2"`
+	Outcome   string         `json:"outcome"`
 	Desc      string         `json:"desc"`
 	Timestamp int64          `json:"timestamp"`
 }

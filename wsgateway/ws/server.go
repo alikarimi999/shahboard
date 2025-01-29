@@ -33,6 +33,8 @@ type Server struct {
 	sessions map[types.ObjectId]*session
 	counter  *atomic.Int64
 
+	m *gameEventsManager
+
 	cache *redisCache
 
 	stopCh chan struct{}
@@ -48,6 +50,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 	server := &Server{
 		cfg:      cfg,
 		cache:    newRedisCache(c),
+		m:        newGameEventsManager(s, l),
 		sessions: make(map[types.ObjectId]*session),
 		counter:  atomic.NewInt64(0),
 		stopCh:   make(chan struct{}),
@@ -121,7 +124,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 		// 	server.cache.DeleteSession(context.Background(), user.ID)
 		// }
 
-		sess = newSession(conn, server.cache, user.ID, s, p, l)
+		sess = newSession(conn, newGameEventsManager(s, l), user.ID, p, l)
 		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
 			l.Error(fmt.Sprintf("failed to save session state: %v", err))
 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
@@ -211,7 +214,7 @@ func (s *Server) sessionReader(sess *session) {
 			s.stopSessions(false, sess)
 			return
 		}
-		var msg ClientMsg
+		var msg Msg
 		if err := json.Unmarshal(recievedMsg, &msg); err != nil {
 			continue
 		}
@@ -238,7 +241,7 @@ func (s *Server) sessionWriter(sess *session) {
 	}
 }
 
-func (s *Server) handleMsg(sess *session, msg *ClientMsg) {
+func (s *Server) handleMsg(sess *session, msg *Msg) {
 	switch msg.Type {
 	case MsgTypeFindMatch:
 		if sess.isSubscribedToGame() {
@@ -246,24 +249,24 @@ func (s *Server) handleMsg(sess *session, msg *ClientMsg) {
 			return
 		}
 
-		d, ok := msg.Data.(DataFindMatchRequest)
-		if !ok {
+		var d DataFindMatchRequest
+		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
 		}
 
-		sess.handlerFindMatchRequest(msg.ID, d)
+		sess.handleFindMatchRequest(msg.ID, d)
 	case MsgTypeView:
-		d, ok := msg.Data.(DataGameViewRequest)
-		if !ok {
+		var d DataGameViewRequest
+		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
 		}
 
 		sess.handleViewGameRequest(msg.ID, d)
-	case MsgTypeMove:
-		d, ok := msg.Data.(DataGamePlayerMoveRequest)
-		if !ok {
+	case MsgTypePlayerMove:
+		var d DataGamePlayerMoveRequest
+		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
 		}
@@ -273,7 +276,7 @@ func (s *Server) handleMsg(sess *session, msg *ClientMsg) {
 	case MsgTypePing:
 		t := time.Now()
 		sess.lastHeartBeat.Store(t)
-		resp := ServerMsg{
+		resp := Msg{
 			MsgBase: MsgBase{
 				ID:        msg.ID,
 				Timestamp: t.Unix(),
