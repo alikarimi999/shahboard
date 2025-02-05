@@ -211,7 +211,7 @@ func (m *gameEventsManager) removeSubscription(sub *subscription) {
 	m.smu.Lock()
 	defer m.smu.Unlock()
 
-	if sub.matchId != 0 {
+	if !sub.matchId.IsZero() {
 		if subs, ok := m.matchSubs[sub.matchId]; ok {
 			for i, s := range subs {
 				if s.index == sub.index {
@@ -222,7 +222,7 @@ func (m *gameEventsManager) removeSubscription(sub *subscription) {
 		}
 	}
 
-	if sub.gameId != 0 {
+	if !sub.gameId.IsZero() {
 		if subs, ok := m.gameSubs[sub.gameId]; ok {
 			for i, s := range subs {
 				if s.index == sub.index {

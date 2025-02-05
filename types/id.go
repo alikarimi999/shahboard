@@ -1,14 +1,13 @@
 package types
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
 	"math/rand"
 )
 
-type ObjectId int64
+type ObjectId string
 
 func NewObjectId() ObjectId {
 	// Get the current timestamp (4 bytes)
@@ -20,17 +19,29 @@ func NewObjectId() ObjectId {
 	// Combine the timestamp and random value into a single int64
 	id := (int64(timestamp) << 32) | int64(random)
 
-	return ObjectId(id)
+	return ObjectId(strconv.FormatInt(id, 10))
+}
+
+func (id ObjectId) IsZero() bool {
+	return id == "" || id == "0"
+}
+
+func (id ObjectId) Int64() int64 {
+	nid, err := strconv.ParseInt(string(id), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return nid
 }
 
 func (id ObjectId) String() string {
-	return fmt.Sprintf("%d", id)
+	return string(id)
 }
 
 func ParseObjectId(s string) (ObjectId, error) {
 	id, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	return ObjectId(id), nil
+	return ObjectId(strconv.FormatInt(id, 10)), nil
 }

@@ -44,7 +44,7 @@ func NewService(cfg Config, p event.Publisher, score ScoreService, l log.Logger)
 	return s, nil
 }
 
-func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*Match, error) {
+func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*event.EventUsersMatched, error) {
 	t := time.NewTicker(time.Duration(s.cfg.MatchRequestTicker) * time.Second)
 
 	level, err := s.score.GetUserLevel(userId)
@@ -53,7 +53,7 @@ func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*
 	}
 
 	req := s.e.addToQueue(userId, level)
-	s.l.Debug(fmt.Sprintf("New match request for user %d with level %d", userId, level))
+	s.l.Debug(fmt.Sprintf("New match request for user '%s' with level %d", userId, level))
 	select {
 	case <-ctx.Done():
 		s.e.cancelRequest(req)
@@ -74,13 +74,12 @@ func (s *Service) run() {
 		for {
 			select {
 			case ms := <-s.e.listen():
+				if len(ms) == 0 {
+					continue
+				}
 				events := make([]event.Event, 0, len(ms))
 				for _, m := range ms {
-					events = append(events, event.EventUsersMatched{
-						ID:        m.ID,
-						User1:     m.UserA,
-						User2:     m.UserB,
-						Timestamp: m.TimeStamp})
+					events = append(events, m)
 				}
 
 				s.p.Publish(events...)

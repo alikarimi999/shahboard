@@ -25,6 +25,7 @@ type session struct {
 	id     types.ObjectId
 	userId types.ObjectId
 	msgCh  chan []byte
+	pongCh chan struct{}
 
 	gameId types.ObjectId
 	role   gameRole
@@ -51,6 +52,7 @@ func newSession(conn *websocket.Conn, em *gameEventsManager, userId types.Object
 
 		userId:      userId,
 		msgCh:       make(chan []byte, 100),
+		pongCh:      make(chan struct{}),
 		changeSubCh: make(chan event.Subscription),
 		em:          em,
 
@@ -81,12 +83,12 @@ func (s *session) startListen() {
 			s.sub = sub
 			wg.Add(1)
 			go func() {
-				s.l.Debug(fmt.Sprintf("session '%d' started listening to '%s'", s.id, sub.Topic().String()))
+				s.l.Debug(fmt.Sprintf("session '%s' started listening to created games", s.id))
 				defer wg.Done()
 				for e := range s.sub.Event() {
 					s.handleEvent(e)
 				}
-				s.l.Debug(fmt.Sprintf("session '%d' stopped listening to '%s'", s.id, sub.Topic().String()))
+				s.l.Debug(fmt.Sprintf("session '%s' stopped listening to created games", s.id))
 			}()
 
 		}
@@ -121,11 +123,7 @@ func (s *session) handleEvent(e event.Event) {
 					Type:      MsgTypeGameCreate,
 					Timestamp: time.Now().Unix(),
 				},
-				Data: DataGameEvent{
-					Domain: event.DomainGame,
-					Action: event.ActionCreated.String(),
-					Event:  eve.Encode(),
-				}.Encode(),
+				Data: eve.Encode(),
 			}
 
 			s.sub.Unsubscribe()
@@ -137,11 +135,7 @@ func (s *session) handleEvent(e event.Event) {
 					Type:      MsgTypeGameEnd,
 					Timestamp: time.Now().Unix(),
 				},
-				Data: DataGameEvent{
-					Domain: event.DomainGame,
-					Action: event.ActionEnded.String(),
-					Event:  e.Encode(),
-				}.Encode(),
+				Data: e.Encode(),
 			}
 			s.sub.Unsubscribe()
 			s.sub = nil
@@ -161,11 +155,7 @@ func (s *session) handleEvent(e event.Event) {
 					Type:      mt,
 					Timestamp: time.Now().Unix(),
 				},
-				Data: DataGameEvent{
-					Domain: event.DomainGame,
-					Action: e.GetAction().String(),
-					Event:  e.Encode(),
-				}.Encode(),
+				Data: e.Encode(),
 			}
 		}
 	}
@@ -179,9 +169,10 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatc
 		}
 	}()
 
-	if s.sub == nil && (s.userId == data.User1 || s.userId == data.User2) {
-		s.changeSub(s.em.SubscribeToMatch(data.MatchID))
+	if s.sub == nil && (s.userId == data.User1.ID || s.userId == data.User2.ID) {
+		s.changeSub(s.em.SubscribeToMatch(data.ID))
 		s.role = gamePlayerRole
+		s.l.Debug(fmt.Sprintf("session '%s' subscribed to match '%s'", s.id, data.ID))
 		return
 	}
 
@@ -211,7 +202,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 		s.changeSub(s.em.SubscribeToGame(req.GameId))
 		s.role = gameViewerRole
 
-		s.l.Debug(fmt.Sprintf("session '%d' subscribed to game '%d'", s.id, req.GameId))
+		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
 
 		return
 	}
@@ -228,15 +219,15 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMove
 	}()
 
 	if s.sub != nil && s.role == gamePlayerRole && s.userId == req.PlayerID && s.gameId == req.GameID {
-		s.l.Debug(fmt.Sprintf("session '%d' received move request %d", s.id, req.ID))
-		s.p.Publish(event.EventGamePlayerMoved{
+		if err := s.p.Publish(event.EventGamePlayerMoved{
 			ID:        req.ID,
 			GameID:    req.GameID,
 			PlayerID:  req.PlayerID,
 			Move:      req.Move,
 			Timestamp: req.Timestamp,
-		})
-
+		}); err != nil {
+			s.l.Error(fmt.Sprintf("failed to publish move event: %v", err))
+		}
 		return
 	}
 
@@ -266,12 +257,16 @@ func (s *session) sendErr(id types.ObjectId, err string) {
 func (s *session) sendWelcome() {
 	s.send(Msg{
 		MsgBase: MsgBase{
-			ID:        0,
+			ID:        types.NewObjectId(),
 			Type:      MsgTypeWelcome,
 			Timestamp: time.Now().Unix(),
 		},
 		Data: []byte("welcome"),
 	})
+}
+
+func (s *session) sendPong() {
+	s.pongCh <- struct{}{}
 }
 
 func (s *session) isSubscribedToGame() bool {

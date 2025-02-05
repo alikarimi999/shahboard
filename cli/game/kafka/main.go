@@ -51,8 +51,8 @@ func newPlayersMatchedCommand(brokerAddress *string) *cobra.Command {
 	}
 
 	// Add specific flags for this command
-	cmd.Flags().Int64Var(&player1, "player1", int64(types.NewObjectId()), "Player1 ID")
-	cmd.Flags().Int64Var(&player2, "player2", int64(types.NewObjectId()), "Player2 ID")
+	cmd.Flags().Int64Var(&player1, "player1", types.NewObjectId().Int64(), "Player1 ID")
+	cmd.Flags().Int64Var(&player2, "player2", types.NewObjectId().Int64(), "Player2 ID")
 
 	return cmd
 }
@@ -77,8 +77,8 @@ func newPlayerMovedCommand(brokerAddress *string) *cobra.Command {
 	}
 
 	// Add specific flags for this command
-	cmd.Flags().Int64Var(&gameId, "gameId", int64(types.NewObjectId()), "Game ID")
-	cmd.Flags().Int64Var(&playerId, "playerId", int64(types.NewObjectId()), "Player ID")
+	cmd.Flags().Int64Var(&gameId, "gameId", types.NewObjectId().Int64(), "Game ID")
+	cmd.Flags().Int64Var(&playerId, "playerId", types.NewObjectId().Int64(), "Player ID")
 	cmd.Flags().StringVar(&move, "move", "", "Move")
 
 	cmd.MarkFlagRequired("gameId")

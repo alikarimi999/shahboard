@@ -3,14 +3,12 @@ package ws
 import (
 	"encoding/json"
 
+	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/types"
 )
 
 type DataFindMatchRequest struct {
-	MatchID   types.ObjectId `json:"match_id"`
-	User1     types.ObjectId `json:"user1"`
-	User2     types.ObjectId `json:"user2"`
-	Timestamp int64          `json:"timestamp"`
+	event.EventUsersMatched
 }
 
 func (d DataFindMatchRequest) Type() MsgType {
@@ -38,7 +36,7 @@ func (d DataGameViewRequest) Encode() []byte {
 type DataGamePlayerMoveRequest struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
-	PlayerID  types.ObjectId `json:"playerId"`
+	PlayerID  types.ObjectId `json:"player_id"`
 	Move      string         `json:"move"`
 	Timestamp int64          `json:"timestamp"`
 }
@@ -48,17 +46,6 @@ func (d DataGamePlayerMoveRequest) Type() MsgType {
 }
 
 func (d DataGamePlayerMoveRequest) Encode() []byte {
-	b, _ := json.Marshal(d)
-	return b
-}
-
-type DataGameEvent struct {
-	Domain string `json:"domain"`
-	Action string `json:"action"`
-	Event  []byte `json:"event"`
-}
-
-func (d DataGameEvent) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }

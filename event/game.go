@@ -48,7 +48,7 @@ func (e EventGameCreated) Encode() []byte {
 type EventGamePlayerMoved struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
-	PlayerID  types.ObjectId `json:"playerId"`
+	PlayerID  types.ObjectId `json:"player_id"`
 	Move      string         `json:"move"`
 	Timestamp int64          `json:"timestamp"`
 }
@@ -77,7 +77,7 @@ func (e EventGamePlayerMoved) Encode() []byte {
 type EventGameMoveApproved struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
-	PlayerID  types.ObjectId `json:"playerId"`
+	PlayerID  types.ObjectId `json:"player_id"`
 	Move      string         `json:"move"`
 	Timestamp int64          `json:"timestamp"`
 }
@@ -137,7 +137,7 @@ func (e EventGameEnded) Encode() []byte {
 type EventGamePlayerLeft struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
-	PlayerID  types.ObjectId `json:"playerId"`
+	PlayerID  types.ObjectId `json:"player_id"`
 	Timestamp int64          `json:"timestamp"`
 }
 

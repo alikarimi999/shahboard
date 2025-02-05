@@ -1,6 +1,6 @@
 package types
 
 type User struct {
-	ID    ObjectId
-	Level Level
+	ID    ObjectId `json:"id"`
+	Level Level    `json:"level"`
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/alikarimi999/shahboard/event/kafka"
 	"github.com/alikarimi999/shahboard/pkg/log"
+	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/alikarimi999/shahboard/wsgateway/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -28,6 +29,7 @@ func SetupApplication(cfg Config) (*application, error) {
 
 	gin.SetMode(gin.ReleaseMode)
 	e := gin.Default()
+	e.Use(middleware.Cors())
 
 	c := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,

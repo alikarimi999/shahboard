@@ -59,22 +59,14 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 
 	go server.checkHeartbeat()
 
-	e.GET("/ws", middleware.ParsUserHeader(), func(ctx *gin.Context) {
+	e.GET("/ws", middleware.ParsQueryToken(), func(ctx *gin.Context) {
 		u, _ := ctx.Get("user")
-		user, ok := u.(types.User)
-		if !ok {
-			ctx.JSON(401, gin.H{"error": "unauthorized"})
-			return
-		}
-
-		if user.ID == 0 {
-			ctx.JSON(401, gin.H{"error": "unauthorized"})
-			return
-		}
+		user := u.(types.User)
 
 		conn, er := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 		if er != nil {
 			ctx.JSON(400, gin.H{"error": "failed to upgrade connection"})
+			ctx.Abort()
 			return
 		}
 
@@ -92,7 +84,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 				go server.sessionReader(sess)
 				go server.sessionWriter(sess)
 				sess.sendWelcome()
-				l.Info(fmt.Sprintf("session '%d' reconnected for user '%d'", sess.id, user.ID))
+				l.Info(fmt.Sprintf("session '%s' reconnected for user '%s'", sess.id, user.ID))
 
 				return
 			}
@@ -138,7 +130,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 		go server.sessionWriter(sess)
 		sess.sendWelcome()
 
-		l.Info(fmt.Sprintf("session '%d' created for user '%d'", sess.id, user.ID))
+		l.Info(fmt.Sprintf("session '%s' created for user '%s'", sess.id, user.ID))
 
 	})
 
@@ -177,13 +169,13 @@ func (s *Server) stopSessions(remove bool, sess ...*session) {
 			continue
 		}
 		if err := se.close(); err != nil {
-			s.l.Error(fmt.Sprintf("session '%d' close error: '%s'", se.id, err))
+			s.l.Error(fmt.Sprintf("session '%s' close error: '%s'", se.id, err))
 			continue
 		}
-		s.l.Debug(fmt.Sprintf("session '%d' closed", se.id))
+		s.l.Debug(fmt.Sprintf("session '%s' closed", se.id))
 		if remove {
 			s.removeSession(se)
-			s.l.Debug(fmt.Sprintf("session '%d' removed from cache", se.id))
+			s.l.Debug(fmt.Sprintf("session '%s' removed from cache", se.id))
 		}
 	}
 
@@ -205,27 +197,36 @@ func (s *Server) stopSessions(remove bool, sess ...*session) {
 
 func (s *Server) sessionReader(sess *session) {
 	defer func() {
-		s.l.Debug(fmt.Sprintf("session '%d' reader stopped", sess.id))
+		s.l.Debug(fmt.Sprintf("session '%s' reader stopped", sess.id))
 	}()
 
 	for {
-		_, recievedMsg, err := sess.ReadMessage()
+		mt, recievedMsg, err := sess.ReadMessage()
 		if err != nil {
+			s.l.Error(fmt.Sprintf("session '%s' read message error: %v", sess.id, err))
 			s.stopSessions(false, sess)
 			return
 		}
-		var msg Msg
-		if err := json.Unmarshal(recievedMsg, &msg); err != nil {
+
+		if mt == websocket.BinaryMessage && len(recievedMsg) > 0 && recievedMsg[0] == 0x0 {
+			sess.lastHeartBeat.Store(time.Now())
+			sess.sendPong()
 			continue
 		}
 
-		s.handleMsg(sess, &msg)
+		if mt == websocket.TextMessage && len(recievedMsg) > 0 {
+			var msg Msg
+			if err := json.Unmarshal(recievedMsg, &msg); err != nil {
+				continue
+			}
+			s.handleMsg(sess, &msg)
+		}
 	}
 }
 
 func (s *Server) sessionWriter(sess *session) {
 	defer func() {
-		s.l.Debug(fmt.Sprintf("session '%d' writer stopped", sess.id))
+		s.l.Debug(fmt.Sprintf("session '%s' writer stopped", sess.id))
 	}()
 
 	for {
@@ -234,6 +235,13 @@ func (s *Server) sessionWriter(sess *session) {
 			return
 		case message := <-sess.msgCh:
 			if err := sess.WriteMessage(websocket.TextMessage, message); err != nil {
+				s.l.Error(fmt.Sprintf("session '%s' write message error: %v", sess.id, err))
+				s.stopSessions(false, sess)
+				return
+			}
+		case <-sess.pongCh:
+			if err := sess.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
+				s.l.Error(fmt.Sprintf("session '%s' write pong message error: %v", sess.id, err))
 				s.stopSessions(false, sess)
 				return
 			}
@@ -273,16 +281,6 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleMoveRequest(msg.ID, d)
 
-	case MsgTypePing:
-		t := time.Now()
-		sess.lastHeartBeat.Store(t)
-		resp := Msg{
-			MsgBase: MsgBase{
-				ID:        msg.ID,
-				Timestamp: t.Unix(),
-				Type:      MsgTypePong,
-			}}
-		sess.send(resp)
 	case MsgTypeData:
 
 		// handle data message

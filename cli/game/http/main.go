@@ -83,7 +83,7 @@ func getGamesFEN(httpAddress string) *cobra.Command {
 			return sendHttpRequest(httpAddress, req)
 		}}
 
-	cmd.Flags().Int64SliceVar(&games, "games", []int64{int64(types.NewObjectId())}, "Games IDs")
+	cmd.Flags().Int64SliceVar(&games, "games", []int64{types.NewObjectId().Int64()}, "Games IDs")
 
 	return cmd
 }
@@ -104,7 +104,7 @@ func getGamePGN(httpAddress string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Int64Var(&gameId, "gameId", int64(types.NewObjectId()), "Game ID")
+	cmd.Flags().Int64Var(&gameId, "gameId", types.NewObjectId().Int64(), "Game ID")
 
 	return cmd
 }

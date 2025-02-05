@@ -12,8 +12,6 @@ const (
 	MsgTypeView         MsgType = "view"
 	MsgTypeData         MsgType = "data"
 	MsgTypeError        MsgType = "err"
-	MsgTypePing         MsgType = "ping"
-	MsgTypePong         MsgType = "pong"
 	MsgTypeGameCreate   MsgType = "game_created"
 	MsgTypePlayerMove   MsgType = "player_moved"
 	MsgTypeMoveApproved MsgType = "move_approved"

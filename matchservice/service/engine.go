@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/types"
 )
 
@@ -12,7 +13,7 @@ type engine struct {
 	mu    sync.Mutex
 	queue map[types.Level][]*matchRequest
 
-	matchCh chan []*Match
+	matchCh chan []*event.EventUsersMatched
 	stopCh  chan struct{}
 	wg      sync.WaitGroup
 }
@@ -21,7 +22,7 @@ func newEngine(ticker time.Duration) *engine {
 	e := &engine{
 		t:       *time.NewTicker(ticker),
 		queue:   make(map[types.Level][]*matchRequest, 0),
-		matchCh: make(chan []*Match),
+		matchCh: make(chan []*event.EventUsersMatched),
 		stopCh:  make(chan struct{}),
 	}
 
@@ -46,7 +47,7 @@ func (e *engine) run() {
 	}()
 }
 
-func (e *engine) listen() <-chan []*Match { return e.matchCh }
+func (e *engine) listen() <-chan []*event.EventUsersMatched { return e.matchCh }
 
 func (e *engine) stop() {
 	close(e.stopCh)
@@ -76,12 +77,12 @@ func (e *engine) cancelRequest(r *matchRequest) {
 	}
 }
 
-func (e *engine) findMatches() []*Match {
+func (e *engine) findMatches() []*event.EventUsersMatched {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	var leftover []*matchRequest
-	var matches []*Match
+	var matches []*event.EventUsersMatched
 
 	t := time.Now().Unix()
 	for l := types.LevelKing; l >= types.LevelPawn; l-- {
@@ -91,11 +92,11 @@ func (e *engine) findMatches() []*Match {
 		for len(currentQueue) > 1 {
 			u1 := currentQueue[0]
 			u2 := currentQueue[1]
-			m := &Match{
+			m := &event.EventUsersMatched{
 				ID:        types.NewObjectId(),
-				UserA:     types.User{ID: u1.userId, Level: u1.level},
-				UserB:     types.User{ID: u2.userId, Level: u2.level},
-				TimeStamp: t,
+				User1:     types.User{ID: u1.userId, Level: u1.level},
+				User2:     types.User{ID: u2.userId, Level: u2.level},
+				Timestamp: t,
 			}
 
 			u1.sendResponse(m)
@@ -124,20 +125,20 @@ func (e *engine) findMatches() []*Match {
 type matchRequest struct {
 	userId types.ObjectId
 	level  types.Level
-	ch     chan *Match
+	ch     chan *event.EventUsersMatched
 }
 
 func newMatchRequest(pId types.ObjectId, l types.Level) *matchRequest {
 	return &matchRequest{
 		userId: pId,
 		level:  l,
-		ch:     make(chan *Match, 1),
+		ch:     make(chan *event.EventUsersMatched, 1),
 	}
 }
 
-func (m matchRequest) sendResponse(r *Match) {
+func (m matchRequest) sendResponse(r *event.EventUsersMatched) {
 	m.ch <- r
 	close(m.ch)
 }
 
-func (m *matchRequest) response() <-chan *Match { return m.ch }
+func (m *matchRequest) response() <-chan *event.EventUsersMatched { return m.ch }

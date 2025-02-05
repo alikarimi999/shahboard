@@ -53,7 +53,7 @@ func sendMatchRequest(httpAddress string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Int64Var(&userId, "user", int64(types.NewObjectId()), "User ID")
+	cmd.Flags().Int64Var(&userId, "user", types.NewObjectId().Int64(), "User ID")
 	cmd.Flags().Int64Var(&scale, "scale", 0, "Scale sends multiple match requests")
 
 	return cmd
