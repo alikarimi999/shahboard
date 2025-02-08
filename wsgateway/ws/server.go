@@ -35,6 +35,8 @@ type Server struct {
 
 	m *gameEventsManager
 
+	p event.Publisher
+
 	cache *redisCache
 
 	stopCh chan struct{}
@@ -51,6 +53,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 		cfg:      cfg,
 		cache:    newRedisCache(c),
 		m:        newGameEventsManager(s, l),
+		p:        p,
 		sessions: make(map[types.ObjectId]*session),
 		counter:  atomic.NewInt64(0),
 		stopCh:   make(chan struct{}),
@@ -70,28 +73,28 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			return
 		}
 
-		// check if user has a session in memory
-		sess := server.getSession(user.ID)
-		if sess != nil {
-			if sess.isClosed() {
-				sess.reconnect(conn)
-				if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
-					l.Error(fmt.Sprintf("failed to save session state: %v", err))
-					conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
-					conn.Close()
-					return
-				}
-				go server.sessionReader(sess)
-				go server.sessionWriter(sess)
-				sess.sendWelcome()
-				l.Info(fmt.Sprintf("session '%s' reconnected for user '%s'", sess.id, user.ID))
+		// // check if user has a session in memory
+		// sess := server.getSession(user.ID)
+		// if sess != nil {
+		// 	if sess.isClosed() {
+		// 		sess.reconnect(conn)
+		// 		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
+		// 			l.Error(fmt.Sprintf("failed to save session state: %v", err))
+		// 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
+		// 			conn.Close()
+		// 			return
+		// 		}
+		// 		go server.sessionReader(sess)
+		// 		go server.sessionWriter(sess)
+		// 		sess.sendWelcome()
+		// 		l.Info(fmt.Sprintf("session '%s' reconnected for user '%s'", sess.id, user.ID))
 
-				return
-			}
-			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
-			conn.Close()
-			return
-		}
+		// 		return
+		// 	}
+		// 	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
+		// 	conn.Close()
+		// 	return
+		// }
 
 		// check if user has a session in redis
 		csess, err := server.cache.GetSession(context.Background(), user.ID)
@@ -112,11 +115,61 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 		// this means that user has a closed session in another wsgateway instance
 		// don't need to save session state if it's closed,it will be replaced by a new session
 		// in future we should be able to retrieve the session state from redis and reconnect the session instead of creating a new one
-		// if csess != nil && csess.Closed {
-		// 	server.cache.DeleteSession(context.Background(), user.ID)
-		// }
+		if csess != nil && csess.Closed {
+			msgs, err := server.cache.GetSessionMsgs(context.Background(), csess.SessionId)
+			if err != nil {
+				l.Error(fmt.Sprintf("failed to get session messages: %v", err))
+				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
+				conn.Close()
+				return
+			}
 
-		sess = newSession(conn, newGameEventsManager(s, l), user.ID, p, l)
+			server.l.Debug(fmt.Sprintf("delete disconnected session for user '%s'", user.ID))
+			sess := server.getSession(user.ID)
+			if sess != nil {
+				server.stopSessions(true, sess)
+			}
+
+			sess = newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, p, l)
+			if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
+				l.Error(fmt.Sprintf("failed to save session state: %v", err))
+				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
+				conn.Close()
+				return
+			}
+
+			server.addSession(sess, user.ID)
+			go server.sessionReader(sess)
+			go server.sessionWriter(sess)
+			sess.sendWelcome()
+
+			for _, msg := range msgs {
+				sess.send(msg)
+			}
+
+			if err := sess.p.Publish(event.EventGamePlayerConnectionUpdated{
+				ID:        types.NewObjectId(),
+				GameID:    csess.GameId,
+				PlayerID:  user.ID,
+				Connected: true,
+				Timestamp: time.Now().Unix(),
+			}); err != nil {
+				l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
+			}
+
+			if !csess.GameId.IsZero() {
+				if csess.Role == gamePlayerRole {
+					sess.SubscribeAsPlayer(csess.GameId)
+				} else if csess.Role == gameViewerRole {
+					sess.SubscribeAsViewer(csess.GameId)
+				}
+			}
+
+			l.Info(fmt.Sprintf("new session '%s' created for user '%s'", sess.id, user.ID))
+			return
+		}
+
+		sess := newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, p, l)
 		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
 			l.Error(fmt.Sprintf("failed to save session state: %v", err))
 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
@@ -160,11 +213,12 @@ func (s *Server) removeSession(sess *session) {
 	s.counter.Add(-1)
 }
 
-func (s *Server) stopSessions(remove bool, sess ...*session) {
+func (s *Server) stopSessions(purge bool, sess ...*session) {
 	for _, se := range sess {
 		if se.isClosed() {
-			if remove {
+			if purge {
 				s.removeSession(se)
+				se.stop()
 			}
 			continue
 		}
@@ -173,26 +227,59 @@ func (s *Server) stopSessions(remove bool, sess ...*session) {
 			continue
 		}
 		s.l.Debug(fmt.Sprintf("session '%s' closed", se.id))
-		if remove {
+		if purge {
 			s.removeSession(se)
+			se.stop()
 			s.l.Debug(fmt.Sprintf("session '%s' removed from cache", se.id))
 		}
 	}
 
-	if len(sess) > 0 {
-		// Preserves session state in Redis by marking as 'closed' rather than deleting
-		// - Enables session resumption across WS gateway instances by retaining full state data
-		// - Maintains cluster-wide visibility of disconnected sessions for coordination
-		// - Supports future session recovery workflows without data reconstruction
-		if err := s.cache.SaveSessionsState(context.Background(), sess...); err != nil {
-			s.l.Error(fmt.Sprintf("failed to save sessions state: %v", err))
-		}
+	if len(sess) == 0 {
+		return
+	}
+
+	if purge {
 		ids := []types.ObjectId{}
 		for _, s := range sess {
 			ids = append(ids, s.userId)
 		}
-		s.l.Debug(fmt.Sprintf("sessions '%v' closed on redis", ids))
+		if err := s.cache.DeleteSessions(context.Background(), ids...); err != nil {
+			s.l.Error(fmt.Sprintf("failed to delete sessions: %v", err))
+			return
+		}
+		s.l.Debug(fmt.Sprintf("user's sessions closed on redis: '%v'", ids))
+		return
 	}
+
+	events := []event.Event{}
+	t := time.Now().Unix()
+	for _, se := range sess {
+		if !se.gameId.IsZero() {
+			events = append(events, event.EventGamePlayerConnectionUpdated{
+				ID:        types.NewObjectId(),
+				GameID:    se.gameId,
+				PlayerID:  se.userId,
+				Connected: false,
+				Timestamp: t,
+			})
+		}
+	}
+
+	if len(events) > 0 {
+		if err := s.p.Publish(events...); err != nil {
+			s.l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
+		}
+	}
+
+	if err := s.cache.SaveSessionsState(context.Background(), sess...); err != nil {
+		s.l.Error(fmt.Sprintf("failed to save sessions state: %v", err))
+		return
+	}
+	ids := []types.ObjectId{}
+	for _, s := range sess {
+		ids = append(ids, s.userId)
+	}
+	s.l.Debug(fmt.Sprintf("sessions '%v' closed on redis", ids))
 }
 
 func (s *Server) sessionReader(sess *session) {
@@ -203,8 +290,8 @@ func (s *Server) sessionReader(sess *session) {
 	for {
 		mt, recievedMsg, err := sess.ReadMessage()
 		if err != nil {
-			s.l.Error(fmt.Sprintf("session '%s' read message error: %v", sess.id, err))
-			s.stopSessions(false, sess)
+			s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", sess.id, err))
+			// s.stopSessions(false, sess)
 			return
 		}
 
@@ -235,13 +322,13 @@ func (s *Server) sessionWriter(sess *session) {
 			return
 		case message := <-sess.msgCh:
 			if err := sess.WriteMessage(websocket.TextMessage, message); err != nil {
-				s.l.Error(fmt.Sprintf("session '%s' write message error: %v", sess.id, err))
+				s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", sess.id, err))
 				s.stopSessions(false, sess)
 				return
 			}
 		case <-sess.pongCh:
 			if err := sess.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
-				s.l.Error(fmt.Sprintf("session '%s' write pong message error: %v", sess.id, err))
+				s.l.Debug(fmt.Sprintf("session '%s' write pong message error: %v", sess.id, err))
 				s.stopSessions(false, sess)
 				return
 			}

@@ -22,11 +22,14 @@ func (gs *Service) subscribeEvents(topics ...event.Topic) {
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
 func (gs *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
+	gs.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
 	// check if player is already in a game
 	if gs.checkByPlayer(d.User1.ID) || gs.checkByPlayer(d.User2.ID) {
+		fmt.Println(111)
 		gs.l.Debug("player is already in a game")
 		return
 	}
+	fmt.Println(222)
 
 	// create a new game
 	g := entity.NewGame(d.User1.ID, d.User2.ID, gs.cfg.DefaultGameSettings)
@@ -90,7 +93,8 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			gs.l.Error(err.Error())
 			return
 		}
-		gs.p.Publish(event.EventGameMoveApproved{
+
+		if err := gs.p.Publish(event.EventGameMoveApproved{
 			ID:        types.NewObjectId(),
 			PlayerID:  d.PlayerID,
 			GameID:    d.GameID,
@@ -104,10 +108,16 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 				Player2:   g.Player2(),
 				Outcome:   string(g.Outcome()),
 				Timestamp: time.Now().Unix(),
-			})
+			}); err != nil {
+			gs.l.Error(err.Error())
+			return
+		}
 
 		gs.l.Debug(fmt.Sprintf("published game move approved event: '%s'", g.ID()))
 		gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", g.ID()))
+
+		g.stop()
+		gs.removeGame(g.ID())
 
 	} else {
 		if err := gs.cache.updateGameMove(context.Background(), g.Game); err != nil {

@@ -7,12 +7,14 @@ import (
 )
 
 var (
-	TopicGame             = NewTopic(DomainGame, ActionAny, "")
-	TopicGameCreated      = NewTopic(DomainGame, ActionCreated, "{gameID}")
-	TopicGamePlayerMoved  = NewTopic(DomainGame, ActionGamePlayerMoved, "{gameID}")
-	TopicGameMoveApproved = NewTopic(DomainGame, ActionGameMoveApprove, "{gameID}")
-	TopicGameEnded        = NewTopic(DomainGame, ActionEnded, "{gameID}")
-	TopicGamePlayerLeft   = NewTopic(DomainGame, ActionGamePlayerLeft, "{gameID}")
+	TopicGame                        = NewTopic(DomainGame, ActionAny, "")
+	TopicGameCreated                 = NewTopic(DomainGame, ActionCreated, "{gameID}")
+	TopicGamePlayerMoved             = NewTopic(DomainGame, ActionGamePlayerMoved, "{gameID}")
+	TopicGameMoveApproved            = NewTopic(DomainGame, ActionGameMoveApprove, "{gameID}")
+	TopicGamePlayerConnectionUpdated = NewTopic(DomainGame, ActionGamePlayerConnectionUpdated, "{gameID}")
+	TopicGameEnded                   = NewTopic(DomainGame, ActionEnded, "{gameID}")
+	TopicGamePlayerLeft              = NewTopic(DomainGame, ActionGamePlayerLeft, "{gameID}")
+	TopicGamePlayerSelectSquare      = NewTopic(DomainGame, ActionGamePlayerSelectSquare, "{gameID}")
 )
 
 type EventGameCreated struct {
@@ -103,6 +105,35 @@ func (e EventGameMoveApproved) Encode() []byte {
 	return b
 }
 
+type EventGamePlayerConnectionUpdated struct {
+	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
+	PlayerID  types.ObjectId `json:"player_id"`
+	Connected bool           `json:"connected"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+func (e EventGamePlayerConnectionUpdated) GetResource() string {
+	return e.GameID.String()
+}
+
+func (e EventGamePlayerConnectionUpdated) GetTopic() Topic {
+	return TopicGamePlayerConnectionUpdated.WithResource(e.GetResource())
+}
+
+func (e EventGamePlayerConnectionUpdated) GetAction() Action {
+	return ActionGamePlayerConnectionUpdated
+}
+
+func (e EventGamePlayerConnectionUpdated) TimeStamp() int64 {
+	return e.Timestamp
+}
+
+func (e EventGamePlayerConnectionUpdated) Encode() []byte {
+	b, _ := json.Marshal(e)
+	return b
+}
+
 type EventGameEnded struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
@@ -158,6 +189,36 @@ func (e EventGamePlayerLeft) TimeStamp() int64 {
 }
 
 func (e EventGamePlayerLeft) Encode() []byte {
+	b, _ := json.Marshal(e)
+	return b
+}
+
+type EventGamePlayerSelectSquare struct {
+	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
+	PlayerID  types.ObjectId `json:"player_id"`
+	Piece     string         `json:"piece"`
+	Square    string         `json:"square"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+func (e EventGamePlayerSelectSquare) GetResource() string {
+	return e.GameID.String()
+}
+
+func (e EventGamePlayerSelectSquare) GetTopic() Topic {
+	return TopicGamePlayerSelectSquare.WithResource(e.GetResource())
+}
+
+func (e EventGamePlayerSelectSquare) GetAction() Action {
+	return ActionGamePlayerSelectSquare
+}
+
+func (e EventGamePlayerSelectSquare) TimeStamp() int64 {
+	return e.Timestamp
+}
+
+func (e EventGamePlayerSelectSquare) Encode() []byte {
 	b, _ := json.Marshal(e)
 	return b
 }

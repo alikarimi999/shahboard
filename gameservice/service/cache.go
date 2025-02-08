@@ -94,7 +94,7 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 }
 
 func (c *redisGameCache) playerHasGame(ctx context.Context, p types.ObjectId) (bool, error) {
-	res, err := c.rc.Get(ctx, fmt.Sprintf("%s%d", keyPlayerGamePrefix, p)).Result()
+	res, err := c.rc.Get(ctx, fmt.Sprintf("%s%s", keyPlayerGamePrefix, p)).Result()
 	if err == redis.Nil {
 		return false, nil
 	}
@@ -112,13 +112,13 @@ func (c *redisGameCache) updateGameMove(ctx context.Context, g *entity.Game) err
 	}
 	bGame := cGame.encode()
 
-	return c.rc.Set(ctx, fmt.Sprintf("%s%d", keyGamePrefix, g.ID()), bGame, 0).Err()
+	return c.rc.Set(ctx, fmt.Sprintf("%s%s", keyGamePrefix, g.ID()), bGame, 0).Err()
 }
 
 func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, g *entity.Game) error {
 	// delete the players game so they can join a new game
-	c.rc.Del(ctx, fmt.Sprintf("%s%d", keyPlayerGamePrefix, g.Player1()))
-	c.rc.Del(ctx, fmt.Sprintf("%s%d", keyPlayerGamePrefix, g.Player2()))
+	c.rc.Del(ctx, fmt.Sprintf("%s%s", keyPlayerGamePrefix, g.Player1().ID))
+	c.rc.Del(ctx, fmt.Sprintf("%s%s", keyPlayerGamePrefix, g.Player2().ID))
 
 	cGame := &inCacheGame{
 		Status: g.Status(),
@@ -127,7 +127,7 @@ func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, g *entity.
 	bGame := cGame.encode()
 
 	// instead of deleting the game, we just set it to inactive and set a TTL
-	return c.rc.Set(ctx, fmt.Sprintf("%s%d", keyGamePrefix, g.ID()), bGame, c.deactivedTTL).Err()
+	return c.rc.Set(ctx, fmt.Sprintf("%s%s", keyGamePrefix, g.ID()), bGame, c.deactivedTTL).Err()
 }
 
 func (c *redisGameCache) getGamesIDs(ctx context.Context) ([]types.ObjectId, error) {

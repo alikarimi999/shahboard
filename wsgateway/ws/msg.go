@@ -1,21 +1,24 @@
 package ws
 
 import (
+	"encoding/json"
+
 	"github.com/alikarimi999/shahboard/types"
 )
 
 type MsgType string
 
 const (
-	MsgTypeWelcome      MsgType = "welcome"
-	MsgTypeFindMatch    MsgType = "find_match"
-	MsgTypeView         MsgType = "view"
-	MsgTypeData         MsgType = "data"
-	MsgTypeError        MsgType = "err"
-	MsgTypeGameCreate   MsgType = "game_created"
-	MsgTypePlayerMove   MsgType = "player_moved"
-	MsgTypeMoveApproved MsgType = "move_approved"
-	MsgTypeGameEnd      MsgType = "game_ended"
+	MsgTypeWelcome                 MsgType = "welcome"
+	MsgTypeFindMatch               MsgType = "find_match"
+	MsgTypeView                    MsgType = "view"
+	MsgTypeData                    MsgType = "data"
+	MsgTypeError                   MsgType = "err"
+	MsgTypeGameCreate              MsgType = "game_created"
+	MsgTypePlayerMove              MsgType = "player_moved"
+	MsgTypeMoveApproved            MsgType = "move_approved"
+	MsgTypePlayerConnectionUpdated MsgType = "player_connection_updated"
+	MsgTypeGameEnd                 MsgType = "game_ended"
 )
 
 type MsgBase struct {
@@ -27,4 +30,9 @@ type MsgBase struct {
 type Msg struct {
 	MsgBase
 	Data []byte `json:"data"`
+}
+
+func (m *Msg) Encode() []byte {
+	b, _ := json.Marshal(m)
+	return b
 }

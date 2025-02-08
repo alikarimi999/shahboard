@@ -62,15 +62,21 @@ func (m *subscriptionManager) run() {
 				m.wg.Add(1)
 				go func(sub event.Subscription) {
 					m.l.Debug(fmt.Sprintf("listening to topic: '%s'", sub.Topic()))
-					defer m.wg.Done()
+					defer func() {
+						m.wg.Done()
+					}()
 					for {
 						select {
 						case e := <-sub.Event():
-							m.gs.handleEvents(e)
+							if e == nil {
+								return
+							}
+							go m.gs.handleEvents(e)
 						case err := <-sub.Err():
+							if err == nil {
+								return
+							}
 							fmt.Println(err)
-						case <-m.closeCh:
-							return
 						}
 					}
 				}(sub)
@@ -82,6 +88,11 @@ func (m *subscriptionManager) run() {
 }
 
 func (m *subscriptionManager) stop() {
+	m.mu.Lock()
+	for _, sub := range m.subs {
+		sub.Unsubscribe()
+	}
+	m.mu.Unlock()
 	close(m.closeCh)
 	m.wg.Wait()
 }

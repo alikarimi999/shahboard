@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -33,6 +34,8 @@ type session struct {
 	sub         event.Subscription
 	changeSubCh chan event.Subscription
 
+	rc *redisCache
+
 	em *gameEventsManager
 
 	lastHeartBeat *atomic.Time
@@ -44,7 +47,7 @@ type session struct {
 	l log.Logger
 }
 
-func newSession(conn *websocket.Conn, em *gameEventsManager, userId types.ObjectId,
+func newSession(conn *websocket.Conn, em *gameEventsManager, rc *redisCache, userId types.ObjectId,
 	p event.Publisher, l log.Logger) *session {
 	sess := &session{
 		Conn: conn,
@@ -54,6 +57,7 @@ func newSession(conn *websocket.Conn, em *gameEventsManager, userId types.Object
 		msgCh:       make(chan []byte, 100),
 		pongCh:      make(chan struct{}),
 		changeSubCh: make(chan event.Subscription),
+		rc:          rc,
 		em:          em,
 
 		lastHeartBeat: atomic.NewTime(time.Now()),
@@ -83,12 +87,13 @@ func (s *session) startListen() {
 			s.sub = sub
 			wg.Add(1)
 			go func() {
-				s.l.Debug(fmt.Sprintf("session '%s' started listening to created games", s.id))
 				defer wg.Done()
+				t := s.sub.Topic().String()
+				s.l.Debug(fmt.Sprintf("session '%s' subscribed to '%s'", s.id, t))
 				for e := range s.sub.Event() {
 					s.handleEvent(e)
 				}
-				s.l.Debug(fmt.Sprintf("session '%s' stopped listening to created games", s.id))
+				s.l.Debug(fmt.Sprintf("session '%s' unsubscribed from '%s'", s.id, t))
 			}()
 
 		}
@@ -107,6 +112,14 @@ func (s *session) handleEvent(e event.Event) {
 	var msg *Msg
 	defer func() {
 		if msg != nil {
+			if s.isClosed() {
+				if err := s.rc.SaveSessionMsg(context.Background(), s.id, msg); err != nil {
+					s.l.Error(fmt.Sprintf("session '%s' failed to save message to redis: %v", s.id, err))
+					return
+				}
+				s.l.Debug(fmt.Sprintf("session '%s' saved message to redis", s.id))
+				return
+			}
 			s.send(*msg)
 		}
 	}()
@@ -139,6 +152,8 @@ func (s *session) handleEvent(e event.Event) {
 			}
 			s.sub.Unsubscribe()
 			s.sub = nil
+			s.gameId = types.ZeroObjectId()
+			s.role = 0
 
 		default:
 			var mt MsgType
@@ -147,6 +162,8 @@ func (s *session) handleEvent(e event.Event) {
 				mt = MsgTypeGameCreate
 			case event.ActionGameMoveApprove:
 				mt = MsgTypeMoveApproved
+			case event.ActionGamePlayerConnectionUpdated:
+				mt = MsgTypePlayerConnectionUpdated
 			default:
 				return
 			}
@@ -161,6 +178,20 @@ func (s *session) handleEvent(e event.Event) {
 	}
 }
 
+func (s *session) SubscribeAsPlayer(gameId types.ObjectId) {
+	s.changeSub(s.em.SubscribeToGame(gameId))
+	s.gameId = gameId
+	s.role = gamePlayerRole
+	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
+}
+
+func (s *session) SubscribeAsViewer(gameId types.ObjectId) {
+	s.changeSub(s.em.SubscribeToGame(gameId))
+	s.gameId = gameId
+	s.role = gameViewerRole
+	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
+}
+
 func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatchRequest) {
 	var errMsg string
 	defer func() {
@@ -172,7 +203,6 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatc
 	if s.sub == nil && (s.userId == data.User1.ID || s.userId == data.User2.ID) {
 		s.changeSub(s.em.SubscribeToMatch(data.ID))
 		s.role = gamePlayerRole
-		s.l.Debug(fmt.Sprintf("session '%s' subscribed to match '%s'", s.id, data.ID))
 		return
 	}
 
@@ -231,7 +261,7 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMove
 		return
 	}
 
-	errMsg = "not allowd"
+	errMsg = "not allowed to move"
 }
 
 func (s *session) send(msg Msg) {
@@ -275,8 +305,11 @@ func (s *session) isSubscribedToGame() bool {
 
 func (s *session) close() error {
 	s.closed.Store(true)
-	close(s.stopCh)
 	return s.Conn.Close()
+}
+
+func (s *session) stop() {
+	close(s.stopCh)
 }
 
 func (s *session) isClosed() bool {

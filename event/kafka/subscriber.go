@@ -149,28 +149,34 @@ func (sm *subscriptionManager) removeSub(sub *feedSub) {
 // Sends an event to all subscribers of the event's topic.
 func (sm *subscriptionManager) send(events ...event.Event) {
 	sm.mu.Lock()
-	subscribers := make([]chan event.Event, 0)
+	defer sm.mu.Unlock()
+	// subscribers := make([]chan event.Event, 0)
 	for _, e := range events {
 		if subs, exists := sm.subs[e.GetTopic().Domain()]; exists {
 			for _, sub := range subs {
 				if e.GetTopic().Match(sub.topic) {
-					subscribers = append(subscribers, sub.ch)
+					select {
+					case sub.ch <- e:
+					default:
+						fmt.Println("event dropped: ", e.GetTopic().String())
+					}
+
+					// subscribers = append(subscribers, sub.ch)
 				}
 			}
 		}
 	}
-	sm.mu.Unlock()
 
-	for _, ch := range subscribers {
-		for _, e := range events {
-			select {
-			case ch <- e:
-			default:
-				fmt.Println("event dropped: ", e.GetTopic().String())
-			}
+	// for _, ch := range subscribers {
+	// 	for _, e := range events {
+	// 		select {
+	// 		case ch <- e:
+	// 		default:
+	// 			fmt.Println("event dropped: ", e.GetTopic().String())
+	// 		}
 
-		}
-	}
+	// 	}
+	// }
 }
 
 // feedSub Implements the event.Subscription interface.
@@ -188,8 +194,9 @@ func newFeedSub(topic event.Topic, kc *kafkaSubscriber) *feedSub {
 	return &feedSub{
 		topic: topic,
 		kc:    kc,
-		ch:    make(chan event.Event, 1000),
-		err:   make(chan error, 1000),
+
+		ch:  make(chan event.Event, 1000),
+		err: make(chan error, 1000),
 	}
 }
 
@@ -219,6 +226,10 @@ func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 			e = &event.EventGameMoveApproved{}
 		case event.ActionGamePlayerLeft:
 			e = &event.EventGamePlayerLeft{}
+		case event.ActionGamePlayerConnectionUpdated:
+			e = &event.EventGamePlayerConnectionUpdated{}
+		case event.ActionGamePlayerSelectSquare:
+			e = &event.EventGamePlayerSelectSquare{}
 		case event.ActionEnded:
 			e = &event.EventGameEnded{}
 		default:

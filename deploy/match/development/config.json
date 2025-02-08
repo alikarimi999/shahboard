@@ -1,6 +1,6 @@
 {
     "match_service": {
-        "engine_ticker": 5,
+        "engine_ticker": 3,
         "match_request_ticker": 15
     },
     "kafka": {

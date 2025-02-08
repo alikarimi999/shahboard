@@ -22,6 +22,10 @@ func NewObjectId() ObjectId {
 	return ObjectId(strconv.FormatInt(id, 10))
 }
 
+func ZeroObjectId() ObjectId {
+	return ObjectId("")
+}
+
 func (id ObjectId) IsZero() bool {
 	return id == "" || id == "0"
 }
