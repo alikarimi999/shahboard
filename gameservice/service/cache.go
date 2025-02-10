@@ -60,7 +60,11 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 
 	-- MSetNX to store game data
 	local success = redis.call('MSETNX', gameKey, ARGV[5])
-	if success == 1 and expirationTime > 0 then
+	if success == 0 then
+		return 0
+	end
+
+	if expirationTime > 0 then
 	    redis.call('EXPIRE', gameKey, expirationTime)
 	end
 
@@ -71,7 +75,7 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 	redis.call('SET', playerGameKey1, gameID)
 	redis.call('SET', playerGameKey2, gameID)
 
-	return success
+	return 1
 	`
 
 	cGame := &inCacheGame{

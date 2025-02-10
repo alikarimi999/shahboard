@@ -186,8 +186,9 @@ type feedSub struct {
 	topic event.Topic
 	kc    *kafkaSubscriber
 
-	ch  chan event.Event // Channel for receiving events.
-	err chan error       // Channel for receiving errors.
+	ch   chan event.Event // Channel for receiving events.
+	err  chan error       // Channel for receiving errors.
+	once sync.Once
 }
 
 func newFeedSub(topic event.Topic, kc *kafkaSubscriber) *feedSub {
@@ -208,6 +209,10 @@ func (s *feedSub) Err() <-chan error { return s.err }
 
 // Unsubscribes from the topic and removes the topic from the topic manager if there are no more subscribers.
 func (s *feedSub) Unsubscribe() {
+	s.once.Do(s.unsubscribe)
+}
+
+func (s *feedSub) unsubscribe() {
 	s.kc.subscriptionManager.removeSub(s) // Removes the subscription.
 	close(s.ch)
 	close(s.err)

@@ -2,6 +2,7 @@ package event
 
 import (
 	"fmt"
+	"strings"
 )
 
 // Topic represents an event topic with structured fields.
@@ -13,6 +14,10 @@ type Topic struct {
 
 // NewTopic creates a new topic instance.
 func NewTopic(domain Domain, action Action, resource string) Topic {
+	if strings.Contains(resource, "{") && strings.Contains(resource, "}") {
+		resource = ""
+	}
+
 	return Topic{
 		domain:   domain,
 		action:   action,

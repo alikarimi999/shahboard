@@ -38,17 +38,26 @@ func NewManager(l log.Logger, handler EventHandler) *SubscriptionManager {
 	return m
 }
 
-func (m *SubscriptionManager) AddSubscription(sub Subscription) {
+func (m *SubscriptionManager) AddSubscription(sub Subscription) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if _, ok := m.subs[sub.Topic().String()]; ok {
+		return false
+	}
+
 	m.subs[sub.Topic().String()] = sub
 	m.newSubCh <- sub
+
+	return true
 }
 
 func (m *SubscriptionManager) RemoveSubscription(t Topic) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.subs, t.String())
+	if sub, ok := m.subs[t.String()]; ok {
+		sub.Unsubscribe()
+		delete(m.subs, t.String())
+	}
 }
 
 func (m *SubscriptionManager) run() {
@@ -61,6 +70,11 @@ func (m *SubscriptionManager) run() {
 				m.wg.Add(1)
 				go m.handleSubscription(sub)
 			case <-m.closeCh:
+				m.mu.Lock()
+				for _, sub := range m.subs {
+					sub.Unsubscribe()
+				}
+				m.mu.Unlock()
 				return
 			}
 		}
@@ -69,7 +83,10 @@ func (m *SubscriptionManager) run() {
 
 func (m *SubscriptionManager) handleSubscription(sub Subscription) {
 	m.l.Debug(fmt.Sprintf("Listening to topic: '%s'", sub.Topic()))
-	defer m.wg.Done()
+	defer func() {
+		m.wg.Done()
+		m.l.Debug(fmt.Sprintf("Stopped listening to topic: '%s'", sub.Topic()))
+	}()
 
 	for {
 		select {
@@ -77,8 +94,6 @@ func (m *SubscriptionManager) handleSubscription(sub Subscription) {
 			m.handler(e)
 		case err := <-sub.Err():
 			m.l.Error(fmt.Sprintf("Error in subscription topic '%s': %v", sub.Topic(), err))
-		case <-m.closeCh:
-			return
 		}
 	}
 }
