@@ -238,11 +238,24 @@ func (s *Server) stopSessions(purge bool, sess ...*session) {
 		return
 	}
 
+	t := time.Now().Unix()
+
 	if purge {
+		events := make([]event.Event, 0, len(sess))
 		ids := []types.ObjectId{}
 		for _, s := range sess {
 			ids = append(ids, s.userId)
+			events = append(events, event.EventGamePlayerLeft{
+				GameID:    s.gameId,
+				PlayerID:  s.userId,
+				Timestamp: t,
+			})
 		}
+
+		if err := s.p.Publish(events...); err != nil {
+			s.l.Error(fmt.Sprintf("failed to publish game_player_left event: %v", err))
+		}
+
 		if err := s.cache.DeleteSessions(context.Background(), ids...); err != nil {
 			s.l.Error(fmt.Sprintf("failed to delete sessions: %v", err))
 			return
@@ -252,7 +265,6 @@ func (s *Server) stopSessions(purge bool, sess ...*session) {
 	}
 
 	events := []event.Event{}
-	t := time.Now().Unix()
 	for _, se := range sess {
 		if !se.gameId.IsZero() {
 			events = append(events, event.EventGamePlayerConnectionUpdated{
@@ -367,7 +379,14 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 		}
 
 		sess.handleMoveRequest(msg.ID, d)
+	case MsgTypeChatMsgSend:
+		var d DataGameChatMsgSend
+		if err := json.Unmarshal(msg.Data, &d); err != nil {
+			sess.sendErr(msg.ID, "invalid data")
+			return
+		}
 
+		sess.handleSendMsg(msg.ID, d)
 	case MsgTypeData:
 
 		// handle data message

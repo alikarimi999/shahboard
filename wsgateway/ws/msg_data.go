@@ -49,3 +49,42 @@ func (d DataGamePlayerMoveRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
+
+type DataGameChatCreated struct {
+	event.EventGameChatCreated
+}
+
+func (d DataGameChatCreated) Type() MsgType {
+	return MsgTypeChatCreated
+}
+
+func (d DataGameChatCreated) Encode() []byte {
+	b, _ := json.Marshal(d)
+	return b
+}
+
+type DataGameChatMsgSend struct {
+	event.EventGameChatMsgeSent
+}
+
+func (d DataGameChatMsgSend) Type() MsgType {
+	return MsgTypeChatMsgSend
+}
+
+func (d DataGameChatMsgSend) Encode() []byte {
+	b, _ := json.Marshal(d)
+	return b
+}
+
+type DataGameChatMsgApproved struct {
+	event.EventGameChatMsgApproved
+}
+
+func (d DataGameChatMsgApproved) Type() MsgType {
+	return MsgTypeChatMsgApproved
+}
+
+func (d DataGameChatMsgApproved) Encode() []byte {
+	b, _ := json.Marshal(d)
+	return b
+}

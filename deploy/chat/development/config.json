@@ -1,0 +1,19 @@
+{
+    "chat_service": {
+        "instance_id": "chat_service_0"
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379
+    },
+    "kafka": {
+        "brokers": [
+            "localhost:9092"
+        ],
+        "group_id": "chat_service_0"
+    },
+    "log": {
+        "file": "./data/log/chat_service.log",
+        "verbose": true
+    }
+}

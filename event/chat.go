@@ -3,7 +3,6 @@ package event
 import (
 	"encoding/json"
 
-	ec "github.com/alikarimi999/shahboard/chatservice/entity"
 	"github.com/alikarimi999/shahboard/types"
 )
 
@@ -15,7 +14,7 @@ const (
 var (
 	TopicGameChat            = NewTopic(DomainGameChat, ActionAny, "")
 	TopicGameChatCreated     = NewTopic(DomainGameChat, ActionCreated, "{gameID}")
-	TopicGameChatMsgCreated  = NewTopic(DomainGameChat, ActionMsgSent, "{gameID}")
+	TopicGameChatMsgSent     = NewTopic(DomainGameChat, ActionMsgSent, "{gameID}")
 	TopicGameChatMsgApproved = NewTopic(DomainGameChat, ActionMsgApproved, "{gameID}")
 	TopicGameChatEnded       = NewTopic(DomainGameChat, ActionEnded, "{gameID}")
 )
@@ -63,7 +62,7 @@ func (e EventGameChatMsgeSent) GetResource() string {
 }
 
 func (e EventGameChatMsgeSent) GetTopic() Topic {
-	return TopicGameChatMsgCreated.WithResource(e.GetResource())
+	return TopicGameChatMsgSent.WithResource(e.GetResource())
 }
 
 func (e EventGameChatMsgeSent) GetAction() Action {
@@ -80,10 +79,11 @@ func (e EventGameChatMsgeSent) Encode() []byte {
 }
 
 type EventGameChatMsgApproved struct {
-	ID         types.ObjectId `json:"id"`
-	GameID     types.ObjectId `json:"game_id"`
-	ec.Message `json:"message"`
-	Timestamp  int64 `json:"timestamp"`
+	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
+	SenderId  types.ObjectId `json:"sender_id"`
+	Content   string         `json:"content"`
+	Timestamp int64          `json:"timestamp"`
 }
 
 func (e EventGameChatMsgApproved) GetResource() string {

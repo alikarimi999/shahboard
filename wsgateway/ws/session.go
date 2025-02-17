@@ -108,7 +108,6 @@ func (s *session) changeSub(sub event.Subscription) {
 }
 
 func (s *session) handleEvent(e event.Event) {
-
 	var msg *Msg
 	defer func() {
 		if msg != nil {
@@ -126,67 +125,99 @@ func (s *session) handleEvent(e event.Event) {
 
 	switch e.GetTopic().Domain() {
 	case event.DomainGame:
-		switch e.GetAction() {
-		case event.ActionCreated:
-			eve := e.(*event.EventGameCreated)
-			s.gameId = eve.GameID
-
-			msg = &Msg{
-				MsgBase: MsgBase{
-					Type:      MsgTypeGameCreate,
-					Timestamp: time.Now().Unix(),
-				},
-				Data: eve.Encode(),
-			}
-
-			s.sub.Unsubscribe()
-			s.changeSub(s.em.SubscribeToGame(eve.GameID))
-
-		case event.ActionEnded:
-			msg = &Msg{
-				MsgBase: MsgBase{
-					Type:      MsgTypeGameEnd,
-					Timestamp: time.Now().Unix(),
-				},
-				Data: e.Encode(),
-			}
-			s.sub.Unsubscribe()
-			s.sub = nil
-			s.gameId = types.ZeroObjectId()
-			s.role = 0
-
-		default:
-			var mt MsgType
-			switch e.GetAction() {
-			case event.ActionCreated:
-				mt = MsgTypeGameCreate
-			case event.ActionGameMoveApprove:
-				mt = MsgTypeMoveApproved
-			case event.ActionGamePlayerConnectionUpdated:
-				mt = MsgTypePlayerConnectionUpdated
-			default:
-				return
-			}
-			msg = &Msg{
-				MsgBase: MsgBase{
-					Type:      mt,
-					Timestamp: time.Now().Unix(),
-				},
-				Data: e.Encode(),
-			}
-		}
+		msg = s.handleGameEvent(e)
+	case event.DomainGameChat:
+		msg = s.handleGameChatEvent(e)
 	}
 }
 
+func (s *session) handleGameEvent(e event.Event) *Msg {
+	var msg *Msg
+
+	switch e.GetAction() {
+	case event.ActionCreated:
+		eve := e.(*event.EventGameCreated)
+		s.gameId = eve.GameID
+
+		msg = &Msg{
+			MsgBase: MsgBase{
+				Type:      MsgTypeGameCreate,
+				Timestamp: time.Now().Unix(),
+			},
+			Data: eve.Encode(),
+		}
+
+		s.sub.Unsubscribe()
+		s.changeSub(s.em.SubscribeToGameWithChat(eve.GameID))
+
+	case event.ActionEnded:
+		msg = &Msg{
+			MsgBase: MsgBase{
+				Type:      MsgTypeGameEnd,
+				Timestamp: time.Now().Unix(),
+			},
+			Data: e.Encode(),
+		}
+		s.sub.Unsubscribe()
+		s.sub = nil
+		s.gameId = types.ZeroObjectId()
+		s.role = 0
+
+	default:
+		var mt MsgType
+		switch e.GetAction() {
+		case event.ActionCreated:
+			mt = MsgTypeGameCreate
+		case event.ActionGameMoveApprove:
+			mt = MsgTypeMoveApproved
+		case event.ActionGamePlayerConnectionUpdated:
+			mt = MsgTypePlayerConnectionUpdated
+		default:
+			return nil
+		}
+		msg = &Msg{
+			MsgBase: MsgBase{
+				Type:      mt,
+				Timestamp: time.Now().Unix(),
+			},
+			Data: e.Encode(),
+		}
+	}
+
+	return msg
+}
+
+func (s *session) handleGameChatEvent(e event.Event) *Msg {
+	var mt MsgType
+	switch e.GetAction() {
+	case event.ActionCreated:
+		mt = MsgTypeChatCreated
+	case event.ActionMsgApproved:
+		mt = MsgTypeChatMsgApproved
+	}
+
+	if mt != "" {
+		return &Msg{
+			MsgBase: MsgBase{
+				Type:      mt,
+				Timestamp: time.Now().Unix(),
+			},
+			Data: e.Encode(),
+		}
+	}
+
+	return nil
+}
+
 func (s *session) SubscribeAsPlayer(gameId types.ObjectId) {
-	s.changeSub(s.em.SubscribeToGame(gameId))
+	s.changeSub(s.em.SubscribeToGameWithChat(gameId))
 	s.gameId = gameId
 	s.role = gamePlayerRole
 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
 }
 
 func (s *session) SubscribeAsViewer(gameId types.ObjectId) {
-	s.changeSub(s.em.SubscribeToGame(gameId))
+	s.changeSub(s.em.SubscribeToGameWithChat(gameId))
 	s.gameId = gameId
 	s.role = gameViewerRole
 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
@@ -229,7 +260,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 				Timestamp: time.Now().Unix(),
 			}}
 
-		s.changeSub(s.em.SubscribeToGame(req.GameId))
+		s.changeSub(s.em.SubscribeToGameWithChat(req.GameId))
 		s.role = gameViewerRole
 
 		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
@@ -262,6 +293,30 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMove
 	}
 
 	errMsg = "not allowed to move"
+}
+
+func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
+	var errMsg string
+	defer func() {
+		if errMsg != "" {
+			s.sendErr(msgId, errMsg)
+		}
+	}()
+
+	if s.sub != nil && s.gameId == req.GameID && s.userId == req.SenderID {
+		if err := s.p.Publish(event.EventGameChatMsgeSent{
+			ID:        req.ID,
+			GameID:    req.GameID,
+			SenderID:  req.SenderID,
+			Content:   req.Content,
+			Timestamp: time.Now().Unix(),
+		}); err != nil {
+			s.l.Error(fmt.Sprintf("failed to publish chat message event: %v", err))
+		}
+		return
+	}
+
+	errMsg = "not allowed to send message"
 }
 
 func (s *session) send(msg Msg) {

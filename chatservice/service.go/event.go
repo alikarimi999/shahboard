@@ -1,4 +1,4 @@
-package service
+package chat
 
 import (
 	"context"
@@ -73,10 +73,11 @@ func (s *Service) handleMsgSent(e *event.EventGameChatMsgeSent) {
 		return
 	}
 
+	t := time.Now()
 	msg := &entity.Message{
 		SenderId:  e.SenderID,
 		Content:   e.Content,
-		Timestamp: time.Now(),
+		Timestamp: t,
 	}
 
 	c.AddMessage(msg)
@@ -84,8 +85,9 @@ func (s *Service) handleMsgSent(e *event.EventGameChatMsgeSent) {
 	if err := s.pub.Publish(event.EventGameChatMsgApproved{
 		ID:        types.NewObjectId(),
 		GameID:    e.GameID,
-		Message:   *msg,
-		Timestamp: time.Now().Unix(),
+		SenderId:  e.SenderID,
+		Content:   e.Content,
+		Timestamp: t.Unix(),
 	}); err != nil {
 		s.l.Error(fmt.Sprintf("failed to publish game chat message approved event, ERR: %s", err.Error()))
 		return

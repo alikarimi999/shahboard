@@ -106,10 +106,11 @@ func (
 		}
 
 		e, err := decodeEvent(message.Topic, action, message.Value)
-		if err == nil {
-			ch.kc.subscriptionManager.send(e) // Sends the decoded event to all subscribers.
+		if err != nil {
+			ch.l.Error(err.Error())
+			continue
 		}
-
+		ch.kc.subscriptionManager.send(e) // Sends the decoded event to all subscribers.
 	}
 	return nil
 }
@@ -238,17 +239,32 @@ func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 		case event.ActionEnded:
 			e = &event.EventGameEnded{}
 		default:
-			return nil, fmt.Errorf("unknown event type for topic: %s", domain)
+			return nil, fmt.Errorf("unknown event type for: %s.%s", domain, action)
 		}
+
+	case event.DomainGameChat:
+		switch event.Action(action) {
+		case event.ActionCreated:
+			e = &event.EventGameChatCreated{}
+		case event.ActionMsgSent:
+			e = &event.EventGameChatMsgeSent{}
+		case event.ActionMsgApproved:
+			e = &event.EventGameChatMsgApproved{}
+		case event.ActionEnded:
+			e = &event.EventGameChatEnded{}
+		default:
+			return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
+		}
+
 	case event.DomainMatch:
 		switch event.Action(action) {
 		case event.ActionUsersMatched:
 			e = &event.EventUsersMatched{}
 		default:
-			return nil, fmt.Errorf("unknown event type for topic: %s", domain)
+			return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
 		}
 	default:
-		return nil, fmt.Errorf("unknown event type for topic: %s", domain)
+		return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
 	}
 
 	// Decode the JSON data into the event struct

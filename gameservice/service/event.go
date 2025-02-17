@@ -73,7 +73,7 @@ func (gs *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
 func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 	g := gs.getGame(d.GameID)
 	// if game is not manging by this instance, do nothing
-	if g == nil {
+	if g == nil || g.Status() == entity.GameStatusDeactive {
 		return
 	}
 
@@ -88,7 +88,10 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 	}
 
 	if g.Outcome() != entity.NoOutcome {
-		g.Deactivate()
+		if !g.EndGame() {
+			return
+		}
+
 		if err := gs.cache.updateAndDeactivateGame(context.Background(), g.Game); err != nil {
 			gs.l.Error(err.Error())
 			return
@@ -142,11 +145,14 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 
 func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 	g := gs.getGame(d.GameID)
-	if g == nil {
+	if g == nil || g.Status() == entity.GameStatusDeactive {
 		return
 	}
 
-	g.Deactivate()
+	if !g.PlayerLeft(d.PlayerID) {
+		return
+	}
+
 	if err := gs.cache.updateAndDeactivateGame(context.Background(), g.Game); err != nil {
 		gs.l.Error(err.Error())
 		return
@@ -159,7 +165,8 @@ func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 		GameID:    d.GameID,
 		Player1:   g.Player1(),
 		Player2:   g.Player2(),
-		Outcome:   string(g.Outcome()),
+		Outcome:   g.Outcome().String(),
+		Desc:      entity.EndDescriptionPlayerLeft.String(),
 		Timestamp: time.Now().Unix(),
 	})
 	gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.GameID))

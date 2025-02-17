@@ -34,6 +34,10 @@ const (
 	Draw GameOutcome = "1/2-1/2"
 )
 
+func (o GameOutcome) String() string {
+	return string(o)
+}
+
 type GameSettings struct {
 	Time time.Duration
 }
@@ -144,12 +148,38 @@ func (g *Game) ValidMoves() []string {
 	return moves
 }
 
-func (g *Game) Deactivate() {
+func (g *Game) Resign(player types.ObjectId) bool {
+	return g.resign(player, EndDescriptionPlayerResigned)
+}
+
+func (g *Game) PlayerLeft(player types.ObjectId) bool {
+	return g.resign(player, EndDescriptionPlayerLeft)
+}
+
+func (g *Game) EndGame() bool {
+	return g.deactivate(EndDescriptionEmpty)
+}
+
+func (g *Game) resign(player types.ObjectId, desc endDescription) bool {
+	if g.player1.ID == player {
+		g.game.Resign(colorToChessColor(g.player1.Color))
+		return g.deactivate(desc)
+	} else if g.player2.ID == player {
+		g.game.Resign(colorToChessColor(g.player2.Color))
+		return g.deactivate(desc)
+	}
+	return false
+}
+
+func (g *Game) deactivate(desc endDescription) bool {
 	g.status = GameStatusDeactive
+	g.game.AddTagPair(endDescriptionTag, string(desc))
+	g.UpdatedAt = time.Now()
+	return true
 }
 
 func (g *Game) Encode() []byte {
-	s := fmt.Sprintf("%d:%d:%d:%d:%d:%d\n", g.id, g.status,
+	s := fmt.Sprintf("%s:%d:%s:%d:%s:%d\n", g.id, g.status,
 		g.player1.ID, g.player1.Color, g.player2.ID, g.player2.Color)
 	txt, _ := g.game.MarshalText()
 	return []byte(s + string(txt))
@@ -162,8 +192,10 @@ func (g *Game) Decode(data []byte) error {
 		return fmt.Errorf("invalid encoded data")
 	}
 
-	var id, status, player1, color1, player2, color2 uint64
-	_, err := fmt.Sscanf(parts[0], "%d:%d:%d:%d:%d:%d\n", &id, &status,
+	var id, player1, player2 string
+	var status, color1, color2 uint64
+
+	_, err := fmt.Sscanf(parts[0], "%s:%d:%s:%d:%s:%d\n", &id, &status,
 		&player1, &color1, &player2, &color2)
 	if err != nil {
 		return fmt.Errorf("failed to parse game header: %v", err)
@@ -198,4 +230,11 @@ func setColors() (types.Color, types.Color) {
 		return types.ColorWhite, types.ColorBlack
 	}
 	return types.ColorBlack, types.ColorWhite
+}
+
+func colorToChessColor(c types.Color) chess.Color {
+	if c == types.ColorWhite {
+		return chess.White
+	}
+	return chess.Black
 }

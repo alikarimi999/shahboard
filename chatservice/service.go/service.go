@@ -1,4 +1,4 @@
-package service
+package chat
 
 import (
 	"context"
@@ -36,6 +36,7 @@ func NewService(cfg Config, pub event.Publisher, sub event.Subscriber, rc *redis
 	}
 	s.sm = event.NewManager(l, s.handleEvents)
 	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameCreated))
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameEnded))
 
 	return s
 }
@@ -52,4 +53,8 @@ func (s *Service) CreateGameChat(ctx context.Context, gameId types.ObjectId, pla
 	}
 
 	return ok, nil
+}
+
+func (s *Service) Stop() {
+	s.sm.Stop()
 }

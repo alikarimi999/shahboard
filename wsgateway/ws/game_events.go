@@ -15,7 +15,8 @@ var (
 )
 
 type gameEventsManager struct {
-	gs event.Subscription
+	gameSub event.Subscription
+	chatSub event.Subscription
 
 	mu                sync.Mutex
 	createdGameEvents map[types.ObjectId]event.Event // map by match id
@@ -23,9 +24,9 @@ type gameEventsManager struct {
 	broadcastTicker *time.Ticker
 	cleanupTicker   *time.Ticker
 
-	smu       sync.Mutex
-	matchSubs map[types.ObjectId][]*subscription
-	gameSubs  map[types.ObjectId][]*subscription
+	smu              sync.Mutex
+	matchSubs        map[types.ObjectId][]*subscription
+	gameWithChatSubs map[types.ObjectId][]*subscription
 
 	gameExpireTime time.Duration
 	l              log.Logger
@@ -34,17 +35,18 @@ type gameEventsManager struct {
 
 func newGameEventsManager(s event.Subscriber, l log.Logger) *gameEventsManager {
 	m := &gameEventsManager{
-		gs:                s.Subscribe(event.TopicGame),
+		gameSub:           s.Subscribe(event.TopicGame),
+		chatSub:           s.Subscribe(event.TopicGameChat),
 		gameExpireTime:    defaultGameExpireTime,
 		createdGameEvents: make(map[types.ObjectId]event.Event),
 
 		broadcastTicker: time.NewTicker(defaultBroadcastInterval),
 		cleanupTicker:   time.NewTicker(defaultGameExpireTime),
 
-		matchSubs: make(map[types.ObjectId][]*subscription),
-		gameSubs:  make(map[types.ObjectId][]*subscription),
-		l:         l,
-		stopCh:    make(chan struct{}),
+		matchSubs:        make(map[types.ObjectId][]*subscription),
+		gameWithChatSubs: make(map[types.ObjectId][]*subscription),
+		l:                l,
+		stopCh:           make(chan struct{}),
 	}
 
 	m.run()
@@ -65,7 +67,7 @@ func (m *gameEventsManager) startEventListener() {
 			case <-m.stopCh:
 				m.l.Debug("event listener stopped")
 				return
-			case e := <-m.gs.Event():
+			case e := <-m.gameSub.Event():
 				switch e.GetAction() {
 				case event.ActionCreated:
 					eve, ok := e.(*event.EventGameCreated)
@@ -95,11 +97,32 @@ func (m *gameEventsManager) startEventListener() {
 
 					// other game events only broadcast to subscribers that subscribed before receiving the event
 					m.smu.Lock()
-					for _, subs := range m.gameSubs[gameID] {
-						subs.ch <- e
+					for _, subs := range m.gameWithChatSubs[gameID] {
+						select {
+						case subs.ch <- e:
+						default:
+							m.l.Warn("failed to broadcast event to subscriber")
+						}
 					}
 					m.smu.Unlock()
 				}
+
+			case e := <-m.chatSub.Event():
+				gameID, err := types.ParseObjectId(e.GetTopic().Resource())
+				if err != nil {
+					continue
+				}
+
+				m.smu.Lock()
+				for _, subs := range m.gameWithChatSubs[gameID] {
+					select {
+					case subs.ch <- e:
+					default:
+						m.l.Warn("failed to broadcast event to subscriber")
+					}
+				}
+				m.smu.Unlock()
+
 			}
 		}
 	}()
@@ -139,7 +162,11 @@ func (m *gameEventsManager) startBroadcastRoutine() {
 					subs, ok := m.matchSubs[id]
 					if ok {
 						for _, sub := range subs {
-							sub.ch <- e
+							select {
+							case sub.ch <- e:
+							default:
+								m.l.Warn("failed to broadcast event to subscriber")
+							}
 						}
 					}
 				}
@@ -165,7 +192,7 @@ func (m *gameEventsManager) Stop() {
 		}
 	}
 
-	for _, subs := range m.gameSubs {
+	for _, subs := range m.gameWithChatSubs {
 		for _, sub := range subs {
 			close(sub.ch)
 			close(sub.errCh)
@@ -182,7 +209,7 @@ func (m *gameEventsManager) SubscribeToMatch(matchId types.ObjectId) event.Subsc
 		matchId: matchId,
 		m:       m,
 		topic:   event.TopicUsersMatched,
-		ch:      make(chan event.Event, 10),
+		ch:      make(chan event.Event, 100),
 		errCh:   make(chan error),
 	}
 
@@ -190,20 +217,20 @@ func (m *gameEventsManager) SubscribeToMatch(matchId types.ObjectId) event.Subsc
 	return s
 }
 
-func (m *gameEventsManager) SubscribeToGame(gameId types.ObjectId) event.Subscription {
+func (m *gameEventsManager) SubscribeToGameWithChat(gameId types.ObjectId) event.Subscription {
 	m.smu.Lock()
 	defer m.smu.Unlock()
 
 	s := &subscription{
-		index:  len(m.gameSubs[gameId]),
+		index:  len(m.gameWithChatSubs[gameId]),
 		gameId: gameId,
 		m:      m,
 		topic:  event.TopicGame.WithResource(gameId.String()),
-		ch:     make(chan event.Event, 10),
+		ch:     make(chan event.Event, 100),
 		errCh:  make(chan error),
 	}
 
-	m.gameSubs[gameId] = append(m.gameSubs[gameId], s)
+	m.gameWithChatSubs[gameId] = append(m.gameWithChatSubs[gameId], s)
 	return s
 }
 
@@ -223,10 +250,10 @@ func (m *gameEventsManager) removeSubscription(sub *subscription) {
 	}
 
 	if !sub.gameId.IsZero() {
-		if subs, ok := m.gameSubs[sub.gameId]; ok {
+		if subs, ok := m.gameWithChatSubs[sub.gameId]; ok {
 			for i, s := range subs {
 				if s.index == sub.index {
-					m.gameSubs[sub.gameId] = append(subs[:i], subs[i+1:]...)
+					m.gameWithChatSubs[sub.gameId] = append(subs[:i], subs[i+1:]...)
 					return
 				}
 			}

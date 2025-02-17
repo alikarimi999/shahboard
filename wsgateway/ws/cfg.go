@@ -5,7 +5,7 @@ import "time"
 var (
 	defaultMaxConnections                  = 1000
 	defaultMaxUserConnections              = 3
-	defaultPingIntervalDeadSession         = 2 * time.Minute
+	defaultPingIntervalDeadSession         = 1 * time.Minute
 	defaultPingIntervalDisconnectedSession = 5 * time.Second
 )
 

@@ -19,6 +19,9 @@ const (
 	MsgTypeMoveApproved            MsgType = "move_approved"
 	MsgTypePlayerConnectionUpdated MsgType = "player_connection_updated"
 	MsgTypeGameEnd                 MsgType = "game_ended"
+	MsgTypeChatCreated             MsgType = "chat_created"
+	MsgTypeChatMsgSend             MsgType = "msg_send"
+	MsgTypeChatMsgApproved         MsgType = "msg_approved"
 )
 
 type MsgBase struct {
