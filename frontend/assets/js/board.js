@@ -25,6 +25,7 @@ export function initializeBoard() {
         pieceTheme: '../../assets/img/pieces/{piece}.svg',
     }
     currentGame.board = Chessboard('board', config);
+    currentGame.boardInteractive = true;
 
     if (user.loggedIn) {
         return getLivePgn(null, user.id).then(game => {
@@ -112,10 +113,21 @@ function onDragStart(source, piece) {
         (currentGame.color === ColorBlack && piece.search(/^w/) !== -1)) {
         return false;
     }
+
 }
 
 function onDrop(source, target) {
     removeDotSquares();
+
+    if (currentGame.gameId && !currentGame.player.connected) {
+        showDisconnectedMessage(false);
+        return 'snapback';
+    }
+    if (currentGame.gameId && !currentGame.opponent.connected) {
+        showDisconnectedMessage(true);
+        return 'snapback';
+    }
+
     const move = currentGame.game.move({ from: source, to: target, promotion: 'q' });
 
     if (!move) return 'snapback';
@@ -133,8 +145,6 @@ function onMouseoverSquare(square, piece) {
     });
 
     if (moves.length === 0) return;
-
-    // Highlight the square currently holding the piece
 
     // Highlight valid move squares with a dot
     if (!selectedSquare) {
@@ -226,6 +236,20 @@ function attemptMove(destinationSquare) {
         return;
     }
 
+    if (!currentGame.player.connected) {
+        showDisconnectedMessage(false);
+        selectedSquare = null;
+        removeDotSquares();
+        return;
+    }
+
+    if (!currentGame.opponent.connected) {
+        showDisconnectedMessage(true);
+        selectedSquare = null;
+        removeDotSquares();
+        return;
+    }
+
     const piece = currentGame.game.get(destinationSquare)
     if (piece && piece.color == currentGame.game.turn()) {
         selectedSquare = destinationSquare; // Change selection to the new piece
@@ -303,3 +327,21 @@ $('#board').on('click', '.square-55d63, .piece-417db', function (event) {
 $(window).resize(function () {
     currentGame.board.resize();
 });
+
+function showDisconnectedMessage(opponent) {
+    if ($('#disconnected').length) return; // Avoid duplicate messages
+
+    let txtMsg = "You are disconnected";
+    if (opponent) {
+        txtMsg = "Opponent disconnected";
+    }
+
+    const message = $('<div id="disconnected" class="disconnected-message"></div>').text(txtMsg);
+    $('body').append(message);
+
+    // Animate the message
+    message.fadeIn(300).delay(2000).fadeOut(500, function () {
+        $(this).remove();
+    });
+}
+

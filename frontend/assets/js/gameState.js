@@ -5,6 +5,6 @@ export const currentGame = {
     gameId: null,
     matchId: null,
     color: null,
-    player: { id: null, name: null },
-    opponent: { id: null, name: null }
+    player: { id: null, name: null, connected: false },
+    opponent: { id: null, name: null, connected: false },
 };

@@ -172,13 +172,26 @@
         });
 
         document.addEventListener("opponent_disconnected", function () {
+            currentGame.opponent.connected = false;
             document.getElementById("opponent-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
         });
 
         document.addEventListener("opponent_connected", function () {
+            console.log("received opponent connected! >>>>");
+            currentGame.opponent.connected = true;
             document.getElementById("opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
         });
 
+        document.addEventListener("websocket_connected", function () {
+            currentGame.player.connected = true;
+            console.log("received WebSocket connected! >>>>");
+            document.getElementById("player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+        });
+
+        document.addEventListener("websocket_disconnected", function () {
+            currentGame.player.connected = false;
+            document.getElementById("player-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+        });
 
         document.addEventListener("chat_created", function () {
             // Enable chat input

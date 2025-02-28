@@ -14,6 +14,7 @@ export function connectWebSocket(url) {
     let healthCheckInterval;
     const messageHandlers = {};
     let resolveConnection;
+    let isFirstPong = true; // Add flag to track first pong after connection
 
     const connectionPromise = new Promise((resolve) => {
         resolveConnection = resolve;
@@ -83,6 +84,14 @@ export function connectWebSocket(url) {
         if (messageType === 0x1) {
             lastReceivedTime = Date.now();
             pongReceived = true;
+            if (isFirstPong) {
+                // Dispatch connected event on first pong
+                document.dispatchEvent(new Event("websocket_connected"));
+                document.dispatchEvent(new Event("opponent_connected"));
+                console.log("WebSocket and opponent connected >>>>> ");
+                isFirstPong = false;
+            }
+
             resolveConnection({
                 sendMessage,
                 registerMessageHandler,
@@ -101,6 +110,8 @@ export function connectWebSocket(url) {
     function checkServerHealth() {
         if (Date.now() - lastReceivedTime > 10000) {
             console.log("Server unresponsive: ", Date.now() - lastReceivedTime);
+            // WebSocket disconnected event 
+            document.dispatchEvent(new Event("websocket_disconnected"));
             socket.close();
             clearInterval(pingInterval);
             lastReceivedTime = Date.now();
