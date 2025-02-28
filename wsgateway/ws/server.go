@@ -286,7 +286,18 @@ func (s *Server) sessionReader(sess *session) {
 		mt, recievedMsg, err := sess.ReadMessage()
 		if err != nil {
 			s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", sess.id, err))
-			// s.stopSessions(false, sess)
+			if !sess.gameId.IsZero() {
+				s.stopSessions(false, false, sess)
+				if err := s.p.Publish(event.EventGamePlayerConnectionUpdated{
+					ID:        types.NewObjectId(),
+					GameID:    sess.gameId,
+					PlayerID:  sess.userId,
+					Connected: false,
+					Timestamp: time.Now().Unix(),
+				}); err != nil {
+					s.l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
+				}
+			}
 			return
 		}
 
