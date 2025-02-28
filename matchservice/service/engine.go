@@ -54,14 +54,22 @@ func (e *engine) stop() {
 	e.wg.Wait()
 }
 
-func (e *engine) addToQueue(pId types.ObjectId, l types.Level) *matchRequest {
+func (e *engine) addToQueue(pId types.ObjectId, l types.Level) (*matchRequest, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	for _, q := range e.queue {
+		for _, req := range q {
+			if req.userId == pId {
+				return nil, false
+			}
+		}
+	}
 
 	r := newMatchRequest(pId, l)
 	e.queue[l] = append(e.queue[l], r)
 
-	return r
+	return r, true
 }
 
 func (e *engine) cancelRequest(r *matchRequest) {

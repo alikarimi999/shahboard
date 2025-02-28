@@ -2,6 +2,7 @@ package entity
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,9 +74,9 @@ func NewGame(player1 types.ObjectId, player2 types.ObjectId, s GameSettings) *Ga
 		UpdatedAt: t,
 	}
 
-	g.game.AddTagPair("ID", g.id.String())
-	g.game.AddTagPair("White", g.white().ID.String())
-	g.game.AddTagPair("Black", g.black().ID.String())
+	g.game.AddTagPair("id", g.id.String())
+	g.game.AddTagPair("w", g.white().ID.String())
+	g.game.AddTagPair("b", g.black().ID.String())
 	g.game.AddTagPair("created_at", t.Format(time.RFC3339))
 	g.game.AddTagPair("updated_at", t.Format(time.RFC3339))
 
@@ -114,7 +115,6 @@ func (g *Game) Turn() types.Player {
 }
 
 func (g *Game) PGN() string {
-	g.game.AddTagPair("updated_at", g.UpdatedAt.Format(time.RFC3339))
 	return g.game.String()
 }
 
@@ -179,8 +179,8 @@ func (g *Game) deactivate(desc endDescription) bool {
 }
 
 func (g *Game) Encode() []byte {
-	s := fmt.Sprintf("%s:%d:%s:%d:%s:%d\n", g.id, g.status,
-		g.player1.ID, g.player1.Color, g.player2.ID, g.player2.Color)
+	s := fmt.Sprintf("%s:%d:%s:%d:%s:%d\n", g.id.String(), g.status,
+		g.player1.ID.String(), g.player1.Color, g.player2.ID.String(), g.player2.Color)
 	txt, _ := g.game.MarshalText()
 	return []byte(s + string(txt))
 }
@@ -192,13 +192,39 @@ func (g *Game) Decode(data []byte) error {
 		return fmt.Errorf("invalid encoded data")
 	}
 
-	var id, player1, player2 string
-	var status, color1, color2 uint64
+	headerFields := strings.Split(parts[0], ":")
+	if len(headerFields) != 6 {
+		return fmt.Errorf("invalid header: expected 6 fields, got %d", len(headerFields))
+	}
 
-	_, err := fmt.Sscanf(parts[0], "%s:%d:%s:%d:%s:%d\n", &id, &status,
-		&player1, &color1, &player2, &color2)
+	id, err := types.ParseObjectId(headerFields[0])
 	if err != nil {
-		return fmt.Errorf("failed to parse game header: %v", err)
+		return fmt.Errorf("failed to parse id: %v", err)
+	}
+
+	status, err := strconv.ParseUint(headerFields[1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse status: %v", err)
+	}
+
+	player1, err := types.ParseObjectId(headerFields[2])
+	if err != nil {
+		return fmt.Errorf("failed to parse player1: %v", err)
+	}
+
+	color1, err := strconv.ParseUint(headerFields[3], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse color1: %v", err)
+	}
+
+	player2, err := types.ParseObjectId(headerFields[4])
+	if err != nil {
+		return fmt.Errorf("failed to parse player2: %v", err)
+	}
+
+	color2, err := strconv.ParseUint(headerFields[5], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse color2: %v", err)
 	}
 
 	g.id = types.ObjectId(id)

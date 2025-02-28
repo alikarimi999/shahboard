@@ -6,6 +6,7 @@ import (
 	"github.com/alikarimi999/shahboard/event/kafka"
 	"github.com/alikarimi999/shahboard/matchservice/delivery/http"
 	match "github.com/alikarimi999/shahboard/matchservice/service"
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -19,6 +20,11 @@ func SetupApplication(cfg Config) (*application, error) {
 
 	l := log.NewLogger(cfg.Log.File, cfg.Log.Verbose)
 
+	v, err := jwt.NewValidator(cfg.JwtValidator)
+	if err != nil {
+		return nil, err
+	}
+
 	p, _, err := kafka.NewKafkaPublisherAndSubscriber(cfg.Kafka, l)
 	if err != nil {
 		return nil, err
@@ -29,7 +35,7 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	r, err := http.NewRouter(cfg.Http, s)
+	r, err := http.NewRouter(cfg.Http, s, v)
 	if err != nil {
 		return nil, err
 	}

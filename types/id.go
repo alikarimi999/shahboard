@@ -9,6 +9,8 @@ import (
 
 type ObjectId string
 
+const ObjectZero ObjectId = ""
+
 func NewObjectId() ObjectId {
 	// Get the current timestamp (4 bytes)
 	timestamp := uint32(time.Now().Unix())
@@ -20,10 +22,6 @@ func NewObjectId() ObjectId {
 	id := (int64(timestamp) << 32) | int64(random)
 
 	return ObjectId(strconv.FormatInt(id, 10))
-}
-
-func ZeroObjectId() ObjectId {
-	return ObjectId("")
 }
 
 func (id ObjectId) IsZero() bool {

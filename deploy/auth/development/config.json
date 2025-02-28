@@ -1,0 +1,33 @@
+{
+    "auth_service": {
+        "google_client_id": "103572145818-otri5g8tq5uu1lv2il163tjti4na2v74.apps.googleusercontent.com"
+    },
+    "kafka": {
+        "brokers": [
+            "localhost:9092"
+        ],
+        "group_id": "auth_service_0"
+    },
+    "jwt_generator": {
+        "private_key_path": "./data/jwt/private_key.pem",
+        "expiration_in_seconds": 2592000
+    },
+    "postgres_db": {
+        "host": "localhost",
+        "port": 5432,
+        "user": "postgres",
+        "password": "postgres",
+        "db_name": "auth_db",
+        "ssl_mode": "disable",
+        "max_idle_conns": 15,
+        "max_open_conns": 100,
+        "conn_max_lifetime": 5
+    },
+    "http": {
+        "port": 8084
+    },
+    "log": {
+        "file": "./data/log/auth_service.log",
+        "verbose": true
+    }
+}

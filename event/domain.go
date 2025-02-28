@@ -3,6 +3,7 @@ package event
 type Domain string
 
 const (
+	DomainUser     = "user"
 	DomainGame     = "game"
 	DomainMatch    = "match"
 	DomainGameChat = "game_chat"

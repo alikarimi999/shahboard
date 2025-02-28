@@ -7,33 +7,33 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-type DataFindMatchRequest struct {
+type dataFindMatchRequest struct {
 	event.EventUsersMatched
 }
 
-func (d DataFindMatchRequest) Type() MsgType {
+func (d dataFindMatchRequest) Type() MsgType {
 	return MsgTypeFindMatch
 }
 
-func (d DataFindMatchRequest) Encode() []byte {
+func (d dataFindMatchRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type DataGameViewRequest struct {
+type dataGameViewRequest struct {
 	GameId types.ObjectId `json:"game_id"`
 }
 
-func (d DataGameViewRequest) Type() MsgType {
+func (d dataGameViewRequest) Type() MsgType {
 	return MsgTypeView
 }
 
-func (d DataGameViewRequest) Encode() []byte {
+func (d dataGameViewRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type DataGamePlayerMoveRequest struct {
+type dataGamePlayerMoveRequest struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"player_id"`
@@ -41,50 +41,63 @@ type DataGamePlayerMoveRequest struct {
 	Timestamp int64          `json:"timestamp"`
 }
 
-func (d DataGamePlayerMoveRequest) Type() MsgType {
+func (d dataGamePlayerMoveRequest) Type() MsgType {
 	return MsgTypePlayerMove
 }
 
-func (d DataGamePlayerMoveRequest) Encode() []byte {
+func (d dataGamePlayerMoveRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type DataGameChatCreated struct {
+type dataGameChatCreated struct {
 	event.EventGameChatCreated
 }
 
-func (d DataGameChatCreated) Type() MsgType {
+func (d dataGameChatCreated) Type() MsgType {
 	return MsgTypeChatCreated
 }
 
-func (d DataGameChatCreated) Encode() []byte {
+func (d dataGameChatCreated) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type DataGameChatMsgSend struct {
+type dataGameChatMsgSend struct {
 	event.EventGameChatMsgeSent
 }
 
-func (d DataGameChatMsgSend) Type() MsgType {
+func (d dataGameChatMsgSend) Type() MsgType {
 	return MsgTypeChatMsgSend
 }
 
-func (d DataGameChatMsgSend) Encode() []byte {
+func (d dataGameChatMsgSend) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type DataGameChatMsgApproved struct {
+type dataGameChatMsgApproved struct {
 	event.EventGameChatMsgApproved
 }
 
-func (d DataGameChatMsgApproved) Type() MsgType {
+func (d dataGameChatMsgApproved) Type() MsgType {
 	return MsgTypeChatMsgApproved
 }
 
-func (d DataGameChatMsgApproved) Encode() []byte {
+func (d dataGameChatMsgApproved) Encode() []byte {
 	b, _ := json.Marshal(d)
+	return b
+}
+
+type dataResumeGameRequest struct {
+	GameId types.ObjectId `json:"game_id"`
+}
+
+func (m dataResumeGameRequest) Type() MsgType {
+	return MsgTypeResumeGame
+}
+
+func (m dataResumeGameRequest) Encode() []byte {
+	b, _ := json.Marshal(m)
 	return b
 }

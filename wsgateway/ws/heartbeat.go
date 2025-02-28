@@ -27,10 +27,10 @@ func (s *Server) checkHeartbeat() {
 		s.connsMux.RUnlock()
 
 		if len(deadSessions) > 0 {
-			s.stopSessions(true, deadSessions...)
+			s.stopSessions(true, true, deadSessions...)
 		}
 		if len(disconnectedSessions) > 0 {
-			s.stopSessions(false, disconnectedSessions...)
+			s.stopSessions(false, false, disconnectedSessions...)
 		}
 	}
 

@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/gin-gonic/gin"
 )
 
-func ParsQueryToken() gin.HandlerFunc {
+func ParseQueryToken(v *jwt.Validator) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		token := ctx.Query("token")
 		if token == "" {
@@ -18,19 +19,14 @@ func ParsQueryToken() gin.HandlerFunc {
 			return
 		}
 
-		user, err := parseToken(token)
+		user, err := v.ValidateJWT(token)
 		if err != nil {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			ctx.Abort()
-			return
-		}
-		if user.ID.IsZero() {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			ctx.Abort()
 			return
 		}
 
-		ctx.Set("user", user)
+		ctx.Set(userKey, user)
 		ctx.Next()
 	}
 }

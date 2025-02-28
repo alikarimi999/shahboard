@@ -25,11 +25,9 @@ func (gs *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
 	gs.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
 	// check if player is already in a game
 	if gs.checkByPlayer(d.User1.ID) || gs.checkByPlayer(d.User2.ID) {
-		fmt.Println(111)
 		gs.l.Debug("player is already in a game")
 		return
 	}
-	fmt.Println(222)
 
 	// create a new game
 	g := entity.NewGame(d.User1.ID, d.User2.ID, gs.cfg.DefaultGameSettings)
@@ -152,6 +150,8 @@ func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 	if !g.PlayerLeft(d.PlayerID) {
 		return
 	}
+
+	gs.l.Debug(fmt.Sprintf("player '%s' left game '%s'", d.PlayerID, d.GameID))
 
 	if err := gs.cache.updateAndDeactivateGame(context.Background(), g.Game); err != nil {
 		gs.l.Error(err.Error())

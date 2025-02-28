@@ -15,6 +15,7 @@ const (
 	MsgTypeData                    MsgType = "data"
 	MsgTypeError                   MsgType = "err"
 	MsgTypeGameCreate              MsgType = "game_created"
+	MsgTypeResumeGame              MsgType = "resume_game"
 	MsgTypePlayerMove              MsgType = "player_moved"
 	MsgTypeMoveApproved            MsgType = "move_approved"
 	MsgTypePlayerConnectionUpdated MsgType = "player_connection_updated"

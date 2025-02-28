@@ -9,7 +9,7 @@ import (
 )
 
 func (r *Router) setupUserRoutes() {
-	u := r.gin.Group("/user", middleware.ParsUserHeader())
+	u := r.gin.Group("/user", middleware.ParsUserHeader(r.v))
 	{
 		u.GET("/match", r.newMatchRequest)
 	}

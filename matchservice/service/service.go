@@ -52,7 +52,11 @@ func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*
 		return nil, err
 	}
 
-	req := s.e.addToQueue(userId, level)
+	req, ok := s.e.addToQueue(userId, level)
+	if !ok {
+		return nil, fmt.Errorf("user '%s' already has a match request", userId)
+	}
+
 	s.l.Debug(fmt.Sprintf("New match request for user '%s' with level %d", userId, level))
 	select {
 	case <-ctx.Done():

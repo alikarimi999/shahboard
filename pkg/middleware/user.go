@@ -1,41 +1,34 @@
 package middleware
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 
-	"github.com/alikarimi999/shahboard/types"
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/gin-gonic/gin"
 )
 
 const userKey = "user"
 
-func ParsUserHeader() gin.HandlerFunc {
+func ParsUserHeader(v *jwt.Validator) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		b64 := ctx.GetHeader("X-User-Data")
-		if b64 == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-User-Data header is required"})
-			ctx.Abort()
+		token := ctx.GetHeader("Authorization")
+		if token == "" {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		token = token[len("Bearer "):]
+		if token == "" {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		data, err := base64.StdEncoding.DecodeString(b64)
+		user, err := v.ValidateJWT(token)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-User-Data header is invalid"})
-			ctx.Abort()
+			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		var u types.User
-		err = json.Unmarshal(data, &u)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "X-User-Data header is invalid"})
-			ctx.Abort()
-			return
-		}
-
-		ctx.Set(userKey, u)
+		ctx.Set(userKey, user)
 		ctx.Next()
 	}
 }

@@ -48,12 +48,13 @@ type session struct {
 }
 
 func newSession(conn *websocket.Conn, em *gameEventsManager, rc *redisCache, userId types.ObjectId,
-	p event.Publisher, l log.Logger) *session {
+	gameId types.ObjectId, p event.Publisher, l log.Logger) *session {
 	sess := &session{
 		Conn: conn,
 		id:   types.NewObjectId(),
 
 		userId:      userId,
+		gameId:      gameId,
 		msgCh:       make(chan []byte, 100),
 		pongCh:      make(chan struct{}),
 		changeSubCh: make(chan event.Subscription),
@@ -137,6 +138,11 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 	switch e.GetAction() {
 	case event.ActionCreated:
 		eve := e.(*event.EventGameCreated)
+		if eve.Player1.ID != s.userId && eve.Player2.ID != s.userId {
+			s.sub.Unsubscribe()
+			return nil
+		}
+
 		s.gameId = eve.GameID
 
 		msg = &Msg{
@@ -148,7 +154,7 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 		}
 
 		s.sub.Unsubscribe()
-		s.changeSub(s.em.SubscribeToGameWithChat(eve.GameID))
+		s.changeSub(s.em.subscribeToGameWithChat(eve.GameID))
 
 	case event.ActionEnded:
 		msg = &Msg{
@@ -160,7 +166,7 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 		}
 		s.sub.Unsubscribe()
 		s.sub = nil
-		s.gameId = types.ZeroObjectId()
+		s.gameId = types.ObjectZero
 		s.role = 0
 
 	default:
@@ -209,21 +215,21 @@ func (s *session) handleGameChatEvent(e event.Event) *Msg {
 	return nil
 }
 
-func (s *session) SubscribeAsPlayer(gameId types.ObjectId) {
-	s.changeSub(s.em.SubscribeToGameWithChat(gameId))
-	s.gameId = gameId
-	s.role = gamePlayerRole
-	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
-}
+// func (s *session) subscribeAsPlayer(gameId types.ObjectId) {
+// 	s.changeSub(s.em.subscribeToGameWithChat(gameId))
+// 	s.gameId = gameId
+// 	s.role = gamePlayerRole
+// 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
+// }
 
-func (s *session) SubscribeAsViewer(gameId types.ObjectId) {
-	s.changeSub(s.em.SubscribeToGameWithChat(gameId))
-	s.gameId = gameId
-	s.role = gameViewerRole
-	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
-}
+// func (s *session) subscribeAsViewer(gameId types.ObjectId) {
+// 	s.changeSub(s.em.subscribeToGameWithChat(gameId))
+// 	s.gameId = gameId
+// 	s.role = gameViewerRole
+// 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
+// }
 
-func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatchRequest) {
+func (s *session) handleFindMatchRequest(msgId types.ObjectId, data dataFindMatchRequest) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {
@@ -232,7 +238,7 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatc
 	}()
 
 	if s.sub == nil && (s.userId == data.User1.ID || s.userId == data.User2.ID) {
-		s.changeSub(s.em.SubscribeToMatch(data.ID))
+		s.changeSub(s.em.subscribeToMatch(data.ID))
 		s.role = gamePlayerRole
 		return
 	}
@@ -240,7 +246,25 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatc
 	errMsg = "already subscribed to a game"
 }
 
-func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRequest) {
+func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGameRequest) {
+	var errMsg string
+	defer func() {
+		if errMsg != "" {
+			s.sendErr(msgId, errMsg)
+		}
+	}()
+
+	if s.sub == nil && s.gameId == req.GameId {
+		s.changeSub(s.em.subscribeToGameWithChat(req.GameId))
+		s.role = gamePlayerRole
+		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
+		return
+	}
+
+	errMsg = "already subscribed to a game"
+}
+
+func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRequest) {
 	var errMsg string
 	var msg *Msg
 	defer func() {
@@ -260,7 +284,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 				Timestamp: time.Now().Unix(),
 			}}
 
-		s.changeSub(s.em.SubscribeToGameWithChat(req.GameId))
+		s.changeSub(s.em.subscribeToGameWithChat(req.GameId))
 		s.role = gameViewerRole
 
 		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
@@ -271,7 +295,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 	errMsg = "already subscribed to a game"
 }
 
-func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMoveRequest) {
+func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMoveRequest) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {
@@ -295,7 +319,7 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMove
 	errMsg = "not allowed to move"
 }
 
-func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
+func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {

@@ -173,6 +173,18 @@ func (c *redisGameCache) getGamesIDs(ctx context.Context) ([]types.ObjectId, err
 	return gamesIDs, nil
 }
 
+func (c *redisGameCache) getGameByUserID(ctx context.Context, userID types.ObjectId) (types.ObjectId, error) {
+	gameID, err := c.rc.Get(ctx, fmt.Sprintf("%s%s", keyPlayerGamePrefix, userID)).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return types.ObjectZero, nil
+		}
+		return types.ObjectZero, err
+	}
+
+	return types.ParseObjectId(gameID)
+}
+
 func (c *redisGameCache) getGames(ctx context.Context) ([]*entity.Game, error) {
 	maxCount := 100
 	var cursor uint64
@@ -304,6 +316,9 @@ func (c *redisGameCache) getGamesByServiceID(ctx context.Context, id string) ([]
 func (c *redisGameCache) getGameByID(ctx context.Context, id types.ObjectId) (*entity.Game, error) {
 	gameData, err := c.rc.Get(ctx, fmt.Sprintf("%s%s", keyGamePrefix, id.String())).Result()
 	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
 		return nil, err
 	}
 

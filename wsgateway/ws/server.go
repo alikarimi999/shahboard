@@ -11,6 +11,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/alikarimi999/shahboard/event"
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/alikarimi999/shahboard/types"
@@ -40,29 +41,33 @@ type Server struct {
 	cache *redisCache
 
 	stopCh chan struct{}
-	l      log.Logger
+
+	jwtValidator *jwt.Validator
+
+	l log.Logger
 }
 
 func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
-	cfg *WsConfigs, c *redis.Client, l log.Logger) (*Server, error) {
+	cfg *WsConfigs, c *redis.Client, v *jwt.Validator, l log.Logger) (*Server, error) {
 	if cfg == nil {
 		cfg = defaultConfigs
 	}
 
 	server := &Server{
-		cfg:      cfg,
-		cache:    newRedisCache(c),
-		m:        newGameEventsManager(s, l),
-		p:        p,
-		sessions: make(map[types.ObjectId]*session),
-		counter:  atomic.NewInt64(0),
-		stopCh:   make(chan struct{}),
-		l:        l,
+		cfg:          cfg,
+		cache:        newRedisCache(c),
+		m:            newGameEventsManager(s, l),
+		p:            p,
+		sessions:     make(map[types.ObjectId]*session),
+		counter:      atomic.NewInt64(0),
+		stopCh:       make(chan struct{}),
+		jwtValidator: v,
+		l:            l,
 	}
 
 	go server.checkHeartbeat()
 
-	e.GET("/ws", middleware.ParsQueryToken(), func(ctx *gin.Context) {
+	e.GET("/ws", middleware.ParseQueryToken(v), func(ctx *gin.Context) {
 		u, _ := ctx.Get("user")
 		user := u.(types.User)
 
@@ -72,29 +77,6 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			ctx.Abort()
 			return
 		}
-
-		// // check if user has a session in memory
-		// sess := server.getSession(user.ID)
-		// if sess != nil {
-		// 	if sess.isClosed() {
-		// 		sess.reconnect(conn)
-		// 		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
-		// 			l.Error(fmt.Sprintf("failed to save session state: %v", err))
-		// 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
-		// 			conn.Close()
-		// 			return
-		// 		}
-		// 		go server.sessionReader(sess)
-		// 		go server.sessionWriter(sess)
-		// 		sess.sendWelcome()
-		// 		l.Info(fmt.Sprintf("session '%s' reconnected for user '%s'", sess.id, user.ID))
-
-		// 		return
-		// 	}
-		// 	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
-		// 	conn.Close()
-		// 	return
-		// }
 
 		// check if user has a session in redis
 		csess, err := server.cache.GetSession(context.Background(), user.ID)
@@ -127,10 +109,10 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			server.l.Debug(fmt.Sprintf("delete disconnected session for user '%s'", user.ID))
 			sess := server.getSession(user.ID)
 			if sess != nil {
-				server.stopSessions(true, sess)
+				server.stopSessions(true, false, sess)
 			}
 
-			sess = newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, p, l)
+			sess = newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, csess.GameId, p, l)
 			if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
 				l.Error(fmt.Sprintf("failed to save session state: %v", err))
 				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
@@ -143,33 +125,41 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			go server.sessionWriter(sess)
 			sess.sendWelcome()
 
+			// if !csess.GameId.IsZero() {
+			// 	sess.send(Msg{
+			// 		MsgBase: MsgBase{
+			// 			Type:      MsgTypeResumeGame,
+			// 			Timestamp: time.Now().Unix(),
+			// 		},
+			// 		Data: msgDataResumeGame{GameID: csess.GameId}.encode(),
+			// 	})
+
+			// 	if csess.Role == gamePlayerRole {
+			// 		sess.SubscribeAsPlayer(csess.GameId)
+			// 	} else if csess.Role == gameViewerRole {
+			// 		sess.SubscribeAsViewer(csess.GameId)
+			// 	}
+
+			// 	if err := sess.p.Publish(event.EventGamePlayerConnectionUpdated{
+			// 		ID:        types.NewObjectId(),
+			// 		GameID:    csess.GameId,
+			// 		PlayerID:  user.ID,
+			// 		Connected: true,
+			// 		Timestamp: time.Now().Unix(),
+			// 	}); err != nil {
+			// 		l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
+			// 	}
+			// }
+
 			for _, msg := range msgs {
 				sess.send(msg)
-			}
-
-			if err := sess.p.Publish(event.EventGamePlayerConnectionUpdated{
-				ID:        types.NewObjectId(),
-				GameID:    csess.GameId,
-				PlayerID:  user.ID,
-				Connected: true,
-				Timestamp: time.Now().Unix(),
-			}); err != nil {
-				l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
-			}
-
-			if !csess.GameId.IsZero() {
-				if csess.Role == gamePlayerRole {
-					sess.SubscribeAsPlayer(csess.GameId)
-				} else if csess.Role == gameViewerRole {
-					sess.SubscribeAsViewer(csess.GameId)
-				}
 			}
 
 			l.Info(fmt.Sprintf("new session '%s' created for user '%s'", sess.id, user.ID))
 			return
 		}
 
-		sess := newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, p, l)
+		sess := newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, types.ObjectZero, p, l)
 		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
 			l.Error(fmt.Sprintf("failed to save session state: %v", err))
 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
@@ -213,7 +203,7 @@ func (s *Server) removeSession(sess *session) {
 	s.counter.Add(-1)
 }
 
-func (s *Server) stopSessions(purge bool, sess ...*session) {
+func (s *Server) stopSessions(purge, endGame bool, sess ...*session) {
 	for _, se := range sess {
 		if se.isClosed() {
 			if purge {
@@ -240,22 +230,29 @@ func (s *Server) stopSessions(purge bool, sess ...*session) {
 
 	t := time.Now().Unix()
 
-	if purge {
+	if endGame {
 		events := make([]event.Event, 0, len(sess))
-		ids := []types.ObjectId{}
 		for _, s := range sess {
-			ids = append(ids, s.userId)
-			events = append(events, event.EventGamePlayerLeft{
-				GameID:    s.gameId,
-				PlayerID:  s.userId,
-				Timestamp: t,
-			})
+			if !s.gameId.IsZero() {
+				events = append(events, event.EventGamePlayerLeft{
+					GameID:    s.gameId,
+					PlayerID:  s.userId,
+					Timestamp: t,
+				})
+				fmt.Println("publish event player leeft: ", s.userId, s.gameId)
+			}
 		}
 
 		if err := s.p.Publish(events...); err != nil {
 			s.l.Error(fmt.Sprintf("failed to publish game_player_left event: %v", err))
 		}
+	}
 
+	if purge {
+		ids := []types.ObjectId{}
+		for _, s := range sess {
+			ids = append(ids, s.userId)
+		}
 		if err := s.cache.DeleteSessions(context.Background(), ids...); err != nil {
 			s.l.Error(fmt.Sprintf("failed to delete sessions: %v", err))
 			return
@@ -335,13 +332,13 @@ func (s *Server) sessionWriter(sess *session) {
 		case message := <-sess.msgCh:
 			if err := sess.WriteMessage(websocket.TextMessage, message); err != nil {
 				s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", sess.id, err))
-				s.stopSessions(false, sess)
+				s.stopSessions(false, false, sess)
 				return
 			}
 		case <-sess.pongCh:
 			if err := sess.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
 				s.l.Debug(fmt.Sprintf("session '%s' write pong message error: %v", sess.id, err))
-				s.stopSessions(false, sess)
+				s.stopSessions(false, false, sess)
 				return
 			}
 		}
@@ -356,15 +353,28 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 			return
 		}
 
-		var d DataFindMatchRequest
+		var d dataFindMatchRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
 		}
 
 		sess.handleFindMatchRequest(msg.ID, d)
+	case MsgTypeResumeGame:
+		if sess.isSubscribedToGame() {
+			sess.sendErr(msg.ID, "already subscribed to a game")
+			return
+		}
+
+		var d dataResumeGameRequest
+		if err := json.Unmarshal(msg.Data, &d); err != nil {
+			sess.sendErr(msg.ID, "invalid data")
+			return
+		}
+
+		sess.handleResumeGameRequest(msg.ID, d)
 	case MsgTypeView:
-		var d DataGameViewRequest
+		var d dataGameViewRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -372,7 +382,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleViewGameRequest(msg.ID, d)
 	case MsgTypePlayerMove:
-		var d DataGamePlayerMoveRequest
+		var d dataGamePlayerMoveRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -380,7 +390,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleMoveRequest(msg.ID, d)
 	case MsgTypeChatMsgSend:
-		var d DataGameChatMsgSend
+		var d dataGameChatMsgSend
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return

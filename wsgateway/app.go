@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/alikarimi999/shahboard/wsgateway/ws"
@@ -19,8 +20,12 @@ type application struct {
 }
 
 func SetupApplication(cfg Config) (*application, error) {
-
 	l := log.NewLogger(cfg.Log.File, cfg.Log.Verbose)
+
+	v, err := jwt.NewValidator(cfg.JwtValidator)
+	if err != nil {
+		return nil, err
+	}
 
 	p, s, err := kafka.NewKafkaPublisherAndSubscriber(cfg.Kafka, l)
 	if err != nil {
@@ -42,7 +47,7 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	server, err := ws.NewServer(e, s, p, nil, c, l)
+	server, err := ws.NewServer(e, s, p, nil, c, v, l)
 	if err != nil {
 		return nil, err
 	}

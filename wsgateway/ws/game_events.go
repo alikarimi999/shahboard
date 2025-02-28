@@ -200,7 +200,7 @@ func (m *gameEventsManager) Stop() {
 	}
 }
 
-func (m *gameEventsManager) SubscribeToMatch(matchId types.ObjectId) event.Subscription {
+func (m *gameEventsManager) subscribeToMatch(matchId types.ObjectId) event.Subscription {
 	m.smu.Lock()
 	defer m.smu.Unlock()
 
@@ -217,7 +217,7 @@ func (m *gameEventsManager) SubscribeToMatch(matchId types.ObjectId) event.Subsc
 	return s
 }
 
-func (m *gameEventsManager) SubscribeToGameWithChat(gameId types.ObjectId) event.Subscription {
+func (m *gameEventsManager) subscribeToGameWithChat(gameId types.ObjectId) event.Subscription {
 	m.smu.Lock()
 	defer m.smu.Unlock()
 
