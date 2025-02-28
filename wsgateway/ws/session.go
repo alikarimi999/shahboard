@@ -1,7 +1,6 @@
 package ws
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -113,11 +112,6 @@ func (s *session) handleEvent(e event.Event) {
 	defer func() {
 		if msg != nil {
 			if s.isClosed() {
-				if err := s.rc.SaveSessionMsg(context.Background(), s.id, msg); err != nil {
-					s.l.Error(fmt.Sprintf("session '%s' failed to save message to redis: %v", s.id, err))
-					return
-				}
-				s.l.Debug(fmt.Sprintf("session '%s' saved message to redis", s.id))
 				return
 			}
 			s.send(*msg)

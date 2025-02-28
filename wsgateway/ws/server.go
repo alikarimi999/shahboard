@@ -98,13 +98,6 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 		// don't need to save session state if it's closed,it will be replaced by a new session
 		// in future we should be able to retrieve the session state from redis and reconnect the session instead of creating a new one
 		if csess != nil && csess.Closed {
-			msgs, err := server.cache.GetSessionMsgs(context.Background(), csess.SessionId)
-			if err != nil {
-				l.Error(fmt.Sprintf("failed to get session messages: %v", err))
-				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
-				conn.Close()
-				return
-			}
 
 			server.l.Debug(fmt.Sprintf("delete disconnected session for user '%s'", user.ID))
 			sess := server.getSession(user.ID)
@@ -135,10 +128,6 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 				}); err != nil {
 					l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
 				}
-			}
-
-			for _, msg := range msgs {
-				sess.send(msg)
 			}
 
 			l.Info(fmt.Sprintf("new session '%s' created for user '%s'", sess.id, user.ID))
