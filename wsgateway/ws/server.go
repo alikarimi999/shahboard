@@ -125,31 +125,17 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			go server.sessionWriter(sess)
 			sess.sendWelcome()
 
-			// if !csess.GameId.IsZero() {
-			// 	sess.send(Msg{
-			// 		MsgBase: MsgBase{
-			// 			Type:      MsgTypeResumeGame,
-			// 			Timestamp: time.Now().Unix(),
-			// 		},
-			// 		Data: msgDataResumeGame{GameID: csess.GameId}.encode(),
-			// 	})
-
-			// 	if csess.Role == gamePlayerRole {
-			// 		sess.SubscribeAsPlayer(csess.GameId)
-			// 	} else if csess.Role == gameViewerRole {
-			// 		sess.SubscribeAsViewer(csess.GameId)
-			// 	}
-
-			// 	if err := sess.p.Publish(event.EventGamePlayerConnectionUpdated{
-			// 		ID:        types.NewObjectId(),
-			// 		GameID:    csess.GameId,
-			// 		PlayerID:  user.ID,
-			// 		Connected: true,
-			// 		Timestamp: time.Now().Unix(),
-			// 	}); err != nil {
-			// 		l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
-			// 	}
-			// }
+			if !csess.GameId.IsZero() {
+				if err := sess.p.Publish(event.EventGamePlayerConnectionUpdated{
+					ID:        types.NewObjectId(),
+					GameID:    csess.GameId,
+					PlayerID:  user.ID,
+					Connected: true,
+					Timestamp: time.Now().Unix(),
+				}); err != nil {
+					l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
+				}
+			}
 
 			for _, msg := range msgs {
 				sess.send(msg)
