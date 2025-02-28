@@ -18,7 +18,7 @@ type Service struct {
 
 	sm *event.SubscriptionManager
 
-	gMu   sync.Mutex
+	gMu   sync.RWMutex
 	games map[types.ObjectId]*entity.Game
 
 	cache *redisGameCache
@@ -51,6 +51,7 @@ func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub ev
 
 	s.sm = event.NewManager(l, s.handleEvents)
 	s.sm.AddSubscription(s.sub.Subscribe(event.TopicUsersMatched))
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGame))
 
 	if err := s.init(); err != nil {
 		return nil, err
@@ -92,9 +93,16 @@ func (gs *Service) addGame(g *entity.Game) bool {
 }
 
 func (gs *Service) getGame(id types.ObjectId) *entity.Game {
-	gs.gMu.Lock()
-	defer gs.gMu.Unlock()
+	gs.gMu.RLock()
+	defer gs.gMu.RUnlock()
 	return gs.games[id]
+}
+
+func (gs *Service) gameExists(id types.ObjectId) bool {
+	gs.gMu.RLock()
+	defer gs.gMu.RUnlock()
+	_, ok := gs.games[id]
+	return ok
 }
 
 func (gs *Service) removeGame(id types.ObjectId) {
@@ -104,8 +112,8 @@ func (gs *Service) removeGame(id types.ObjectId) {
 }
 
 func (gs *Service) checkByPlayer(p types.ObjectId) bool {
-	gs.gMu.Lock()
-	defer gs.gMu.Unlock()
+	gs.gMu.RLock()
+	defer gs.gMu.RUnlock()
 	for _, g := range gs.games {
 		if g.Player1().ID == p || g.Player2().ID == p {
 			return true

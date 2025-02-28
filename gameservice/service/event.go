@@ -40,11 +40,6 @@ func (s *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
 		return
 	}
 
-	sub := s.sub.Subscribe(event.TopicGame.WithResource(game.ID().String()))
-	s.sm.AddSubscription(sub)
-
-	s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
-
 	// publish the game created event
 	if err := s.pub.Publish(event.EventGameCreated{
 		GameID:    game.ID(),
@@ -112,7 +107,6 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
 		s.l.Debug(fmt.Sprintf("published game ended event: '%s'", game.ID()))
 
-		s.sm.RemoveSubscription(event.TopicGame.WithResource(game.ID().String()))
 		s.removeGame(game.ID())
 
 	} else {
@@ -153,7 +147,6 @@ func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 		return
 	}
 
-	s.sm.RemoveSubscription(event.TopicGame.WithResource(game.ID().String()))
 	s.removeGame(d.GameID)
 	s.l.Debug(fmt.Sprintf("removed game: '%s'", d.GameID))
 
@@ -173,12 +166,23 @@ func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 func (gs *Service) handleEvents(e event.Event) {
 	switch e.GetTopic().Domain() {
 	case event.DomainGame:
+		res := e.GetTopic().Resource()
+		gameId, err := types.ParseObjectId(res)
+		if err != nil {
+			return
+		}
+
+		if !gs.gameExists(gameId) {
+			return
+		}
+
 		switch e.GetAction() {
 		case event.ActionGamePlayerMoved:
 			gs.handleEventGamePlayerMoved(e.(*event.EventGamePlayerMoved))
 		case event.ActionGamePlayerLeft:
 			gs.handleEventGamePlayerLeft(e.(*event.EventGamePlayerLeft))
 		}
+
 	case event.DomainMatch:
 		switch e.GetAction() {
 		case event.ActionUsersMatched:
