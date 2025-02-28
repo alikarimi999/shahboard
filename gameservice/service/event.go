@@ -10,92 +10,87 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-func (gs *Service) subscribeEvents(topics ...event.Topic) {
-	for _, topic := range topics {
-		gs.subManager.addSub(gs.s.Subscribe(topic))
-		gs.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", topic))
-	}
-}
-
 // handleEventUsersMatched handles the event of two players being matched
 // and creates a new game if both players do not have any active games.
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
-func (gs *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
-	gs.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
+func (s *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
+	s.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
 	// check if player is already in a game
-	if gs.checkByPlayer(d.User1.ID) || gs.checkByPlayer(d.User2.ID) {
-		gs.l.Debug("player is already in a game")
+	if s.checkByPlayer(d.User1.ID) || s.checkByPlayer(d.User2.ID) {
+		s.l.Debug("player is already in a game")
 		return
 	}
 
 	// create a new game
-	g := entity.NewGame(d.User1.ID, d.User2.ID, gs.cfg.DefaultGameSettings)
+	game := entity.NewGame(d.User1.ID, d.User2.ID, s.cfg.DefaultGameSettings)
 
 	// add the game to the cache
-	if ok, err := gs.cache.addGame(context.Background(), g); err != nil {
-		gs.l.Error(err.Error())
+	if ok, err := s.cache.addGame(context.Background(), game); err != nil {
+		s.l.Error(err.Error())
 		return
 	} else if !ok {
-		gs.l.Debug(fmt.Sprintf("game already exists in cache: '%s'", g.ID()))
+		s.l.Debug(fmt.Sprintf("game already exists in cache: '%s'", game.ID()))
 		return
 	}
-	gs.l.Debug(fmt.Sprintf("added game to cache: '%s'", g.ID()))
+	s.l.Debug(fmt.Sprintf("added game to cache: '%s'", game.ID()))
 
-	gm := newGameManager(gs, g)
-	gs.addGame(gm)
-	topic := event.TopicGame.WithResource(gm.ID().String())
-	subsctiption := gs.s.Subscribe(topic)
-	gm.addSub(subsctiption)
+	if !s.addGame(game) {
+		s.l.Error(fmt.Sprintf("game '%s' created before", game.ID()))
+		return
+	}
 
-	gs.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", topic))
+	sub := s.sub.Subscribe(event.TopicGame.WithResource(game.ID().String()))
+	s.sm.AddSubscription(sub)
+
+	s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
 
 	// publish the game created event
-	if err := gs.p.Publish(event.EventGameCreated{
-		GameID:    g.ID(),
+	if err := s.pub.Publish(event.EventGameCreated{
+		GameID:    game.ID(),
 		MatchID:   d.ID,
-		Player1:   g.Player1(),
-		Player2:   g.Player2(),
+		Player1:   game.Player1(),
+		Player2:   game.Player2(),
 		Timestamp: time.Now().Unix(),
 	}); err != nil {
-		gs.l.Error(err.Error())
+		s.l.Error(err.Error())
 	}
-	gs.l.Debug(fmt.Sprintf("published game created event: '%s'", g.ID()))
+	s.l.Debug(fmt.Sprintf("published game created event: '%s'", game.ID()))
 
-	gs.l.Info(fmt.Sprintf("game '%s' created by player '%s' as '%s' and player '%s' as '%s'",
-		g.ID(), g.Player1().ID, g.Player1().Color, g.Player2().ID, g.Player2().Color))
+	s.l.Info(fmt.Sprintf("game '%s' created by player '%s' as '%s' and player '%s' as '%s'",
+		game.ID(), game.Player1().ID, game.Player1().Color, game.Player2().ID, game.Player2().Color))
 
 	// TODO: add to repository concurrency control
 }
 
-func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
-	g := gs.getGame(d.GameID)
+func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
+	game := s.getGame(d.GameID)
 	// if game is not manging by this instance, do nothing
-	if g == nil || g.Status() == entity.GameStatusDeactive {
+	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return
 	}
 
-	if g.Turn().ID != d.PlayerID {
-		gs.l.Debug(fmt.Sprintf("it's not player '%s' turn", d.PlayerID))
+	if game.Turn().ID != d.PlayerID {
+		s.l.Debug(fmt.Sprintf("it's not player '%s' turn", d.PlayerID))
 		return
 	}
 
-	if err := g.Move(d.Move); err != nil {
-		gs.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.GameID))
+	if err := game.Move(d.Move); err != nil {
+		s.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.GameID))
 		return
 	}
 
-	if g.Outcome() != entity.NoOutcome {
-		if !g.EndGame() {
+	if game.Outcome() != entity.NoOutcome {
+		if !game.EndGame() {
 			return
 		}
 
-		if err := gs.cache.updateAndDeactivateGame(context.Background(), g.Game); err != nil {
-			gs.l.Error(err.Error())
+		if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
+			s.l.Error(err.Error())
 			return
 		}
 
-		if err := gs.p.Publish(event.EventGameMoveApproved{
+		if err := s.pub.Publish(event.EventGameMoveApproved{
 			ID:        types.NewObjectId(),
 			PlayerID:  d.PlayerID,
 			GameID:    d.GameID,
@@ -104,72 +99,74 @@ func (gs *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		},
 			event.EventGameEnded{
 				ID:        types.NewObjectId(),
-				GameID:    g.ID(),
-				Player1:   g.Player1(),
-				Player2:   g.Player2(),
-				Outcome:   string(g.Outcome()),
+				GameID:    game.ID(),
+				Player1:   game.Player1(),
+				Player2:   game.Player2(),
+				Outcome:   string(game.Outcome()),
 				Timestamp: time.Now().Unix(),
 			}); err != nil {
-			gs.l.Error(err.Error())
+			s.l.Error(err.Error())
 			return
 		}
 
-		gs.l.Debug(fmt.Sprintf("published game move approved event: '%s'", g.ID()))
-		gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", g.ID()))
+		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
+		s.l.Debug(fmt.Sprintf("published game ended event: '%s'", game.ID()))
 
-		g.stop()
-		gs.removeGame(g.ID())
+		s.sm.RemoveSubscription(event.TopicGame.WithResource(game.ID().String()))
+		s.removeGame(game.ID())
 
 	} else {
-		if err := gs.cache.updateGameMove(context.Background(), g.Game); err != nil {
-			gs.l.Debug(err.Error())
+		if err := s.cache.updateGameMove(context.Background(), game); err != nil {
+			s.l.Debug(err.Error())
 			return
 		}
 
-		gs.l.Debug(fmt.Sprintf("player '%s' made move '%s' on game '%s'", d.PlayerID, d.Move, g.ID()))
+		s.l.Debug(fmt.Sprintf("player '%s' made move '%s' on game '%s'", d.PlayerID, d.Move, game.ID()))
 
-		gs.p.Publish(event.EventGameMoveApproved{
+		s.pub.Publish(event.EventGameMoveApproved{
 			ID:        types.NewObjectId(),
 			PlayerID:  d.PlayerID,
 			GameID:    d.GameID,
 			Move:      d.Move,
 			Timestamp: time.Now().Unix(),
 		})
-		gs.l.Debug(fmt.Sprintf("published game move approved event: '%s'", g.ID()))
+		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
 	}
 
 	// TODO: think about how to update the database
 }
 
-func (gs *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
-	g := gs.getGame(d.GameID)
-	if g == nil || g.Status() == entity.GameStatusDeactive {
+func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
+	game := s.getGame(d.GameID)
+	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return
 	}
 
-	if !g.PlayerLeft(d.PlayerID) {
+	if !game.PlayerLeft(d.PlayerID) {
 		return
 	}
 
-	gs.l.Debug(fmt.Sprintf("player '%s' left game '%s'", d.PlayerID, d.GameID))
+	s.l.Debug(fmt.Sprintf("player '%s' left game '%s'", d.PlayerID, d.GameID))
 
-	if err := gs.cache.updateAndDeactivateGame(context.Background(), g.Game); err != nil {
-		gs.l.Error(err.Error())
+	if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
+		s.l.Error(err.Error())
 		return
 	}
-	gs.removeGame(d.GameID)
-	gs.l.Debug(fmt.Sprintf("removed game: '%s'", d.GameID))
 
-	gs.p.Publish(event.EventGameEnded{
+	s.sm.RemoveSubscription(event.TopicGame.WithResource(game.ID().String()))
+	s.removeGame(d.GameID)
+	s.l.Debug(fmt.Sprintf("removed game: '%s'", d.GameID))
+
+	s.pub.Publish(event.EventGameEnded{
 		ID:        types.NewObjectId(),
 		GameID:    d.GameID,
-		Player1:   g.Player1(),
-		Player2:   g.Player2(),
-		Outcome:   g.Outcome().String(),
+		Player1:   game.Player1(),
+		Player2:   game.Player2(),
+		Outcome:   game.Outcome().String(),
 		Desc:      entity.EndDescriptionPlayerLeft.String(),
 		Timestamp: time.Now().Unix(),
 	})
-	gs.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.GameID))
+	s.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.GameID))
 
 }
 

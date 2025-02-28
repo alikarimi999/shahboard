@@ -67,7 +67,7 @@ func (s *Service) GetGamePGN(ctx context.Context, id types.ObjectId) (GetGamePGN
 
 func (s *Service) getGameByID(ctx context.Context, id types.ObjectId) (*entity.Game, error) {
 	if g := s.getGame(id); g != nil {
-		return g.Game, nil
+		return g, nil
 	}
 
 	return s.cache.getGameByID(ctx, id)

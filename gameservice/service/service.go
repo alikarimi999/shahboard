@@ -16,15 +16,15 @@ import (
 type Service struct {
 	cfg Config
 
-	subManager *subscriptionManager
+	sm *event.SubscriptionManager
 
 	gMu   sync.Mutex
-	games map[types.ObjectId]*gameManager
+	games map[types.ObjectId]*entity.Game
 
 	cache *redisGameCache
 
-	p event.Publisher
-	s event.Subscriber
+	pub event.Publisher
+	sub event.Subscriber
 
 	l log.Logger
 
@@ -32,69 +32,48 @@ type Service struct {
 	wg      sync.WaitGroup
 }
 
-func NewGameService(cfg Config, redis *redis.Client, p event.Publisher, s event.Subscriber, l log.Logger) (*Service, error) {
+func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub event.Subscriber, l log.Logger) (*Service, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
-	gs := &Service{
+	s := &Service{
 		cfg: cfg,
 
-		games: make(map[types.ObjectId]*gameManager),
+		games: make(map[types.ObjectId]*entity.Game),
 		cache: newRedisGameCache(cfg.InstanceID, redis, 15*time.Minute),
-		p:     p,
-		s:     s,
+		pub:   pub,
+		sub:   sub,
 		l:     l,
 
 		closeCh: make(chan struct{}),
 	}
 
-	gs.subManager = newSubscriptionManager(gs)
+	s.sm = event.NewManager(l, s.handleEvents)
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicUsersMatched))
 
-	if err := gs.init(); err != nil {
+	if err := s.init(); err != nil {
 		return nil, err
 	}
 
-	gs.start()
-
-	return gs, nil
+	return s, nil
 }
 
-func (gs *Service) start() {
-	gs.wg.Add(1)
-	go func() {
-		defer gs.wg.Done()
-		for range gs.closeCh {
-			gs.subManager.stop()
-			gs.gMu.Lock()
-			for _, g := range gs.games {
-				g.stop()
-			}
-			gs.gMu.Unlock()
-		}
-	}()
-}
-
-func (gs *Service) init() error {
-
-	// subscribe to events
-	gs.subscribeEvents(event.TopicUsersMatched)
+func (s *Service) init() error {
 
 	// load games from cache
-	games, err := gs.cache.getGamesByServiceID(context.Background(), gs.cfg.InstanceID)
+	games, err := s.cache.getGamesByServiceID(context.Background(), s.cfg.InstanceID)
 	if err != nil {
 		return err
 	}
 
 	for _, g := range games {
 		if g.Status() == entity.GameStatusActive {
-			gm := newGameManager(gs, g)
-			gs.addGame(gm)
-
-			// subscribe to the game
-			topic := event.TopicGame.WithResource(gm.ID().String())
-			gm.addSub(gs.s.Subscribe(topic))
-			gs.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", topic))
+			if s.addGame(g) {
+				sub := s.sub.Subscribe(event.TopicGame.WithResource(g.ID().String()))
+				s.sm.AddSubscription(sub)
+				s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
+			}
 
 		}
 	}
@@ -102,7 +81,7 @@ func (gs *Service) init() error {
 	return nil
 }
 
-func (gs *Service) addGame(g *gameManager) bool {
+func (gs *Service) addGame(g *entity.Game) bool {
 	gs.gMu.Lock()
 	defer gs.gMu.Unlock()
 	if _, ok := gs.games[g.ID()]; ok {
@@ -112,7 +91,7 @@ func (gs *Service) addGame(g *gameManager) bool {
 	return true
 }
 
-func (gs *Service) getGame(id types.ObjectId) *gameManager {
+func (gs *Service) getGame(id types.ObjectId) *entity.Game {
 	gs.gMu.Lock()
 	defer gs.gMu.Unlock()
 	return gs.games[id]
