@@ -57,6 +57,7 @@ export function initializeBoard() {
                     data: base64Data
                 });
                 document.dispatchEvent(new Event("game_created"));
+                document.dispatchEvent(new Event("pgn_applied"));
             }
         })
     }

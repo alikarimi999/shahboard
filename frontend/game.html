@@ -162,7 +162,7 @@
                     document.querySelector("#opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
 
                     // Clear move list
-                    document.querySelector(".moves").innerHTML = "";
+                    // document.querySelector(".moves").innerHTML = "";
 
                     // Clear chat messages
                     document.querySelector(".messages").innerHTML = "";
@@ -307,6 +307,48 @@
             movesContainer.scrollTop = movesContainer.scrollHeight;
 
         });
+
+
+        document.addEventListener("pgn_applied", function (event) {
+            // Clear previous moves
+            const movesContainer = document.querySelector(".moves");
+            movesContainer.innerHTML = "";
+
+            // Process and display moves
+            const moves = currentGame.game.history({ verbose: true });
+            console.log("pgn applied>>>> ", moves);
+            moves.forEach((move, index) => {
+                let moveNumber;
+                const isWhiteMove = index % 2 === 0;
+                if (isWhiteMove) {
+                    moveNumber = (index + 2) / 2;
+                } else {
+                    moveNumber = (index + 1) / 2;
+                }
+                console.log("move,index: ", moveNumber, isWhiteMove)
+                let moveRow = document.querySelector(`.move-row[data-move="${moveNumber}"]`);
+                if (!moveRow) {
+                    moveRow = document.createElement("div");
+                    moveRow.classList.add("move-row");
+                    moveRow.setAttribute("data-move", moveNumber);
+                    moveRow.style.backgroundColor = moveNumber % 2 === 0 ? "#292929" : "#1F1F1F";
+                    moveRow.innerHTML = `
+                <span class="text-left">${moveNumber}.</span> 
+                <span class="white-move text-left"></span> 
+                <span class="black-move text-left"></span>
+            `;
+                    movesContainer.appendChild(moveRow);
+                }
+
+                const moveSpan = moveRow.querySelector(isWhiteMove ? ".white-move" : ".black-move");
+                moveSpan.textContent = move.san;
+            });
+
+            // Scroll to latest move
+            movesContainer.scrollTop = movesContainer.scrollHeight;
+        });
+
+
 
         function triggerWin(desc) {
             const winEffect = document.createElement("div");
