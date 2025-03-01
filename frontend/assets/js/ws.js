@@ -13,17 +13,21 @@ export function connectWebSocket(url) {
     let pongReceived = true;
     let healthCheckInterval;
     const messageHandlers = {};
+    let resolveConnection;
+    let isFirstPong = true; // Add flag to track first pong after connection
+
+    const connectionPromise = new Promise((resolve) => {
+        resolveConnection = resolve;
+    });
 
     function initializeSocket() {
         socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
             console.log("Connected to WebSocket");
-
             pingInterval = setInterval(() => {
                 if (socket.readyState === WebSocket.OPEN && pongReceived) {
-                    const pingMessage = new Uint8Array([0x0]);
-                    socket.send(pingMessage);
+                    socket.send(new Uint8Array([0x0]));
                     pongReceived = false;
                 }
             }, 1000);
@@ -33,14 +37,12 @@ export function connectWebSocket(url) {
             if (event.data instanceof Blob) {
                 const reader = new FileReader();
                 reader.onload = function () {
-                    const arrayBuffer = reader.result;
-                    const byteArray = new Uint8Array(arrayBuffer);
+                    const byteArray = new Uint8Array(reader.result);
                     handleBinaryMessage(byteArray);
                 };
                 reader.readAsArrayBuffer(event.data);
             } else if (typeof event.data === "string") {
-                let jsonData = JSON.parse(event.data);
-                handleTextMessage(jsonData);
+                handleTextMessage(JSON.parse(event.data));
             } else {
                 console.warn("Unknown message type:", event.data);
             }
@@ -82,6 +84,24 @@ export function connectWebSocket(url) {
         if (messageType === 0x1) {
             lastReceivedTime = Date.now();
             pongReceived = true;
+            if (isFirstPong) {
+                // Dispatch connected event on first pong
+                document.dispatchEvent(new Event("websocket_connected"));
+                document.dispatchEvent(new Event("opponent_connected"));
+                console.log("WebSocket and opponent connected >>>>> ");
+                isFirstPong = false;
+            }
+
+            resolveConnection({
+                sendMessage,
+                registerMessageHandler,
+                unregisterMessageHandler,
+                close: () => {
+                    socket.close();
+                    clearInterval(pingInterval);
+                    clearInterval(healthCheckInterval);
+                }
+            });
         } else {
             console.warn("Unknown binary message received:", byteArray);
         }
@@ -89,7 +109,9 @@ export function connectWebSocket(url) {
 
     function checkServerHealth() {
         if (Date.now() - lastReceivedTime > 10000) {
-            console.log("Server unresponsive, reconnecting...");
+            console.log("Server unresponsive: ", Date.now() - lastReceivedTime);
+            // WebSocket disconnected event 
+            document.dispatchEvent(new Event("websocket_disconnected"));
             socket.close();
             clearInterval(pingInterval);
             lastReceivedTime = Date.now();
@@ -100,14 +122,5 @@ export function connectWebSocket(url) {
 
     healthCheckInterval = setInterval(checkServerHealth, 5000);
 
-    return {
-        sendMessage,
-        registerMessageHandler,
-        unregisterMessageHandler,
-        close: () => {
-            socket.close();
-            clearInterval(pingInterval);
-            clearInterval(healthCheckInterval);
-        }
-    };
+    return connectionPromise;
 }

@@ -44,7 +44,10 @@ export function handleGameChatCreated(base64Data) {
 
 export function handleMoveApproved(base64Data) {
     const moveData = JSON.parse(atob(base64Data));
-    if (moveData.game_id === currentGame.gameId && moveData.player_id === currentGame.opponent.id) {
+    if (currentGame.isPlayer && moveData.game_id === currentGame.gameId && moveData.player_id === currentGame.opponent.id) {
+        currentGame.game.move(moveData.move);
+        updateBoardPosition();
+    } else if (moveData.game_id === currentGame.gameId && (moveData.player_id === currentGame.player.id || moveData.player_id === currentGame.opponent.id)) {
         currentGame.game.move(moveData.move);
         updateBoardPosition();
     }
@@ -52,20 +55,35 @@ export function handleMoveApproved(base64Data) {
 
 export function handleGameChatMsg(base64Data) {
     const chatData = JSON.parse(atob(base64Data));
-    if (chatData.game_id === currentGame.gameId && chatData.sender_id === currentGame.opponent.id) {
+    if (currentGame.isPlayer && chatData.game_id === currentGame.gameId && chatData.sender_id === currentGame.opponent.id) {
         document.dispatchEvent(new CustomEvent("opponent_msg", { detail: { content: chatData.content } }));
+    } else if (chatData.game_id === currentGame.gameId && (chatData.sender_id === currentGame.player.id || chatData.sender_id === currentGame.opponent.id)) {
+        document.dispatchEvent(new CustomEvent("chat_msg", {
+            detail: {
+                sender: chatData.sender_id,
+                content: chatData.content
+            }
+        }));
     }
 }
 
 export function handlePlayerConnectionUpdate(base64Data) {
     const playerData = JSON.parse(atob(base64Data));
-    if (playerData.player_id === currentGame.opponent.id) {
+    if (currentGame.isPlayer && playerData.player_id === currentGame.opponent.id) {
         if (playerData.connected) {
             document.dispatchEvent(new Event("opponent_connected"));
             console.log("Opponent connected");
         } else {
             document.dispatchEvent(new Event("opponent_disconnected"));
             console.log("Opponent disconnected");
+        }
+    } else {
+        // Dispatch player_disconnected event with player id 
+        if (playerData.connected) {
+            document.dispatchEvent(new CustomEvent("player_connected", { detail: { id: playerData.player_id } }));
+
+        } else {
+            document.dispatchEvent(new CustomEvent("player_disconnected", { detail: { id: playerData.player_id } }));
         }
     }
 }

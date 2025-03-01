@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShahBoard - Play Chess</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./assets/js/chess.js"></script>
+    <link rel="stylesheet" href="./assets/css/chessboard-1.0.0.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+        integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2"
+        crossorigin="anonymous"></script>
+    <script src="./assets/js/chessboard-1.0.0.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="./assets/css/style.css"></script>
+    <link rel="stylesheet" href="./assets/css/style.css">
+
+
+</head>
+
+<body>
+
+
+    <div id="game-start-animation" class="hidden">
+        <div class="animation-content">
+            <div class="player">
+                <img id="player-avatar" src="./assets/img/player1.webp" alt="Player">
+                <span id="player-name-display">Player</span>
+            </div>
+            <span class="vs-text">VS</span>
+            <div class="player">
+                <img id="opponent-avatar" src="./assets/img/player2.webp" alt="Opponent">
+                <span id="opponent-name-display">Opponent</span>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="loading-spinner" class="hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="sidebar-container"></div>
+    <div class="container">
+        <div class="board-container">
+
+
+
+            <div class="hidden opponent-info">
+                <img id="opponent-avatar" class="avatar" src="./assets/img/player2.webp" alt="Opponent Avatar">
+                <span id="opponent-name"></span>
+                <!-- <span class="timer">10:00</span> -->
+            </div>
+            <div id="board"></div>
+            <div class="hidden player-info">
+                <img id="player-avatar" class="avatar" src="./assets/img/player1.webp" alt="Player Avatar">
+                <span id="player-name"></span>
+                <!-- <span class="timer">10:00</span> -->
+            </div>
+            <button id="find-match-btn">Find Match</button>
+        </div>
+        <div class=" game-sidebar">
+            <div class="moves"></div>
+            <div class="chat">
+                <div class="chat-messages-container messages"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Type a message...">
+                    <button id="send-btn">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./assets/js/play.js"></script>
+
+    <script type="module" src="/assets/js/sidebar.js"></script>
+
+    <script type="module">
+        import { currentGame } from "./assets/js/gameState.js";
+        import { sendGameChatMsg } from './assets/js/chat.js';
+
+        const moveSound = new Audio('./assets/sounds/move2.mp3');
+
+
+        document.getElementById("find-match-btn").addEventListener("click", async () => {
+            const findMatchBtn = document.getElementById("find-match-btn");
+            const loadingSpinner = document.getElementById("loading-spinner");
+            loadingSpinner.classList.add("active");
+
+            try {
+                const module = await import("../assets/js/matchmaking.js");
+                await module.findMatch();
+            } catch (error) {
+                console.error("Matchmaking failed:", error);
+                loadingSpinner.classList.remove("active");
+
+                Swal.fire({
+                    icon: "error",
+                    title: "Matchmaking Failed",
+                    text: "Something went wrong. Please try again later.",
+                    background: "#1a1a1a", // Dark background
+                    color: "#FFD700", // Gold text
+                    confirmButtonColor: "#D4AF37", // Gold button
+                    iconColor: "#D4AF37", // Gold error icon
+                    customClass: {
+                        popup: "custom-swal-container",
+                        confirmButton: "custom-swal-button",
+                    },
+                });
+
+            } finally {
+                loadingSpinner.classList.remove("active");
+            }
+        });
+
+        document.addEventListener("game_created", function () {
+            moveSound.play();
+
+            console.log("game_created event received, adjusting layout...");
+            currentGame.player.name = "Player1";
+            currentGame.opponent.name = "Player2";
+
+            document.getElementById("find-match-btn").classList.add("hidden");
+            document.querySelector(".player-info").classList.remove("hidden");
+            document.querySelector(".opponent-info").classList.remove("hidden");
+
+            // Update player names and avatars
+            document.getElementById("player-name-display").textContent = currentGame.player.name;
+            document.getElementById("opponent-name-display").textContent = currentGame.opponent.name;
+
+            // Set player avatars
+            document.getElementById("player-avatar").src = `./assets/img/${currentGame.player.avatar || "player1.webp"}`;
+            document.getElementById("opponent-avatar").src = `./assets/img/${currentGame.opponent.avatar || "player2.webp"}`;
+
+
+            // Optionally set different profile pictures based on the player
+            document.getElementById("player-avatar").src = `./assets/img/${currentGame.player.avatar || "player1.webp"}`;
+            document.getElementById("opponent-avatar").src = `./assets/img/${currentGame.opponent.avatar || "player2.webp"}`;
+
+            // Show animation
+            const animationOverlay = document.getElementById("game-start-animation");
+            animationOverlay.style.opacity = "1";
+            animationOverlay.style.pointerEvents = "auto";
+
+            // After 3 seconds, fade out animation and proceed with UI updates
+            setTimeout(() => {
+                animationOverlay.style.animation = "fadeOut 1s forwards";
+
+                // Hide elements and clear move/chat after fade-out
+                setTimeout(() => {
+                    animationOverlay.style.opacity = "0";
+                    animationOverlay.style.pointerEvents = "none";
+                    animationOverlay.style.animation = ""; // Reset animation
+
+                    // Hide match button and update layout
+                    document.getElementById("find-match-btn").classList.add("hidden");
+                    document.querySelector(".player-info").classList.remove("hidden");
+                    document.querySelector(".opponent-info").classList.remove("hidden");
+
+                    document.querySelector("#player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+                    document.querySelector("#opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+                    document.querySelector(".messages").innerHTML = "";
+
+                }, 1000); // Delay after fade out
+            }, 3000); // Display animation for 3 seconds
+        });
+
+        document.addEventListener("opponent_disconnected", function () {
+            currentGame.opponent.connected = false;
+            document.getElementById("opponent-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+        });
+
+        document.addEventListener("opponent_connected", function () {
+            currentGame.opponent.connected = true;
+            document.getElementById("opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+        });
+
+        document.addEventListener("websocket_connected", function () {
+            currentGame.player.connected = true;
+            document.getElementById("player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+        });
+
+        document.addEventListener("websocket_disconnected", function () {
+            currentGame.player.connected = false;
+            document.getElementById("player-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+        });
+
+        document.addEventListener("chat_created", function () {
+            // Enable chat input
+            const chatContainer = document.querySelector(".chat-input-container");
+            chatContainer.classList.remove("disabled");
+
+            const chatInput = document.getElementById("chat-input");
+            const sendBtn = document.getElementById("send-btn");
+
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+        });
+
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const chatInput = document.getElementById("chat-input");
+            const sendBtn = document.getElementById("send-btn");
+            const chatBox = document.querySelector(".messages");
+
+            sendBtn.addEventListener("click", () => sendChatMsg(chatInput.value.trim(), false));
+            chatInput.addEventListener("keypress", (event) => {
+                if (event.key === "Enter") {
+                    sendChatMsg(chatInput.value.trim(), false);
+                }
+            });
+        });
+
+        document.addEventListener("opponent_msg", () => {
+            const { content } = event.detail;
+            sendChatMsg(content, true);
+        })
+
+        function sendChatMsg(msgText, isOpponent) {
+            if (!msgText) return;
+
+            const chatBox = document.querySelector(".messages");
+            const chatInput = document.getElementById("chat-input");
+
+            let messageClass;
+            let alignment;
+
+            if (isOpponent) {
+                messageClass = currentGame.color === "w" ? "black-message" : "white-message";
+                alignment = "flex-end";
+            } else {
+                messageClass = currentGame.color === "w" ? "white-message" : "black-message";
+                alignment = "flex-start";
+            }
+
+            appendMessage(msgText, messageClass, alignment);
+
+            if (!isOpponent) {
+                chatInput.value = ""; // Clear input only for user messages
+                sendGameChatMsg(msgText)
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function appendMessage(text, className, alignment) {
+            const chatBox = document.querySelector(".messages");
+            const messageElement = document.createElement("div");
+            messageElement.classList.add("message", className);
+            messageElement.textContent = text;
+            messageElement.style.alignSelf = alignment;
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+
+
+        document.addEventListener("move", (event) => {
+            moveSound.play();
+
+            const { index, san } = event.detail;
+            const movesContainer = document.querySelector(".moves");
+
+            // Determine move number and color
+            let moveNumber;
+            const isWhiteMove = index % 2 !== 0;
+            if (isWhiteMove) {
+                moveNumber = (index + 1) / 2;
+            } else {
+                moveNumber = index / 2;
+            }
+            // Create move row
+            // Check if the move row already exists
+            let moveRow = document.querySelector(`.move-row[data-move="${moveNumber}"]`);
+            ;
+            if (!moveRow) {
+                // Create a row with better organization
+                moveRow = document.createElement("div");
+                moveRow.classList.add("move-row");
+                moveRow.setAttribute("data-move", moveNumber);
+
+                // Apply alternating background colors
+                moveRow.style.backgroundColor = moveNumber % 2 === 0 ? "#292929" : "#1F1F1F";
+
+                // Add move number and placeholders for moves
+                moveRow.innerHTML = `
+            <span class="text-left">${moveNumber}.</span> 
+            <span class="white-move text-left"></span> 
+            <span class="black-move text-left"></span>
+        `;
+
+                movesContainer.appendChild(moveRow);
+            }
+
+            // Insert move in appropriate column (white or black)
+            const moveSpan = moveRow.querySelector(isWhiteMove ? ".white-move" : ".black-move");
+            moveSpan.textContent = san;
+
+            movesContainer.scrollTop = movesContainer.scrollHeight;
+
+        });
+
+
+        document.addEventListener("pgn_applied", function (event) {
+            // Clear previous moves
+            const movesContainer = document.querySelector(".moves");
+            movesContainer.innerHTML = "";
+
+            // Process and display moves
+            const moves = currentGame.game.history({ verbose: true });
+            console.log("pgn applied>>>> ", moves);
+            moves.forEach((move, index) => {
+                let moveNumber;
+                const isWhiteMove = index % 2 === 0;
+                if (isWhiteMove) {
+                    moveNumber = (index + 2) / 2;
+                } else {
+                    moveNumber = (index + 1) / 2;
+                }
+                console.log("move,index: ", moveNumber, isWhiteMove)
+                let moveRow = document.querySelector(`.move-row[data-move="${moveNumber}"]`);
+                if (!moveRow) {
+                    moveRow = document.createElement("div");
+                    moveRow.classList.add("move-row");
+                    moveRow.setAttribute("data-move", moveNumber);
+                    moveRow.style.backgroundColor = moveNumber % 2 === 0 ? "#292929" : "#1F1F1F";
+                    moveRow.innerHTML = `
+                <span class="text-left">${moveNumber}.</span> 
+                <span class="white-move text-left"></span> 
+                <span class="black-move text-left"></span>
+            `;
+                    movesContainer.appendChild(moveRow);
+                }
+
+                const moveSpan = moveRow.querySelector(isWhiteMove ? ".white-move" : ".black-move");
+                moveSpan.textContent = move.san;
+            });
+
+            // Scroll to latest move
+            movesContainer.scrollTop = movesContainer.scrollHeight;
+        });
+
+
+
+        function triggerWin(desc) {
+            const winEffect = document.createElement("div");
+            winEffect.classList.add("win-effect");
+
+            const winTitle = document.createElement("div");
+            winTitle.classList.add("win-title");
+            winTitle.innerText = "You Won!";
+
+            const winMessage = document.createElement("div");
+            winMessage.classList.add("win-message");
+
+            // use desc to display if desc is null then use default message
+            winMessage.innerText = desc ? desc : "congratulations! You won the game!";
+
+            winEffect.appendChild(winTitle);
+            winEffect.appendChild(winMessage);
+            document.body.appendChild(winEffect);
+
+            // Delay message fade-in
+            setTimeout(() => {
+                winMessage.style.opacity = "1";
+                winMessage.style.transform = "translateY(0)";
+            }, 1200);
+
+            // Add sparkles inside winEffect instead of document.body
+            for (let i = 0; i < 30; i++) {
+                const sparkle = document.createElement("div");
+                sparkle.classList.add("sparkle");
+                sparkle.style.left = Math.random() * 100 + "%";
+                sparkle.style.top = Math.random() * 100 + "%";
+                sparkle.style.animationDuration = (Math.random() * 1.5 + 0.5) + "s";
+                sparkle.style.width = sparkle.style.height = Math.random() * 15 + "px";
+                winEffect.appendChild(sparkle);
+
+                setTimeout(() => sparkle.remove(), 2900);
+            }
+
+            setTimeout(() => winEffect.remove(), 3000);
+        }
+
+
+        function triggerLoss(desc) {
+            const loseEffect = document.createElement("div");
+            loseEffect.classList.add("lose-effect");
+
+            const loseTitle = document.createElement("div");
+            loseTitle.classList.add("lose-title");
+            loseTitle.innerText = "You Lost!";
+
+            const loseMessage = document.createElement("div");
+            loseMessage.classList.add("lose-message");
+            loseMessage.innerText = desc ? desc : "You lost the game! Better luck next time!";
+
+            loseEffect.appendChild(loseTitle);
+            loseEffect.appendChild(loseMessage);
+            document.body.appendChild(loseEffect);
+
+            // Delay message fade-in
+            setTimeout(() => {
+                loseMessage.style.opacity = "1";
+                loseMessage.style.transform = "translateY(0)";
+            }, 2900);
+
+            setTimeout(() => loseEffect.remove(), 3000);
+        }
+
+        function triggerDraw() {
+            const drawEffect = document.createElement("div");
+            drawEffect.classList.add("draw-effect");
+
+            const drawTitle = document.createElement("div");
+            drawTitle.classList.add("draw-title");
+            drawTitle.innerText = "Draw!";
+
+            const drawMessage = document.createElement("div");
+            drawMessage.classList.add("draw-message");
+            drawMessage.innerText = "The game ended in a draw!";
+
+            drawEffect.appendChild(drawTitle);
+            drawEffect.appendChild(drawMessage);
+            document.body.appendChild(drawEffect);
+
+            // Fade-in message
+            setTimeout(() => {
+                drawMessage.style.opacity = "1";
+                drawMessage.style.transform = "translateY(0)";
+            }, 1200);
+
+            // Add sparkles
+            for (let i = 0; i < 30; i++) {
+                const sparkle = document.createElement("div");
+                sparkle.classList.add("draw-sparkle");
+                sparkle.style.left = Math.random() * 100 + "%";
+                sparkle.style.top = Math.random() * 100 + "%";
+                sparkle.style.animationDuration = (Math.random() * 1.5 + 0.5) + "s";
+                sparkle.style.width = sparkle.style.height = Math.random() * 12 + "px";
+                drawEffect.appendChild(sparkle);
+
+                setTimeout(() => sparkle.remove(), 2900);
+            }
+
+            setTimeout(() => drawEffect.remove(), 3000);
+        }
+
+        document.addEventListener("game_ended", function (event) {
+            const { gameId, result, desc } = event.detail;
+            if (result === "win") {
+                triggerWin(desc);
+            } else if (result === "lose") {
+                triggerLoss(desc);
+            } else if (result === "draw") {
+                triggerDraw();
+            }
+
+            // hidden player info
+            document.querySelector(".player-info").classList.add("hidden");
+            // hidden opponent info
+            document.querySelector(".opponent-info").classList.add("hidden");
+            // show find match button
+            document.getElementById("find-match-btn").classList.remove("hidden");
+
+            // clear chat box
+            const chatContainer = document.querySelector(".chat-input-container");
+            chatContainer.classList.add("disabled");
+            document.getElementById("chat-input").disabled = true;
+            document.getElementById("send-btn").disabled = true;
+            document.querySelector(".messages").innerHTML = "";
+
+            // Clear move list
+            document.querySelector(".moves").innerHTML = "";
+        });
+
+
+    </script>
+</body>
+
+</html>

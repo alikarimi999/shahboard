@@ -1142,7 +1142,7 @@
             animation: sparkleEffect 1.2s infinite alternate ease-in-out;
         }
 
-        .disconnected-message {
+        .error-message {
             position: fixed;
             top: 20px;
             left: 50%;

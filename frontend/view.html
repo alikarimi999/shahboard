@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShahBoard - Play Chess</title>
+    <title>ShahBoard - View Chess</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./assets/js/chess.js"></script>
     <link rel="stylesheet" href="./assets/css/chessboard-1.0.0.css">
@@ -59,60 +59,26 @@
                 <span id="player-name"></span>
                 <!-- <span class="timer">10:00</span> -->
             </div>
-            <button id="find-match-btn">Find Match</button>
         </div>
         <div class=" game-sidebar">
             <div class="moves"></div>
             <div class="chat">
                 <div class="chat-messages-container messages"></div>
-                <div class="chat-input-container disabled">
-                    <input type="text" id="chat-input" placeholder="Type a message..." disabled>
-                    <button id="send-btn" disabled>➤</button>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Chat is read-only." disabled>
                 </div>
             </div>
         </div>
     </div>
-    <script type="module" src="./assets/js/game.js"></script>
+    <script type="module" src="./assets/js/view.js"></script>
 
     <script type="module" src="/assets/js/sidebar.js"></script>
 
     <script type="module">
         import { currentGame } from "./assets/js/gameState.js";
-        import { sendGameChatMsg } from './assets/js/chat.js';
 
         const moveSound = new Audio('./assets/sounds/move2.mp3');
 
-
-        document.getElementById("find-match-btn").addEventListener("click", async () => {
-            const findMatchBtn = document.getElementById("find-match-btn");
-            const loadingSpinner = document.getElementById("loading-spinner");
-            loadingSpinner.classList.add("active");
-
-            try {
-                const module = await import("../assets/js/matchmaking.js");
-                await module.findMatch();
-            } catch (error) {
-                console.error("Matchmaking failed:", error);
-                loadingSpinner.classList.remove("active");
-
-                Swal.fire({
-                    icon: "error",
-                    title: "Matchmaking Failed",
-                    text: "Something went wrong. Please try again later.",
-                    background: "#1a1a1a", // Dark background
-                    color: "#FFD700", // Gold text
-                    confirmButtonColor: "#D4AF37", // Gold button
-                    iconColor: "#D4AF37", // Gold error icon
-                    customClass: {
-                        popup: "custom-swal-container",
-                        confirmButton: "custom-swal-button",
-                    },
-                });
-
-            } finally {
-                loadingSpinner.classList.remove("active");
-            }
-        });
 
         document.addEventListener("game_created", function () {
             moveSound.play();
@@ -121,7 +87,6 @@
             currentGame.player.name = "Player1";
             currentGame.opponent.name = "Player2";
 
-            document.getElementById("find-match-btn").classList.add("hidden");
             document.querySelector(".player-info").classList.remove("hidden");
             document.querySelector(".opponent-info").classList.remove("hidden");
 
@@ -154,79 +119,49 @@
                     animationOverlay.style.animation = ""; // Reset animation
 
                     // Hide match button and update layout
-                    document.getElementById("find-match-btn").classList.add("hidden");
                     document.querySelector(".player-info").classList.remove("hidden");
                     document.querySelector(".opponent-info").classList.remove("hidden");
 
                     document.querySelector("#player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
                     document.querySelector("#opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
 
-                    // Clear move list
-                    // document.querySelector(".moves").innerHTML = "";
-
-                    // Clear chat messages
-                    document.querySelector(".messages").innerHTML = "";
-
                 }, 1000); // Delay after fade out
             }, 3000); // Display animation for 3 seconds
         });
 
-        document.addEventListener("opponent_disconnected", function () {
-            currentGame.opponent.connected = false;
-            document.getElementById("opponent-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+        document.addEventListener("player_disconnected", (event) => {
+            if (event.detail.id === currentGame.player.id) {
+                document.getElementById("player-name").textContent = `❌ ${currentGame.player.name} Disconnected`;
+            } else if (event.detail.id === currentGame.opponent.id) {
+                document.getElementById("opponent-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+            }
         });
 
-        document.addEventListener("opponent_connected", function () {
-            console.log("received opponent connected! >>>>");
-            currentGame.opponent.connected = true;
-            document.getElementById("opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+
+        document.addEventListener("player_connected", (event) => {
+            if (event.detail.id === currentGame.player.id) {
+                document.getElementById("player-name").textContent = `✅ ${currentGame.player.name} Connected`;
+            } else if (event.detail.id === currentGame.opponent.id) {
+                document.getElementById("opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+            }
         });
 
         document.addEventListener("websocket_connected", function () {
-            currentGame.player.connected = true;
-            console.log("received WebSocket connected! >>>>");
             document.getElementById("player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
         });
 
         document.addEventListener("websocket_disconnected", function () {
-            currentGame.player.connected = false;
             document.getElementById("player-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
         });
 
-        document.addEventListener("chat_created", function () {
-            // Enable chat input
-            const chatContainer = document.querySelector(".chat-input-container");
-            chatContainer.classList.remove("disabled");
 
-            const chatInput = document.getElementById("chat-input");
-            const sendBtn = document.getElementById("send-btn");
-
-            chatInput.disabled = false;
-            sendBtn.disabled = false;
-        });
-
-
-
-        document.addEventListener("DOMContentLoaded", () => {
-            const chatInput = document.getElementById("chat-input");
-            const sendBtn = document.getElementById("send-btn");
-            const chatBox = document.querySelector(".messages");
-
-            sendBtn.addEventListener("click", () => sendChatMsg(chatInput.value.trim(), false));
-            chatInput.addEventListener("keypress", (event) => {
-                if (event.key === "Enter") {
-                    sendChatMsg(chatInput.value.trim(), false);
-                }
-            });
-        });
-
-        document.addEventListener("opponent_msg", () => {
-            const { content } = event.detail;
-            sendChatMsg(content, true);
+        document.addEventListener("chat_msg", () => {
+            const { sender, content } = event.detail;
+            sendChatMsg(sender, content);
         })
 
-        function sendChatMsg(msgText, isOpponent) {
-            if (!msgText) return;
+        function sendChatMsg(sender, msgText) {
+            if (!msgText || !sender) return;
 
             const chatBox = document.querySelector(".messages");
             const chatInput = document.getElementById("chat-input");
@@ -234,7 +169,7 @@
             let messageClass;
             let alignment;
 
-            if (isOpponent) {
+            if (sender === currentGame.opponent.id) {
                 messageClass = currentGame.color === "w" ? "black-message" : "white-message";
                 alignment = "flex-end";
             } else {
@@ -243,11 +178,6 @@
             }
 
             appendMessage(msgText, messageClass, alignment);
-
-            if (!isOpponent) {
-                chatInput.value = ""; // Clear input only for user messages
-                sendGameChatMsg(msgText)
-            }
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
@@ -468,14 +398,11 @@
             document.querySelector(".player-info").classList.add("hidden");
             // hidden opponent info
             document.querySelector(".opponent-info").classList.add("hidden");
-            // show find match button
-            document.getElementById("find-match-btn").classList.remove("hidden");
 
             // clear chat box
             const chatContainer = document.querySelector(".chat-input-container");
             chatContainer.classList.add("disabled");
             document.getElementById("chat-input").disabled = true;
-            document.getElementById("send-btn").disabled = true;
             document.querySelector(".messages").innerHTML = "";
 
             // Clear move list

@@ -1,5 +1,5 @@
 import { currentGame } from './gameState.js';
-import { connectWebSocket } from './ws0.js';
+import { connectWebSocket } from './ws.js';
 import { initializeBoard } from './board.js';
 import { handleGameCreated, handleGameChatCreated, handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate, handleGameEnded, handleError } from './eventHandlers.js';
 
@@ -14,7 +14,7 @@ connectWebSocket('http://localhost:8083/ws').then(connection => {
     currentGame.ws.registerMessageHandler("player_connection_updated", handlePlayerConnectionUpdate);
     currentGame.ws.registerMessageHandler("err", handleError);
 
-    const game = initializeBoard();
+    const game = initializeBoard(true);
 
 }).catch(error => {
     console.error('Connection failed:', error);

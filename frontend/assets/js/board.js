@@ -1,6 +1,7 @@
 import { currentGame } from './gameState.js';
 import { user } from './user.js'
-import { getLivePgn } from './game_utils.js';
+import { getLivePgnByGame, getLivePgnByUser } from './game_utils.js';
+import { showErrorMessage } from './error.js';
 
 const whiteSquareYellow = '#DAA520';
 const blackSquareYellow = '#AA7600';
@@ -11,11 +12,15 @@ export const ColorBlack = 'b';
 let selectedSquare = null;
 // const moveSound = new Audio('../../assets/sounds/move2.mp3');
 
-export function initializeBoard() {
+export function initializeBoard(isPlayer) {
     currentGame.game = new Chess(); // Create a new game instance
 
+    if (isPlayer) {
+        currentGame.isPlayer = true;
+    }
+
     var config = {
-        draggable: true,
+        draggable: currentGame.isPlayer,
         position: 'start',
         onDragStart: onDragStart,
         onDrop: onDrop,
@@ -25,45 +30,65 @@ export function initializeBoard() {
         pieceTheme: '../../assets/img/pieces/{piece}.svg',
     }
     currentGame.board = Chessboard('board', config);
-    currentGame.boardInteractive = true;
 
     if (user.loggedIn) {
-        return getLivePgn(null, user.id).then(game => {
+        // Check if the user is a player and call the respective function
+        const pgnPromise = isPlayer ? getLivePgnByUser(user.id) : getLivePgnByGame(currentGame.gameId);
+
+        return pgnPromise.then(game => {
             if (game) {
                 currentGame.gameId = game.id;
-                currentGame.player.id = user.id;
-                if (game.pgn.parsed.w === user.id) {
-                    currentGame.color = "w";
-                    currentGame.opponent.id = game.pgn.parsed.b;
+
+                if (isPlayer) {
+                    currentGame.player.id = user.id;
+
+                    // Determine player color and opponent ID based on PGN
+                    if (game.pgn.parsed.w === user.id) {
+                        currentGame.color = "w";
+                        currentGame.opponent.id = game.pgn.parsed.b;
+                    } else {
+                        currentGame.color = "b";
+                        currentGame.opponent.id = game.pgn.parsed.w;
+                    }
                 } else {
-                    currentGame.color = "b";
-                    currentGame.opponent.id = game.pgn.parsed.w;
+                    currentGame.player.id = game.pgn.parsed.w;
+                    currentGame.opponent.id = game.pgn.parsed.b;
+                    currentGame.color = "w";  // Viewer always sees the game as if they are white
                 }
 
+                // Reset game and set board orientation
                 currentGame.game.reset();
                 currentGame.board.orientation(currentGame.color === 'w' ? 'white' : 'black');
                 currentGame.game.load_pgn(game.pgn.raw);
                 updateBoardPosition();
-                const data = {
-                    game_id: currentGame.gameId,
-                    timestamp: Date.now()
-                };
 
-                const jsonData = JSON.stringify(data);
-                const base64Data = btoa(jsonData);
+                if (isPlayer) {
 
-                currentGame.ws.sendMessage({
-                    type: "resume_game",
-                    data: base64Data
-                });
+                    // Send game resume message
+                    const data = {
+                        game_id: currentGame.gameId,
+                        timestamp: Date.now()
+                    };
+
+                    const jsonData = JSON.stringify(data);
+                    const base64Data = btoa(jsonData);
+
+                    currentGame.ws.sendMessage({
+                        type: "resume_game",
+                        data: base64Data
+                    });
+                }
+
+                // Dispatch events
                 document.dispatchEvent(new Event("game_created"));
                 document.dispatchEvent(new Event("pgn_applied"));
             }
-        })
+        });
     }
 
-    return currentGame
+    return currentGame;
 }
+
 
 function highlightCurrentSquare(square) {
     const $square = $('#board .square-' + square);
@@ -193,9 +218,17 @@ function sendMove(move) {
 
 function handleSquareSelection(square) {
     if (currentGame.gameId) {
-        // Prevent clicking on opponent's pieces
+
+        if (!currentGame.isPlayer) {
+            showNotAllowedMessage();
+            selectedSquare = null;
+            removeDotSquares();
+            return;
+        }
+
         var piece = currentGame.game.get(square);
         if (piece && piece.color !== currentGame.color) {
+            showNotAllowedMessage();
             return;
         }
     }
@@ -232,6 +265,13 @@ function attemptMove(destinationSquare) {
 
     if (selectedSquare === destinationSquare) {
         // Deselect the square if it's clicked again
+        selectedSquare = null;
+        removeDotSquares();
+        return;
+    }
+
+    if (!currentGame.isPlayer) {
+        showNotAllowedMessage();
         selectedSquare = null;
         removeDotSquares();
         return;
@@ -332,17 +372,14 @@ $(window).resize(function () {
 function showDisconnectedMessage(opponent) {
     if ($('#disconnected').length) return; // Avoid duplicate messages
 
-    let txtMsg = "You are disconnected";
+    let txtMsg = "You are disconnected!";
     if (opponent) {
-        txtMsg = "Opponent disconnected";
+        txtMsg = "Opponent disconnected!";
     }
 
-    const message = $('<div id="disconnected" class="disconnected-message"></div>').text(txtMsg);
-    $('body').append(message);
-
-    // Animate the message
-    message.fadeIn(300).delay(2000).fadeOut(500, function () {
-        $(this).remove();
-    });
+    showErrorMessage(txtMsg);
 }
 
+function showNotAllowedMessage() {
+    showErrorMessage("Not allowed!");
+}
