@@ -7,14 +7,14 @@ import (
 )
 
 var (
-	TopicGame                        = NewTopic(DomainGame, ActionAny, "")
-	TopicGameCreated                 = NewTopic(DomainGame, ActionCreated, "{gameID}")
-	TopicGamePlayerMoved             = NewTopic(DomainGame, ActionGamePlayerMoved, "{gameID}")
-	TopicGameMoveApproved            = NewTopic(DomainGame, ActionGameMoveApprove, "{gameID}")
-	TopicGamePlayerConnectionUpdated = NewTopic(DomainGame, ActionGamePlayerConnectionUpdated, "{gameID}")
-	TopicGameEnded                   = NewTopic(DomainGame, ActionEnded, "{gameID}")
-	TopicGamePlayerLeft              = NewTopic(DomainGame, ActionGamePlayerLeft, "{gameID}")
-	TopicGamePlayerSelectSquare      = NewTopic(DomainGame, ActionGamePlayerSelectSquare, "{gameID}")
+	TopicGame                        = NewTopic(DomainGame, ActionAny)
+	TopicGameCreated                 = NewTopic(DomainGame, ActionCreated)
+	TopicGamePlayerMoved             = NewTopic(DomainGame, ActionGamePlayerMoved)
+	TopicGameMoveApproved            = NewTopic(DomainGame, ActionGameMoveApprove)
+	TopicGamePlayerConnectionUpdated = NewTopic(DomainGame, ActionGamePlayerConnectionUpdated)
+	TopicGameEnded                   = NewTopic(DomainGame, ActionEnded)
+	TopicGamePlayerLeft              = NewTopic(DomainGame, ActionGamePlayerLeft)
+	TopicGamePlayerSelectSquare      = NewTopic(DomainGame, ActionGamePlayerSelectSquare)
 )
 
 type EventGameCreated struct {
@@ -31,7 +31,7 @@ func (e EventGameCreated) GetResource() string {
 }
 
 func (e EventGameCreated) GetTopic() Topic {
-	return TopicGameCreated.WithResource(e.GetResource())
+	return TopicGameCreated.SetResource(e.GetResource())
 }
 
 func (e EventGameCreated) GetAction() Action {
@@ -60,7 +60,7 @@ func (e EventGamePlayerMoved) GetResource() string {
 }
 
 func (e EventGamePlayerMoved) GetTopic() Topic {
-	return TopicGamePlayerMoved.WithResource(e.GetResource())
+	return TopicGamePlayerMoved.SetResource(e.GetResource())
 }
 
 func (e EventGamePlayerMoved) GetAction() Action {
@@ -89,7 +89,7 @@ func (e EventGameMoveApproved) GetResource() string {
 }
 
 func (e EventGameMoveApproved) GetTopic() Topic {
-	return TopicGameMoveApproved.WithResource(e.GetResource())
+	return TopicGameMoveApproved.SetResource(e.GetResource())
 }
 
 func (e EventGameMoveApproved) GetAction() Action {
@@ -118,7 +118,7 @@ func (e EventGamePlayerConnectionUpdated) GetResource() string {
 }
 
 func (e EventGamePlayerConnectionUpdated) GetTopic() Topic {
-	return TopicGamePlayerConnectionUpdated.WithResource(e.GetResource())
+	return TopicGamePlayerConnectionUpdated.SetResource(e.GetResource())
 }
 
 func (e EventGamePlayerConnectionUpdated) GetAction() Action {
@@ -149,7 +149,7 @@ func (e EventGameEnded) GetResource() string {
 }
 
 func (e EventGameEnded) GetTopic() Topic {
-	return TopicGameEnded.WithResource(e.GetResource())
+	return TopicGameEnded.SetResource(e.GetResource())
 }
 
 func (e EventGameEnded) GetAction() Action {
@@ -177,7 +177,7 @@ func (e EventGamePlayerLeft) GetResource() string {
 }
 
 func (e EventGamePlayerLeft) GetTopic() Topic {
-	return TopicGamePlayerLeft.WithResource(e.GetResource())
+	return TopicGamePlayerLeft.SetResource(e.GetResource())
 }
 
 func (e EventGamePlayerLeft) GetAction() Action {
@@ -207,7 +207,7 @@ func (e EventGamePlayerSelectSquare) GetResource() string {
 }
 
 func (e EventGamePlayerSelectSquare) GetTopic() Topic {
-	return TopicGamePlayerSelectSquare.WithResource(e.GetResource())
+	return TopicGamePlayerSelectSquare.SetResource(e.GetResource())
 }
 
 func (e EventGamePlayerSelectSquare) GetAction() Action {

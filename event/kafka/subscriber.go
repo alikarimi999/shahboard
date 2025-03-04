@@ -258,8 +258,8 @@ func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 
 	case event.DomainMatch:
 		switch event.Action(action) {
-		case event.ActionUsersMatched:
-			e = &event.EventUsersMatched{}
+		case event.ActionCreated:
+			e = &event.EventUsersMatchCreated{}
 		default:
 			return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
 		}

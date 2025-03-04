@@ -31,7 +31,7 @@ func (kp *kafkaPublisher) Publish(data ...event.Event) error {
 			Headers: []sarama.RecordHeader{
 				{
 					Key:   []byte(headerAction),
-					Value: []byte(e.GetAction().String()),
+					Value: []byte(e.GetTopic().Action().String()),
 				},
 			},
 			Key:   sarama.ByteEncoder(e.GetTopic().String()),

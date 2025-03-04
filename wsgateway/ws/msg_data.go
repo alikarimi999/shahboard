@@ -8,7 +8,7 @@ import (
 )
 
 type dataFindMatchRequest struct {
-	event.EventUsersMatched
+	event.EventUsersMatchCreated
 }
 
 func (d dataFindMatchRequest) Type() MsgType {

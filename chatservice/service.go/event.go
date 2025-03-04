@@ -13,14 +13,14 @@ import (
 func (s *Service) handleEvents(e event.Event) {
 	switch e.GetTopic().Domain() {
 	case event.DomainGame:
-		switch e.GetAction() {
+		switch e.GetTopic().Action() {
 		case event.ActionCreated:
 			s.handleGameCreated(e.(*event.EventGameCreated))
 		case event.ActionEnded:
 			s.handleGameEnded(e.(*event.EventGameEnded))
 		}
 	case event.DomainGameChat:
-		switch e.GetAction() {
+		switch e.GetTopic().Action() {
 		case event.ActionMsgSent:
 			s.handleMsgSent(e.(*event.EventGameChatMsgeSent))
 		}
@@ -52,7 +52,7 @@ func (s *Service) handleGameCreated(e *event.EventGameCreated) {
 		return
 	}
 
-	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameChat.WithResource(e.GameID.String())))
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameChat.SetResource(e.GameID.String())))
 	s.l.Debug(fmt.Sprintf("game chat created, gameID: %s", e.GameID))
 }
 

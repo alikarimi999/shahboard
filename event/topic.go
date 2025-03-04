@@ -2,7 +2,11 @@ package event
 
 import (
 	"fmt"
-	"strings"
+)
+
+const (
+	ResourceAny = "*"
+	DomainAny   = "*"
 )
 
 // Topic represents an event topic with structured fields.
@@ -13,36 +17,24 @@ type Topic struct {
 }
 
 // NewTopic creates a new topic instance.
-func NewTopic(domain Domain, action Action, resource string) Topic {
-	if strings.Contains(resource, "{") && strings.Contains(resource, "}") {
-		resource = ""
-	}
-
+func NewTopic(domain Domain, action Action) Topic {
 	return Topic{
 		domain:   domain,
 		action:   action,
-		resource: resource,
+		resource: ResourceAny,
 	}
 }
 
 func (t Topic) Domain() Domain   { return t.domain }
+func (t Topic) Action() Action   { return t.action }
 func (t Topic) Resource() string { return t.resource }
 
 func (t Topic) String() string {
-	if t.resource == "" && t.action == "" {
-		return string(t.domain)
-	}
-	if t.resource == "" {
-		return fmt.Sprintf("%s.%s", t.domain, t.action)
-	}
-	if t.action == "" {
-		return fmt.Sprintf("%s..%s", t.domain, t.resource)
-	}
 	return fmt.Sprintf("%s.%s.%s", t.domain, t.action, t.resource)
 }
 
-// WithResource creates a new topic with the specified resource.
-func (t Topic) WithResource(resource string) Topic {
+// SetResource creates a new topic with the specified resource.
+func (t Topic) SetResource(resource string) Topic {
 	return Topic{
 		domain:   t.domain,
 		action:   t.action,
@@ -51,7 +43,7 @@ func (t Topic) WithResource(resource string) Topic {
 }
 
 func (t Topic) Match(filter Topic) bool {
-	if filter.domain == "" && filter.action == ActionAny && filter.resource == "" {
+	if filter.domain == DomainAny && filter.action == ActionAny && filter.resource == ResourceAny {
 		return true
 	}
 
@@ -61,7 +53,7 @@ func (t Topic) Match(filter Topic) bool {
 	if filter.action != ActionAny && t.action != filter.action {
 		return false
 	}
-	if filter.resource != "" && t.resource != filter.resource {
+	if filter.resource != ResourceAny && t.resource != filter.resource {
 		return false
 	}
 	return true

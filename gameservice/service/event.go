@@ -14,7 +14,7 @@ import (
 // and creates a new game if both players do not have any active games.
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
-func (s *Service) handleEventUsersMatched(d *event.EventUsersMatched) {
+func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
 	s.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
 	// check if player is already in a game
 	if s.checkByPlayer(d.User1.ID) || s.checkByPlayer(d.User2.ID) {
@@ -176,7 +176,7 @@ func (gs *Service) handleEvents(e event.Event) {
 			return
 		}
 
-		switch e.GetAction() {
+		switch e.GetTopic().Action() {
 		case event.ActionGamePlayerMoved:
 			gs.handleEventGamePlayerMoved(e.(*event.EventGamePlayerMoved))
 		case event.ActionGamePlayerLeft:
@@ -184,9 +184,9 @@ func (gs *Service) handleEvents(e event.Event) {
 		}
 
 	case event.DomainMatch:
-		switch e.GetAction() {
-		case event.ActionUsersMatched:
-			gs.handleEventUsersMatched(e.(*event.EventUsersMatched))
+		switch e.GetTopic().Action() {
+		case event.ActionCreated:
+			gs.handleEventUsersMatched(e.(*event.EventUsersMatchCreated))
 		}
 	}
 }

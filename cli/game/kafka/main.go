@@ -41,7 +41,7 @@ func newPlayersMatchedCommand(brokerAddress *string) *cobra.Command {
 		Use:   "players_matched",
 		Short: "Send a PlayersMatched event",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			event := event.EventUsersMatched{
+			event := event.EventUsersMatchCreated{
 				User1:     types.User{ID: types.ObjectId(player1)},
 				User2:     types.User{ID: types.ObjectId(player2)},
 				Timestamp: time.Now().Unix(),
@@ -121,7 +121,7 @@ func sendEventToKafka(brokerAddress string, event event.Event) error {
 		Headers: []sarama.RecordHeader{
 			{
 				Key:   []byte("action"),
-				Value: []byte(event.GetAction().String()),
+				Value: []byte(event.GetTopic().Action().String()),
 			},
 		},
 		Key:   sarama.ByteEncoder(event.GetTopic().String()),

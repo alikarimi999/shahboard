@@ -68,7 +68,7 @@ func (m *gameEventsManager) startEventListener() {
 				m.l.Debug("event listener stopped")
 				return
 			case e := <-m.gameSub.Event():
-				switch e.GetAction() {
+				switch e.GetTopic().Action() {
 				case event.ActionCreated:
 					eve, ok := e.(*event.EventGameCreated)
 					if !ok {
@@ -208,7 +208,7 @@ func (m *gameEventsManager) subscribeToMatch(matchId types.ObjectId) event.Subsc
 		index:   len(m.matchSubs[matchId]),
 		matchId: matchId,
 		m:       m,
-		topic:   event.TopicUsersMatched,
+		topic:   event.TopicUsersMatchedCreated,
 		ch:      make(chan event.Event, 100),
 		errCh:   make(chan error),
 	}
@@ -225,7 +225,7 @@ func (m *gameEventsManager) subscribeToGameWithChat(gameId types.ObjectId) event
 		index:  len(m.gameWithChatSubs[gameId]),
 		gameId: gameId,
 		m:      m,
-		topic:  event.TopicGame.WithResource(gameId.String()),
+		topic:  event.TopicGame.SetResource(gameId.String()),
 		ch:     make(chan event.Event, 100),
 		errCh:  make(chan error),
 	}

@@ -12,12 +12,12 @@ const (
 )
 
 var (
-	TopicUser          = NewTopic(DomainUser, ActionAny, "{userID}")
-	TopicUserCreated   = NewTopic(DomainUser, ActionCreated, "{user}")
-	TopicUserUpdated   = NewTopic(DomainUser, ActionUpdated, "{user}")
-	TopicUserDeleted   = NewTopic(DomainUser, ActionDeleted, "{user}")
-	TopicUserLoggedIn  = NewTopic(DomainUser, ActionLoggedIn, "{user}")
-	TopicUserLoggedOut = NewTopic(DomainUser, ActionLoggedOut, "{user}")
+	TopicUser          = NewTopic(DomainUser, ActionAny)
+	TopicUserCreated   = NewTopic(DomainUser, ActionCreated)
+	TopicUserUpdated   = NewTopic(DomainUser, ActionUpdated)
+	TopicUserDeleted   = NewTopic(DomainUser, ActionDeleted)
+	TopicUserLoggedIn  = NewTopic(DomainUser, ActionLoggedIn)
+	TopicUserLoggedOut = NewTopic(DomainUser, ActionLoggedOut)
 )
 
 type EventUserCreated struct {
@@ -34,7 +34,7 @@ func (e EventUserCreated) GetResource() string {
 }
 
 func (e EventUserCreated) GetTopic() Topic {
-	return TopicUser.WithResource(e.GetResource())
+	return TopicUser.SetResource(e.GetResource())
 }
 
 func (e EventUserCreated) GetAction() Action {
@@ -62,7 +62,7 @@ func (e EventUserLoggedIn) GetResource() string {
 }
 
 func (e EventUserLoggedIn) GetTopic() Topic {
-	return TopicUser.WithResource(e.GetResource())
+	return TopicUser.SetResource(e.GetResource())
 }
 
 func (e EventUserLoggedIn) GetAction() Action {
@@ -88,7 +88,7 @@ func (e EventUserLoggedOut) GetResource() string {
 }
 
 func (e EventUserLoggedOut) GetTopic() Topic {
-	return TopicUser.WithResource(e.GetResource())
+	return TopicUser.SetResource(e.GetResource())
 }
 
 func (e EventUserLoggedOut) GetAction() Action {

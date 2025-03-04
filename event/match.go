@@ -7,29 +7,29 @@ import (
 )
 
 var (
-	TopicUsersMatched = NewTopic(DomainMatch, ActionUsersMatched, "")
+	TopicUsersMatchedCreated = NewTopic(DomainMatch, ActionCreated)
 )
 
-type EventUsersMatched struct {
+type EventUsersMatchCreated struct {
 	ID        types.ObjectId `json:"id"`
 	User1     types.User     `json:"user1"`
 	User2     types.User     `json:"user2"`
 	Timestamp int64          `json:"timestamp"`
 }
 
-func (e EventUsersMatched) GetTopic() Topic {
-	return TopicUsersMatched
+func (e EventUsersMatchCreated) GetTopic() Topic {
+	return TopicUsersMatchedCreated
 }
 
-func (e EventUsersMatched) GetAction() Action {
-	return ActionUsersMatched
+func (e EventUsersMatchCreated) GetAction() Action {
+	return ActionCreated
 }
 
-func (e EventUsersMatched) TimeStamp() int64 {
+func (e EventUsersMatchCreated) TimeStamp() int64 {
 	return e.Timestamp
 }
 
-func (e EventUsersMatched) Encode() []byte {
+func (e EventUsersMatchCreated) Encode() []byte {
 	b, _ := json.Marshal(e)
 	return b
 }

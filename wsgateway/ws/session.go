@@ -129,7 +129,7 @@ func (s *session) handleEvent(e event.Event) {
 func (s *session) handleGameEvent(e event.Event) *Msg {
 	var msg *Msg
 
-	switch e.GetAction() {
+	switch e.GetTopic().Action() {
 	case event.ActionCreated:
 		eve := e.(*event.EventGameCreated)
 		if eve.Player1.ID != s.userId && eve.Player2.ID != s.userId {
@@ -165,7 +165,7 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 
 	default:
 		var mt MsgType
-		switch e.GetAction() {
+		switch e.GetTopic().Action() {
 		case event.ActionCreated:
 			mt = MsgTypeGameCreate
 		case event.ActionGameMoveApprove:
@@ -189,7 +189,7 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 
 func (s *session) handleGameChatEvent(e event.Event) *Msg {
 	var mt MsgType
-	switch e.GetAction() {
+	switch e.GetTopic().Action() {
 	case event.ActionCreated:
 		mt = MsgTypeChatCreated
 	case event.ActionMsgApproved:

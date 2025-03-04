@@ -12,11 +12,11 @@ const (
 )
 
 var (
-	TopicGameChat            = NewTopic(DomainGameChat, ActionAny, "")
-	TopicGameChatCreated     = NewTopic(DomainGameChat, ActionCreated, "{gameID}")
-	TopicGameChatMsgSent     = NewTopic(DomainGameChat, ActionMsgSent, "{gameID}")
-	TopicGameChatMsgApproved = NewTopic(DomainGameChat, ActionMsgApproved, "{gameID}")
-	TopicGameChatEnded       = NewTopic(DomainGameChat, ActionEnded, "{gameID}")
+	TopicGameChat            = NewTopic(DomainGameChat, ActionAny)
+	TopicGameChatCreated     = NewTopic(DomainGameChat, ActionCreated)
+	TopicGameChatMsgSent     = NewTopic(DomainGameChat, ActionMsgSent)
+	TopicGameChatMsgApproved = NewTopic(DomainGameChat, ActionMsgApproved)
+	TopicGameChatEnded       = NewTopic(DomainGameChat, ActionEnded)
 )
 
 type EventGameChatCreated struct {
@@ -33,7 +33,7 @@ func (e EventGameChatCreated) GetResource() string {
 }
 
 func (e EventGameChatCreated) GetTopic() Topic {
-	return TopicGameChatCreated.WithResource(e.GetResource())
+	return TopicGameChatCreated.SetResource(e.GetResource())
 }
 
 func (e EventGameChatCreated) GetAction() Action {
@@ -62,7 +62,7 @@ func (e EventGameChatMsgeSent) GetResource() string {
 }
 
 func (e EventGameChatMsgeSent) GetTopic() Topic {
-	return TopicGameChatMsgSent.WithResource(e.GetResource())
+	return TopicGameChatMsgSent.SetResource(e.GetResource())
 }
 
 func (e EventGameChatMsgeSent) GetAction() Action {
@@ -91,7 +91,7 @@ func (e EventGameChatMsgApproved) GetResource() string {
 }
 
 func (e EventGameChatMsgApproved) GetTopic() Topic {
-	return TopicGameChatMsgApproved.WithResource(e.GetResource())
+	return TopicGameChatMsgApproved.SetResource(e.GetResource())
 }
 
 func (e EventGameChatMsgApproved) GetAction() Action {
@@ -120,7 +120,7 @@ func (e EventGameChatEnded) GetResource() string {
 }
 
 func (e EventGameChatEnded) GetTopic() Topic {
-	return TopicGameChatEnded.WithResource(e.GetResource())
+	return TopicGameChatEnded.SetResource(e.GetResource())
 }
 
 func (e EventGameChatEnded) GetAction() Action {

@@ -50,7 +50,7 @@ func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub ev
 	}
 
 	s.sm = event.NewManager(l, s.handleEvents)
-	s.sm.AddSubscription(s.sub.Subscribe(event.TopicUsersMatched))
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicUsersMatchedCreated))
 	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGame))
 
 	if err := s.init(); err != nil {
@@ -71,7 +71,7 @@ func (s *Service) init() error {
 	for _, g := range games {
 		if g.Status() == entity.GameStatusActive {
 			if s.addGame(g) {
-				sub := s.sub.Subscribe(event.TopicGame.WithResource(g.ID().String()))
+				sub := s.sub.Subscribe(event.TopicGame.SetResource(g.ID().String()))
 				s.sm.AddSubscription(sub)
 				s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
 			}

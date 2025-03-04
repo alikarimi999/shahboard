@@ -3,7 +3,7 @@ package event
 type Action string
 
 const (
-	ActionAny                         Action = ""
+	ActionAny                         Action = "*"
 	ActionCreated                     Action = "created"
 	ActionEnded                       Action = "ended"
 	ActionUpdated                     Action = "updated"
@@ -12,7 +12,6 @@ const (
 	ActionGameMoveApprove             Action = "moveApproved"
 	ActionGamePlayerLeft              Action = "playerLeft"
 	ActionGamePlayerConnectionUpdated Action = "playerConnectionUpdated"
-	ActionUsersMatched                Action = "usersMatched"
 	ActionGamePlayerSelectSquare      Action = "selectSquare"
 )
 

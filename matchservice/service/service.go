@@ -44,7 +44,7 @@ func NewService(cfg Config, p event.Publisher, score ScoreService, l log.Logger)
 	return s, nil
 }
 
-func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*event.EventUsersMatched, error) {
+func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*event.EventUsersMatchCreated, error) {
 	t := time.NewTicker(time.Duration(s.cfg.MatchRequestTicker) * time.Second)
 
 	level, err := s.score.GetUserLevel(userId)
