@@ -22,6 +22,7 @@ type Service struct {
 
 	p     event.Publisher
 	score ScoreService
+	game  GameService
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup
@@ -29,12 +30,13 @@ type Service struct {
 	l log.Logger
 }
 
-func NewService(cfg Config, p event.Publisher, score ScoreService, l log.Logger) (*Service, error) {
+func NewService(cfg Config, p event.Publisher, score ScoreService, game GameService, l log.Logger) (*Service, error) {
 	s := &Service{
 		cfg:    cfg,
 		e:      newEngine(time.Duration(cfg.EngineTicker) * time.Second),
 		p:      p,
 		score:  score,
+		game:   game,
 		stopCh: make(chan struct{}),
 		l:      l,
 	}
@@ -46,6 +48,17 @@ func NewService(cfg Config, p event.Publisher, score ScoreService, l log.Logger)
 
 func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*event.EventUsersMatchCreated, error) {
 	t := time.NewTicker(time.Duration(s.cfg.MatchRequestTicker) * time.Second)
+
+	currentGameId, err := s.game.GetUserLiveGameID(ctx, userId)
+	if err != nil {
+		s.l.Error(fmt.Sprintf("failed to get user '%s' live game id: %s", userId, err.Error()))
+		return nil, fmt.Errorf("internal error")
+	}
+
+	if currentGameId != types.ObjectZero {
+		s.l.Debug(fmt.Sprintf("user '%s' is already in a game", userId))
+		return nil, fmt.Errorf("user is already in a game")
+	}
 
 	level, err := s.score.GetUserLevel(userId)
 	if err != nil {

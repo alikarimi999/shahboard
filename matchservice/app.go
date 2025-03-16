@@ -4,8 +4,12 @@ import (
 	"math/rand"
 
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/matchservice/delivery/game"
 	"github.com/alikarimi999/shahboard/matchservice/delivery/http"
 	match "github.com/alikarimi999/shahboard/matchservice/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
@@ -30,7 +34,13 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	s, err := match.NewService(cfg.Match, p, &mockScoreService{}, l)
+	gameService, err := game.NewService(cfg.GameService,
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := match.NewService(cfg.Match, p, &mockScoreService{}, gameService, l)
 	if err != nil {
 		return nil, err
 	}
