@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/gameservice/delivery/grpc"
 	"github.com/alikarimi999/shahboard/gameservice/delivery/http"
 	game "github.com/alikarimi999/shahboard/gameservice/service"
 	"github.com/alikarimi999/shahboard/pkg/log"
@@ -13,6 +14,7 @@ import (
 type application struct {
 	GameService *game.Service
 	Router      *http.Router
+	Grpc        *grpc.Server
 }
 
 func SetupApplication(cfg Config) (*application, error) {
@@ -44,12 +46,28 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
+	grpcServer, err := grpc.NewServer(cfg.Grpc, gs)
+	if err != nil {
+		return nil, err
+	}
+
 	return &application{
 		GameService: gs,
 		Router:      router,
+		Grpc:        grpcServer,
 	}, nil
 }
 
 func (a *application) Run() error {
-	return a.Router.Run()
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- a.Grpc.Run()
+	}()
+
+	go func() {
+		errCh <- a.Router.Run()
+	}()
+
+	return <-errCh
 }

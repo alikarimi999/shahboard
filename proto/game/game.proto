@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package game;
+option go_package = "./gamepb";
+
+
+message GetUserLiveGamePgnRequest {
+  string user_id = 1;
+}
+
+message GetUserLiveGamePgnResponse {
+  string game_id = 1;
+  string pgn = 2;
+}
+
+message GetUserLiveGameIdRequest {
+  string user_id = 1;
+}
+
+message GetUserLiveGameIdResponse {
+  string game_id = 1;
+}
+
+service GameService {
+    rpc GetUserLiveGameID(GetUserLiveGameIdRequest) returns (GetUserLiveGameIdResponse);
+    rpc GetUserLiveGamePGN(GetUserLiveGamePgnRequest) returns (GetUserLiveGamePgnResponse);
+}

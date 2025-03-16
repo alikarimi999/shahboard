@@ -2,6 +2,7 @@ package gameservice
 
 import (
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/gameservice/delivery/grpc"
 	"github.com/alikarimi999/shahboard/gameservice/delivery/http"
 	game "github.com/alikarimi999/shahboard/gameservice/service"
 )
@@ -12,6 +13,7 @@ type Config struct {
 	Redis       RedisConfg   `json:"redis"`
 	Log         LogConfig    `json:"log"`
 	Http        http.Config  `json:"http"`
+	Grpc        grpc.Config  `json:"grpc"`
 }
 
 type RedisConfg struct {

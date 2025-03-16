@@ -12,19 +12,32 @@ func (s *Service) GetLiveGames(ctx context.Context) ([]types.ObjectId, error) {
 	return s.cache.getGamesIDs(ctx)
 }
 
-func (s *Service) GetLiveGameByUserID(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
+func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (types.ObjectId, error) {
+	return s.cache.getGameByUserID(ctx, id)
+
+}
+
+// GetLiveGamePgnByUserID returns the game ID and PGN for a given user ID.
+// It first checks the cache for the game ID associated with the user ID.
+// If the game ID is found, it retrieves the game from the cache.
+// If the game is not found, it returns an empty response with a zero ID.
+func (s *Service) GetLiveGamePgnByUserID(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
 	gameId, err := s.cache.getGameByUserID(ctx, id)
 	if err != nil {
 		return GetGamePGNResponse{}, err
 	}
 
 	if gameId.IsZero() {
-		return GetGamePGNResponse{}, fmt.Errorf("game not found")
+		return GetGamePGNResponse{ID: types.ObjectZero}, nil
 	}
 
 	game, err := s.cache.getGameByID(ctx, gameId)
 	if err != nil {
 		return GetGamePGNResponse{}, err
+	}
+
+	if game == nil {
+		return GetGamePGNResponse{ID: types.ObjectZero}, nil
 	}
 
 	return GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}, nil
