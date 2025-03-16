@@ -423,6 +423,37 @@
             background: rgba(212, 175, 55, 0.3);
         }
 
+        .user-info {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 8px;
+            border-radius: 5px;
+            text-align: left;
+            font-size: 12px;
+            color: #FFD700;
+        }
+
+        .user-info p {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .copy-text {
+            cursor: pointer;
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+        }
+
+        .copy-text:hover {
+            color: #FFD700;
+            /* Gold color */
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+            /* Soft glow effect */
+            text-decoration: none;
+            /* Remove default underline */
+            font-weight: bold;
+        }
+
         @media screen and (min-width: 769px) {
             .sidebar {
                 left: 0;
@@ -436,83 +467,6 @@
                 display: none;
             }
         }
-
-        /* Change sidebar layout for mobile screens */
-        /*@media screen and (max-width: 768px) {
-            .sidebar {
-                top: -100%;
-                left: 0;
-                width: 100%;
-                height: 100px;
-
-                transition: top 0.3s ease-in-out;
-                box-shadow: 0 2px 10px rgba(212, 175, 55, 0.4);
-                border-bottom: 2px solid rgba(212, 175, 55, 0.2);
-            }
-
-            .sidebar.open {
-                top: 0;
-            }
-
-            .sidebar-content ul {
-                display: flex;
-                justify-content: center;
-                gap: 10px;
-                 padding: 0px;
-            }
-
-            .sidebar-content ul li {
-                margin: 0;
-            }
-        } */
-
-        /* @media screen and (max-width: 768px) {
-            .sidebar {
-                height: auto;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .user-profile {
-                padding: 10px;
-                display: flex;
-                flex-direction: row;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                justify-content: center;
-            }
-
-            .user-profile img {
-                width: 40px;
-                height: 40px;
-                margin-bottom: 0;
-            }
-
-            .user-profile h3,
-            .user-profile p {
-                font-size: 14px;
-                margin: 0;
-            }
-
-            .sidebar-content ul {
-                display: flex;
-                flex-direction: row;
-                justify-content: center;
-                width: 100%;
-                gap: 15px;
-            }
-
-            .sidebar-content ul li {
-                margin: 0;
-            }
-
-            .sidebar-content ul li a {
-                font-size: 12px;
-                padding: 5px;
-            }
-        } */
 
         @media screen and (max-width: 768px) {
             .sidebar {
@@ -734,125 +688,6 @@
                 opacity: 0;
             }
         }
-
-        /* Game Start Animation Styles Code (End) */
-
-
-        /* Win Event Animation */
-        /* @keyframes winAnimation {
-            0% {
-                transform: scale(0.5);
-                opacity: 0;
-            }
-
-            50% {
-                transform: scale(1.2);
-                opacity: 1;
-                box-shadow: 0px 0px 20px rgba(255, 215, 0, 0.8);
-            }
-
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
-        @keyframes sparkles {
-
-            0%,
-            100% {
-                opacity: 0;
-                transform: translateY(0) scale(1);
-            }
-
-            50% {
-                opacity: 1;
-                transform: translateY(-20px) scale(1.2);
-            }
-        }
-
-        .win-effect {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(255, 215, 0, 0.3), transparent);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            animation: winAnimation 1s ease-in-out forwards;
-            border-radius: 10px;
-        }
-
-        .win-effect::before {
-            content: "Victory!";
-            font-size: 3rem;
-            font-weight: bold;
-            color: white;
-            text-shadow: 0px 0px 10px gold;
-            animation: goldPulse 1s infinite alternate;
-        }
-
-        .sparkle {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: gold;
-            border-radius: 50%;
-            box-shadow: 0px 0px 10px rgba(255, 215, 0, 0.8);
-            animation: sparkles 1.2s infinite alternate ease-in-out;
-        }
-
-        @keyframes loseAnimation {
-            0% {
-                opacity: 1;
-                transform: scale(1);
-            }
-
-            50% {
-                opacity: 0.5;
-                transform: scale(0.9);
-            }
-
-            100% {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-        }
-
-        @keyframes redPulse {
-            0% {
-                box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.5);
-            }
-
-            100% {
-                box-shadow: 0px 0px 30px rgba(255, 0, 0, 1);
-            }
-        }
-
-        .lose-effect {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: rgba(139, 0, 0, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            animation: loseAnimation 1.5s ease-in-out forwards;
-        }
-
-        .lose-effect::before {
-            content: "Game Over";
-            font-size: 3rem;
-            font-weight: bold;
-            color: white;
-            text-shadow: 0px 0px 10px red;
-            animation: redPulse 1s infinite alternate;
-        } */
-
-
-
 
 
         /* ----- WIN ANIMATION ----- */
@@ -1153,4 +988,13 @@
             border-radius: 5px;
             font-size: 16px;
             display: none;
+        }
+
+        .small-swal {
+            width: 200px !important;
+            /* Reduce width */
+            font-size: 12px !important;
+            /* Smaller text */
+            padding: 8px !important;
+            /* Less padding */
         }

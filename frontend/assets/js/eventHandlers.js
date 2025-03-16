@@ -118,44 +118,12 @@ export function handleGameEnded(base64Data) {
         detail: { gameId: gameData.game_id, result, desc },
     });
     document.dispatchEvent(event);
-
-    // const eventType = eventMap[gameData.outcome];
-    // if (eventType) {
-    //     document.dispatchEvent(new Event(eventType));
-    // }
 }
 
-// export function handleResumeGame(base64Data) {
-//     console.log("Resume Game:", base64Data);
-//     const gameData = JSON.parse(atob(base64Data));
-
-//     if (!gameData.game_id) {
-//         return
-//     }
-
-//     return getLivePgn(gameData.game_id).then(game => {
-//         if (game) {
-//             currentGame.gameId = gameData.game_id;
-//             currentGame.player.id = user.id;
-//             if (game.pgn.parsed.w === user.id) {
-//                 currentGame.color = "w";
-//                 currentGame.opponent.id = game.pgn.parsed.b;
-//             } else {
-//                 currentGame.color = "b";
-//                 currentGame.opponent.id = game.pgn.parsed.w;
-//             }
-
-//             currentGame.game.reset();
-//             currentGame.board.orientation(currentGame.color === 'w' ? 'white' : 'black');
-//             currentGame.game.load_pgn(game.pgn.raw);
-//             updateBoardPosition();
-
-//             document.dispatchEvent(new Event("game_created"));
-//         }
-//     });
-
-// }
-
 export function handleError(base64Data) {
-    console.error("Error:", atob(base64Data));
+    try {
+        alert("Error: " + atob(base64Data));
+    } catch (e) {
+        alert("Error: " + base64Data);
+    }
 }

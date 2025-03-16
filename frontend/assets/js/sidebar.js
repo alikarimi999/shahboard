@@ -1,5 +1,6 @@
 import { user } from "./user.js";
 import { logout } from "./auth.js";
+import { copyToClipboard } from "./copy.js";
 
 document.addEventListener("DOMContentLoaded", () => {
     fetch("../../sidebar.html")
@@ -55,4 +56,26 @@ function updateUserProfile() {
         document.getElementById("user-name").innerText = user.name;
         document.getElementById("logout-btn").classList.remove("hidden");
     }
+
+    if (user.email) {
+        document.getElementById("user-email").classList.remove("hidden");
+        document.getElementById("email-text").innerText = maskText(user.email);
+        document.getElementById("email-text").dataset.full = user.email; // Store full email
+    }
+
+    if (user.id) {
+        document.getElementById("user-uid").classList.remove("hidden");
+        document.getElementById("uid-text").innerText = maskText(user.id);
+        document.getElementById("uid-text").dataset.full = user.id; // Store full UID
+    }
+
+    // Add copy functionality
+    document.getElementById("user-email").addEventListener("click", () => copyToClipboard(user.email));
+    document.getElementById("user-uid").addEventListener("click", () => copyToClipboard(user.id));
+}
+
+
+function maskText(text) {
+    if (!text || text.length < 7) return text; // Avoid masking short text
+    return text.slice(0, 3) + "***" + text.slice(-3);
 }

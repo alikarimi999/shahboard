@@ -23,6 +23,8 @@ const (
 	MsgTypeChatCreated             MsgType = "chat_created"
 	MsgTypeChatMsgSend             MsgType = "msg_send"
 	MsgTypeChatMsgApproved         MsgType = "msg_approved"
+
+	MsgDataInternalErrorr string = "internal error "
 )
 
 type MsgBase struct {

@@ -4,104 +4,307 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/redis/go-redis/v9"
 )
 
+// Lua scripts for atomic operations with hashes
+const (
+	addSessionHashScript = `
+local key = KEYS[1]
+local field = ARGV[1]
+local value = ARGV[2]
+local cap = tonumber(ARGV[3])
+
+local current_size = redis.call('HLEN', key)
+if current_size >= cap then
+    return 0
+end
+
+redis.call('HSET', key, field, value)
+return 1
+`
+)
+
 type redisCache struct {
-	c                    *redis.Client
-	gameSessionPrefixKey string
-	expirationTime       time.Duration
+	c                            *redis.Client
+	userSessionsPrefixKey        string
+	userGameSessionsHeartbeatKey string
+	expirationTime               time.Duration
+	userSessionsCap              int
+
+	l log.Logger
 }
 
-func newRedisCache(c *redis.Client) *redisCache {
+// newRedisCache initializes a new redisCache instance
+func newRedisCache(c *redis.Client, userSessionsCap int, l log.Logger) *redisCache {
 	return &redisCache{
-		c:                    c,
-		gameSessionPrefixKey: "user_game_session",
-		expirationTime:       time.Hour * 24,
+		c:                            c,
+		userSessionsPrefixKey:        "user_sessions",
+		userGameSessionsHeartbeatKey: "user_game_sessions_heartbeat",
+		expirationTime:               time.Hour * 24,
+		userSessionsCap:              userSessionsCap,
+		l:                            l,
 	}
 }
 
-func (c *redisCache) SaveSessionState(ctx context.Context, sess *session) error {
-	s := &sessionInCache{
-		SessionId: sess.id,
-		UserId:    sess.userId,
-		GameId:    sess.gameId,
-		Role:      sess.role,
-		Closed:    sess.isClosed(),
+// addUserSessionId adds a session to the user's hash if below the session cap
+func (c *redisCache) addUserSessionId(ctx context.Context, userId, sessionId types.ObjectId) (bool, error) {
+
+	key := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, userId)
+
+	sic := &sessionInCache{
+		SessionId: sessionId.String(),
+		UserId:    userId.String(),
+		GameId:    types.ObjectZero.String(),
+		UpdatedAt: time.Now(),
 	}
 
-	return c.c.Set(ctx, fmt.Sprintf("%s:%s", c.gameSessionPrefixKey, s.UserId), s.encode(), c.expirationTime).Err()
+	value, err := json.Marshal(sic)
+	if err != nil {
+		return false, fmt.Errorf("failed to serialize session: %v", err)
+	}
+
+	script := redis.NewScript(addSessionHashScript)
+
+	result, err := script.Run(ctx, c.c, []string{key}, sessionId.String(), value, c.userSessionsCap).Int64()
+	if err != nil {
+		return false, fmt.Errorf("failed to execute add session script: %v", err)
+	}
+
+	return result == 1, nil
 }
 
-func (c *redisCache) SaveSessionsState(ctx context.Context, sess ...*session) error {
-	ss := make(map[string]interface{})
-	for _, s := range sess {
+func (c *redisCache) updateUserSession(ctx context.Context, s *session) error {
+	key := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, s.userId)
+
+	sic := &sessionInCache{
+		SessionId: s.id.String(),
+		UserId:    s.userId.String(),
+		GameId:    s.playGameId.String(),
+		UpdatedAt: time.Now(),
+	}
+
+	value, err := json.Marshal(sic)
+	if err != nil {
+		return fmt.Errorf("failed to serialize session: %v", err)
+	}
+
+	return c.c.HSet(ctx, key, s.id.String(), value).Err()
+}
+
+// updateSessionsTimestamp is needed to update the timestamp of the live sessions
+func (c *redisCache) updateSessionsTimestamp(ctx context.Context, ss ...*session) error {
+	if len(ss) == 0 {
+		return nil
+	}
+
+	pipe := c.c.Pipeline()
+
+	t := time.Now()
+	for _, s := range ss {
 		sic := &sessionInCache{
-			SessionId: s.id,
-			UserId:    s.userId,
-			GameId:    s.gameId,
-			Role:      s.role,
-			Closed:    s.isClosed(),
-		}
-		ss[fmt.Sprintf("%s:%s", c.gameSessionPrefixKey, s.userId)] = sic.encode()
-	}
-
-	return c.c.MSet(ctx, ss).Err()
-}
-
-func (c *redisCache) DeleteSessions(ctx context.Context, usersId ...types.ObjectId) error {
-	keys := make([]string, len(usersId))
-	for i, userId := range usersId {
-		keys[i] = fmt.Sprintf("%s:%s", c.gameSessionPrefixKey, userId)
-	}
-	return c.c.Del(ctx, keys...).Err()
-}
-
-func (c *redisCache) GetSession(ctx context.Context, userId types.ObjectId) (*sessionInCache, error) {
-	session, err := c.c.Get(ctx, fmt.Sprintf("%s:%s", c.gameSessionPrefixKey, userId)).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return nil, nil
+			SessionId: s.id.String(),
+			UserId:    s.userId.String(),
+			GameId:    s.playGameId.String(),
+			UpdatedAt: t,
 		}
 
-		return nil, err
+		value, err := json.Marshal(sic)
+		if err != nil {
+			continue
+		}
+
+		key := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, s.userId.String())
+		pipe.HSet(ctx, key, s.id.String(), value)
 	}
-	sess := &sessionInCache{}
-	err = sess.decode([]byte(session))
+
+	_, err := pipe.Exec(ctx)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to execute Redis pipeline for updating sessions: %v", err)
 	}
-	return sess, nil
+
+	return nil
 }
 
-// func (c *redisCache) DeleteSession(ctx context.Context, userId types.ObjectId) error {
-// 	return c.c.Del(ctx, fmt.Sprintf("%s:%s", c.gameSessionPrefixKey, userId)).Err()
-// }
+func (c *redisCache) updateUserGameSessionsHeartbeat(ctx context.Context, gamesByUserId map[types.ObjectId]types.ObjectId) error {
+	if len(gamesByUserId) == 0 {
+		return nil
+	}
 
-// func (c *redisCache) DeleteSessions(ctx context.Context, userIds ...types.ObjectId) error {
-// 	keys := make([]string, len(userIds))
-// 	for i, userId := range userIds {
-// 		keys[i] = fmt.Sprintf("%s:%s", c.gameSessionPrefixKey, userId)
-// 	}
-// 	return c.c.Del(ctx, keys...).Err()
-// }
+	pipe := c.c.Pipeline()
+	for userId, gameId := range gamesByUserId {
+		key := fmt.Sprintf("%s:%s:%s", c.userGameSessionsHeartbeatKey, userId.String(), gameId.String())
+		pipe.Set(ctx, key, time.Now().Unix(), 0)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for updating user game sessions heartbeat: %v", err)
+	}
+
+	return nil
+}
+
+func (c *redisCache) deleteExpiredUserGameSessionsHeartbeat(ctx context.Context, ttl time.Duration) (map[types.ObjectId]types.ObjectId, error) {
+	keys, err := c.c.Keys(ctx, fmt.Sprintf("%s:*", c.userGameSessionsHeartbeatKey)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get keys: %v", err)
+	}
+
+	pipe := c.c.Pipeline()
+	expirationThreshold := time.Now().Add(-ttl)
+	deletedSessions := make(map[types.ObjectId]types.ObjectId)
+	for _, key := range keys {
+		t, err := c.c.Get(ctx, key).Int64()
+		if err != nil {
+			c.l.Error(fmt.Sprintf("failed to get key: %v", err))
+			continue
+		}
+
+		if t < expirationThreshold.Unix() {
+			parts := strings.Split(key, ":")
+			if len(parts) != 3 {
+				continue
+			}
+			userId, err := strconv.ParseUint(parts[1], 10, 64)
+			if err != nil {
+				continue
+			}
+			gameId, err := strconv.ParseUint(parts[2], 10, 64)
+			if err != nil {
+				continue
+			}
+			deletedSessions[types.ObjectId(userId)] = types.ObjectId(gameId)
+			pipe.Del(ctx, key)
+		}
+	}
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Redis pipeline for deleting expired keys: %v", err)
+	}
+	return deletedSessions, nil
+}
+
+// deleteUsersSessions removes multiple sessions from their respective user hashes
+// replace lua script with pipeline execution, because multiple key operations with lua script
+// is not supported in redis cluster
+func (c *redisCache) deleteUsersSessions(ctx context.Context, ss ...*session) error {
+	if len(ss) == 0 {
+		return nil
+	}
+
+	pipe := c.c.Pipeline()
+
+	for _, s := range ss {
+		key := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, s.userId.String())
+		pipe.HDel(ctx, key, s.id.String())
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for removing sessions: %v", err)
+	}
+
+	return nil
+}
+
+func (c *redisCache) deleteExpiredSessions(ctx context.Context, ttl time.Duration) error {
+	keys, err := c.c.Keys(ctx, fmt.Sprintf("%s:*", c.userSessionsPrefixKey)).Result()
+	if err != nil {
+		return fmt.Errorf("failed to get keys: %v", err)
+	}
+
+	pipe := c.c.Pipeline()
+	expirationThreshold := time.Now().Add(-ttl)
+
+	for _, key := range keys {
+		sessions, err := c.c.HGetAll(ctx, key).Result()
+		if err != nil {
+			c.l.Error(fmt.Sprintf("failed to get sessions for key %s: %v", key, err))
+			continue
+		}
+
+		for sessionId, jsonStr := range sessions {
+			var sic sessionInCache
+			if err := json.Unmarshal([]byte(jsonStr), &sic); err != nil {
+				c.l.Debug(fmt.Sprintf("failed to unmarshal session for key %s: %v", key, err))
+				continue
+			}
+
+			if sic.UpdatedAt.Before(expirationThreshold) {
+				pipe.HDel(ctx, key, sessionId)
+			}
+		}
+	}
+
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for deleting expired sessions: %v", err)
+	}
+
+	return nil
+}
+
+// countUsersGameSessions returns the number of game sessions for multiple users
+// replace lua script with pipeline execution, same as RemoveUsersSessions
+func (c *redisCache) countUsersGameSessions(ctx context.Context, userIds ...types.ObjectId) (map[types.ObjectId]int64, error) {
+	if len(userIds) == 0 {
+		return nil, nil
+	}
+
+	pipe := c.c.Pipeline()
+	cmds := make(map[types.ObjectId]*redis.MapStringStringCmd) // map by userId
+
+	for _, userId := range userIds {
+		key := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, userId.String())
+		cmds[userId] = pipe.HGetAll(ctx, key)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Redis pipeline: %v", err)
+	}
+
+	res := make(map[types.ObjectId]int64)
+	for userId, cmd := range cmds {
+		sessions, err := cmd.Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get session data: %v", err)
+		}
+
+		for _, jsonStr := range sessions {
+			gameId := extractGameID(jsonStr)
+			if gameId != types.ObjectZero.Int64() {
+				res[userId]++
+			}
+		}
+	}
+
+	return res, nil
+}
+
+func extractGameID(jsonStr string) int64 {
+	var sic sessionInCache
+	if err := json.Unmarshal([]byte(jsonStr), &sic); err != nil {
+		return types.ObjectZero.Int64()
+	}
+
+	i, err := strconv.Atoi(sic.GameId)
+	if err != nil {
+		return types.ObjectZero.Int64()
+	}
+	return int64(i)
+}
 
 type sessionInCache struct {
-	SessionId types.ObjectId
-	UserId    types.ObjectId
-	GameId    types.ObjectId
-	Role      gameRole
-	Closed    bool
-}
-
-func (s *sessionInCache) encode() []byte {
-	b, _ := json.Marshal(s)
-	return b
-}
-
-func (s *sessionInCache) decode(b []byte) error {
-	return json.Unmarshal(b, s)
+	SessionId string    `json:"sessionId"`
+	UserId    string    `json:"userId"`
+	GameId    string    `json:"gameId"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }

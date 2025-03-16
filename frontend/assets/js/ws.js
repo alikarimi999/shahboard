@@ -42,15 +42,26 @@ export function connectWebSocket(url) {
                 };
                 reader.readAsArrayBuffer(event.data);
             } else if (typeof event.data === "string") {
-                handleTextMessage(JSON.parse(event.data));
+                if (!event.data || event.data.trim() === "") {
+                    console.warn("Received empty or whitespace-only message:", event.data);
+                    return;
+                }
+                try {
+                    const parsedMessage = JSON.parse(event.data);
+                    handleTextMessage(parsedMessage);
+                } catch (e) {
+                    console.error("Failed to parse WebSocket message as JSON:", event.data, e);
+                }
             } else {
                 console.warn("Unknown message type:", event.data);
             }
         };
 
-        socket.onclose = () => {
-            console.log("Disconnected from WebSocket");
+        socket.onclose = (event) => {
             clearInterval(pingInterval);
+            console.warn("Unexpected disconnection:", event);
+            alert("Connection closed: " + event.reason);
+            window.location.reload();
         };
     }
 

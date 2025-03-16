@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -13,116 +14,97 @@ import (
 	"go.uber.org/atomic"
 )
 
-type gameRole uint8
-
 const (
-	gameViewerRole gameRole = iota + 1
-	gamePlayerRole
+	defaultViewGamesCap = 5
 )
 
 type session struct {
 	*websocket.Conn
 	id     types.ObjectId
 	userId types.ObjectId
-	msgCh  chan []byte
-	pongCh chan struct{}
 
-	gameId types.ObjectId
-	role   gameRole
+	eventCh chan event.Event
+	msgCh   chan []byte
+	pongCh  chan struct{}
 
-	sub         event.Subscription
-	changeSubCh chan event.Subscription
+	matchId types.ObjectId
+
+	playGameId types.ObjectId
+
+	vmu        sync.Mutex
+	viewGamsId map[types.ObjectId]struct{}
+	viewCap    int
 
 	rc *redisCache
 
-	em *gameEventsManager
-
+	h             *sessionsEventsHandler
 	lastHeartBeat *atomic.Time
 
-	closed *atomic.Bool
 	stopCh chan struct{}
 
 	p event.Publisher
 	l log.Logger
+
+	once    sync.Once
+	stopped *atomic.Bool
 }
 
-func newSession(conn *websocket.Conn, em *gameEventsManager, rc *redisCache, userId types.ObjectId,
+func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandler, rc *redisCache, userId types.ObjectId,
 	gameId types.ObjectId, p event.Publisher, l log.Logger) *session {
-	sess := &session{
-		Conn: conn,
-		id:   types.NewObjectId(),
+	s := &session{
+		Conn:       conn,
+		id:         id,
+		userId:     userId,
+		playGameId: gameId,
 
-		userId:      userId,
-		gameId:      gameId,
-		msgCh:       make(chan []byte, 100),
-		pongCh:      make(chan struct{}),
-		changeSubCh: make(chan event.Subscription),
-		rc:          rc,
-		em:          em,
+		eventCh: make(chan event.Event, 100),
+		msgCh:   make(chan []byte, 100),
+		pongCh:  make(chan struct{}),
 
+		viewGamsId: make(map[types.ObjectId]struct{}),
+		viewCap:    defaultViewGamesCap,
+
+		rc:            rc,
+		h:             h,
 		lastHeartBeat: atomic.NewTime(time.Now()),
 
-		closed: atomic.NewBool(false),
-		stopCh: make(chan struct{}),
-		p:      p,
-		l:      l,
+		stopCh:  make(chan struct{}),
+		p:       p,
+		l:       l,
+		stopped: atomic.NewBool(false),
 	}
-	sess.start()
+	go s.start()
+	h.subscribeToBasicEvents(s)
 
-	return sess
+	return s
 }
 
 func (s *session) start() {
-	go s.startListen()
+	go s.handleEvent()
 }
 
-func (s *session) startListen() {
-	wg := sync.WaitGroup{}
-	for {
-		select {
-		case <-s.stopCh:
-			return
-		case sub := <-s.changeSubCh:
-			wg.Wait()
-			s.sub = sub
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				t := s.sub.Topic().String()
-				s.l.Debug(fmt.Sprintf("session '%s' subscribed to '%s'", s.id, t))
-				for e := range s.sub.Event() {
-					s.handleEvent(e)
-				}
-				s.l.Debug(fmt.Sprintf("session '%s' unsubscribed from '%s'", s.id, t))
-			}()
+func (s *session) consume(e event.Event) {
+	select {
+	case s.eventCh <- e:
+	default:
+		s.l.Error(fmt.Sprintf("session consume event failed: '%s'", e.GetTopic()))
+	}
+}
 
+func (s *session) handleEvent() {
+	for e := range s.eventCh {
+		var msg *Msg
+		switch e.GetTopic().Domain() {
+		case event.DomainGame:
+			msg = s.handleGameEvent(e)
+		case event.DomainGameChat:
+			msg = s.handleGameChatEvent(e)
 		}
-	}
-}
 
-func (s *session) changeSub(sub event.Subscription) {
-	if sub == nil {
-		return
-	}
-	s.changeSubCh <- sub
-}
-
-func (s *session) handleEvent(e event.Event) {
-	var msg *Msg
-	defer func() {
 		if msg != nil {
-			if s.isClosed() {
-				return
-			}
-			s.send(*msg)
+			s.send(msg)
 		}
-	}()
 
-	switch e.GetTopic().Domain() {
-	case event.DomainGame:
-		msg = s.handleGameEvent(e)
-	case event.DomainGameChat:
-		msg = s.handleGameChatEvent(e)
 	}
 }
 
@@ -132,13 +114,22 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 	switch e.GetTopic().Action() {
 	case event.ActionCreated:
 		eve := e.(*event.EventGameCreated)
-		if eve.Player1.ID != s.userId && eve.Player2.ID != s.userId {
-			s.sub.Unsubscribe()
-			return nil
+
+		s.playGameId = eve.GameID
+		if err := s.rc.updateUserSession(context.Background(), s); err != nil {
+			s.l.Error(err.Error())
+			s.playGameId = types.ObjectZero
+
+			return &Msg{
+				MsgBase: MsgBase{
+					Type:      MsgTypeError,
+					Timestamp: time.Now().Unix(),
+				},
+				Data: []byte(MsgDataInternalErrorr),
+			}
 		}
 
-		s.gameId = eve.GameID
-
+		s.h.subscribeToGameWithChat(s, eve.GameID)
 		msg = &Msg{
 			MsgBase: MsgBase{
 				Type:      MsgTypeGameCreate,
@@ -147,10 +138,8 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 			Data: eve.Encode(),
 		}
 
-		s.sub.Unsubscribe()
-		s.changeSub(s.em.subscribeToGameWithChat(eve.GameID))
-
 	case event.ActionEnded:
+		eve := e.(*event.EventGameEnded)
 		msg = &Msg{
 			MsgBase: MsgBase{
 				Type:      MsgTypeGameEnd,
@@ -158,16 +147,23 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 			},
 			Data: e.Encode(),
 		}
-		s.sub.Unsubscribe()
-		s.sub = nil
-		s.gameId = types.ObjectZero
-		s.role = 0
+		if eve.GameID == s.playGameId {
+			s.playGameId = types.ObjectZero
+		}
+
+		s.vmu.Lock()
+		for id := range s.viewGamsId {
+			if id == eve.GameID {
+				delete(s.viewGamsId, id)
+			}
+		}
+		s.vmu.Unlock()
+
+		s.h.unsubscribeFromGameWithChat(s, eve.GameID)
 
 	default:
 		var mt MsgType
 		switch e.GetTopic().Action() {
-		case event.ActionCreated:
-			mt = MsgTypeGameCreate
 		case event.ActionGameMoveApprove:
 			mt = MsgTypeMoveApproved
 		case event.ActionGamePlayerConnectionUpdated:
@@ -209,20 +205,6 @@ func (s *session) handleGameChatEvent(e event.Event) *Msg {
 	return nil
 }
 
-// func (s *session) subscribeAsPlayer(gameId types.ObjectId) {
-// 	s.changeSub(s.em.subscribeToGameWithChat(gameId))
-// 	s.gameId = gameId
-// 	s.role = gamePlayerRole
-// 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
-// }
-
-// func (s *session) subscribeAsViewer(gameId types.ObjectId) {
-// 	s.changeSub(s.em.subscribeToGameWithChat(gameId))
-// 	s.gameId = gameId
-// 	s.role = gameViewerRole
-// 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, gameId))
-// }
-
 func (s *session) handleFindMatchRequest(msgId types.ObjectId, data dataFindMatchRequest) {
 	var errMsg string
 	defer func() {
@@ -231,9 +213,9 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data dataFindMatc
 		}
 	}()
 
-	if s.sub == nil && (s.userId == data.User1.ID || s.userId == data.User2.ID) {
-		s.changeSub(s.em.subscribeToMatch(data.ID))
-		s.role = gamePlayerRole
+	if s.playGameId.IsZero() && s.matchId.IsZero() && (s.userId == data.User1.ID || s.userId == data.User2.ID) {
+		s.matchId = data.ID
+		s.h.subscribeToMatch(s)
 		return
 	}
 
@@ -248,9 +230,25 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGa
 		}
 	}()
 
-	if s.sub == nil && s.gameId == req.GameId {
-		s.changeSub(s.em.subscribeToGameWithChat(req.GameId))
-		s.role = gamePlayerRole
+	if s.matchId.IsZero() && s.playGameId.IsZero() {
+		// TODO: should get the game pgn from game service and pass it to the client
+
+		s.playGameId = req.GameId
+		if err := s.rc.updateUserSession(context.Background(), s); err != nil {
+			s.l.Error(err.Error())
+			s.playGameId = types.ObjectZero
+			errMsg = MsgDataInternalErrorr
+			return
+		}
+
+		s.h.subscribeToGameWithChat(s, req.GameId)
+		s.p.Publish(event.EventGamePlayerConnectionUpdated{
+			GameID:    req.GameId,
+			PlayerID:  s.userId,
+			Connected: true,
+			Timestamp: time.Now().Unix(),
+		})
+
 		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
 		return
 	}
@@ -263,30 +261,28 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 	var msg *Msg
 	defer func() {
 		if msg != nil {
-			s.send(*msg)
+			s.send(msg)
 		}
 		if errMsg != "" {
 			s.sendErr(msgId, errMsg)
 		}
 	}()
 
-	if s.sub == nil {
-		msg = &Msg{
-			MsgBase: MsgBase{
-				ID:        msgId,
-				Type:      MsgTypeView,
-				Timestamp: time.Now().Unix(),
-			}}
-
-		s.changeSub(s.em.subscribeToGameWithChat(req.GameId))
-		s.role = gameViewerRole
-
-		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
-
+	s.vmu.Lock()
+	defer s.vmu.Unlock()
+	if _, ok := s.viewGamsId[req.GameId]; ok {
+		errMsg = "already subscribed to this game"
 		return
 	}
 
-	errMsg = "already subscribed to a game"
+	if len(s.viewGamsId) >= s.viewCap {
+		errMsg = "view cap reached"
+		return
+	}
+
+	s.viewGamsId[req.GameId] = struct{}{}
+	s.h.subscribeToGameWithChat(s, req.GameId)
+	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
 }
 
 func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMoveRequest) {
@@ -297,7 +293,7 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMove
 		}
 	}()
 
-	if s.sub != nil && s.role == gamePlayerRole && s.userId == req.PlayerID && s.gameId == req.GameID {
+	if s.userId == req.PlayerID && s.playGameId == req.GameID {
 		if err := s.p.Publish(event.EventGamePlayerMoved{
 			ID:        req.ID,
 			GameID:    req.GameID,
@@ -321,7 +317,7 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
 		}
 	}()
 
-	if s.sub != nil && s.gameId == req.GameID && s.userId == req.SenderID {
+	if s.userId == req.SenderID && s.playGameId == req.GameID {
 		if err := s.p.Publish(event.EventGameChatMsgeSent{
 			ID:        req.ID,
 			GameID:    req.GameID,
@@ -337,7 +333,7 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
 	errMsg = "not allowed to send message"
 }
 
-func (s *session) send(msg Msg) {
+func (s *session) send(msg *Msg) {
 	b, err := json.Marshal(msg)
 	if err != nil {
 		s.l.Error(fmt.Sprintf("failed to marshal message: %v", err))
@@ -347,7 +343,7 @@ func (s *session) send(msg Msg) {
 }
 
 func (s *session) sendErr(id types.ObjectId, err string) {
-	s.send(Msg{
+	s.send(&Msg{
 		MsgBase: MsgBase{
 			ID:        id,
 			Type:      MsgTypeError,
@@ -358,7 +354,7 @@ func (s *session) sendErr(id types.ObjectId, err string) {
 }
 
 func (s *session) sendWelcome() {
-	s.send(Msg{
+	s.send(&Msg{
 		MsgBase: MsgBase{
 			ID:        types.NewObjectId(),
 			Type:      MsgTypeWelcome,
@@ -372,25 +368,33 @@ func (s *session) sendPong() {
 	s.pongCh <- struct{}{}
 }
 
-func (s *session) isSubscribedToGame() bool {
-	return s.sub != nil
-}
-
-func (s *session) close() error {
-	s.closed.Store(true)
-	return s.Conn.Close()
+func (s *session) isStopped() bool {
+	return s.stopped.Load()
 }
 
 func (s *session) stop() {
-	close(s.stopCh)
-}
+	s.once.Do(func() {
+		s.stopped.Store(true)
+		close(s.eventCh)
+		close(s.msgCh)
+		close(s.stopCh)
 
-func (s *session) isClosed() bool {
-	return s.closed.Load()
-}
+		var gamesId []types.ObjectId
+		if !s.playGameId.IsZero() {
+			gamesId = append(gamesId, s.playGameId)
+		}
 
-func (s *session) reconnect(conn *websocket.Conn) {
-	s.closed.Store(false)
-	s.stopCh = make(chan struct{})
-	s.Conn = conn
+		s.vmu.Lock()
+		for id := range s.viewGamsId {
+			gamesId = append(gamesId, id)
+		}
+		s.vmu.Unlock()
+
+		s.h.unsubscribeFromBasicEvents(s)
+		s.h.unsubscribeFromGameWithChat(s, gamesId...)
+
+		if !s.matchId.IsZero() {
+			s.h.unsubscribeFromMatch(s)
+		}
+	})
 }

@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/pkg/jwt"
@@ -30,11 +27,9 @@ var upgrader = websocket.Upgrader{
 type Server struct {
 	cfg *WsConfigs
 
-	connsMux sync.RWMutex
-	sessions map[types.ObjectId]*session
-	counter  *atomic.Int64
+	sm *sessionsManager
 
-	m *gameEventsManager
+	h *sessionsEventsHandler
 
 	p event.Publisher
 
@@ -55,17 +50,16 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 
 	server := &Server{
 		cfg:          cfg,
-		cache:        newRedisCache(c),
-		m:            newGameEventsManager(s, l),
+		cache:        newRedisCache(c, cfg.UserSessionsCap, l),
+		sm:           newSessionsManager(),
+		h:            newSessionsEventsHandler(s, l),
 		p:            p,
-		sessions:     make(map[types.ObjectId]*session),
-		counter:      atomic.NewInt64(0),
 		stopCh:       make(chan struct{}),
 		jwtValidator: v,
 		l:            l,
 	}
 
-	go server.checkHeartbeat()
+	go server.manageSessionsState()
 
 	e.GET("/ws", middleware.ParseQueryToken(v), func(ctx *gin.Context) {
 		u, _ := ctx.Get("user")
@@ -78,170 +72,63 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			return
 		}
 
-		// check if user has a session in redis
-		csess, err := server.cache.GetSession(context.Background(), user.ID)
+		id := types.NewObjectId()
+		success, err := server.cache.addUserSessionId(context.Background(), user.ID, id)
 		if err != nil {
-			l.Error(fmt.Sprintf("failed to check if user has session: %v", err))
-			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
-			conn.Close()
-			return
-		}
-
-		// this means that user has an open session in another wsgateway instance
-		if csess != nil && !csess.Closed {
-			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "session is open"))
-			conn.Close()
-			return
-		}
-
-		// this means that user has a closed session in another wsgateway instance
-		// don't need to save session state if it's closed,it will be replaced by a new session
-		// in future we should be able to retrieve the session state from redis and reconnect the session instead of creating a new one
-		if csess != nil && csess.Closed {
-
-			server.l.Debug(fmt.Sprintf("delete disconnected session for user '%s'", user.ID))
-			sess := server.getSession(user.ID)
-			if sess != nil {
-				server.stopSessions(true, false, sess)
-			}
-
-			sess = newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, csess.GameId, p, l)
-			if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
-				l.Error(fmt.Sprintf("failed to save session state: %v", err))
-				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
-				conn.Close()
-				return
-			}
-
-			server.addSession(sess, user.ID)
-			go server.sessionReader(sess)
-			go server.sessionWriter(sess)
-			sess.sendWelcome()
-
-			if !csess.GameId.IsZero() {
-				if err := sess.p.Publish(event.EventGamePlayerConnectionUpdated{
-					ID:        types.NewObjectId(),
-					GameID:    csess.GameId,
-					PlayerID:  user.ID,
-					Connected: true,
-					Timestamp: time.Now().Unix(),
-				}); err != nil {
-					l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
-				}
-			}
-
-			l.Info(fmt.Sprintf("new session '%s' created for user '%s'", sess.id, user.ID))
-			return
-		}
-
-		sess := newSession(conn, newGameEventsManager(s, l), server.cache, user.ID, types.ObjectZero, p, l)
-		if err := server.cache.SaveSessionState(context.Background(), sess); err != nil {
 			l.Error(fmt.Sprintf("failed to save session state: %v", err))
 			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "internal server error"))
 			conn.Close()
 			return
 		}
 
-		server.addSession(sess, user.ID)
+		if !success {
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "open sessions cap reached"))
+			conn.Close()
+			return
+		}
+
+		sess := newSession(id, conn, server.h, server.cache, user.ID, types.ObjectZero, p, l)
+		server.sm.add(sess)
 
 		go server.sessionReader(sess)
 		go server.sessionWriter(sess)
 		sess.sendWelcome()
 
-		l.Info(fmt.Sprintf("session '%s' created for user '%s'", sess.id, user.ID))
+		l.Debug(fmt.Sprintf("session '%s' created for user '%s'", sess.id, user.ID))
 
 	})
 
 	return server, nil
 }
 
-func (s *Server) getSession(userId types.ObjectId) *session {
-	s.connsMux.RLock()
-	defer s.connsMux.RUnlock()
-
-	return s.sessions[userId]
-}
-
-func (s *Server) addSession(sess *session, userId types.ObjectId) {
-	s.connsMux.Lock()
-	defer s.connsMux.Unlock()
-
-	s.sessions[userId] = sess
-	s.counter.Add(1)
-}
-
-func (s *Server) removeSession(sess *session) {
-	s.connsMux.Lock()
-	defer s.connsMux.Unlock()
-
-	delete(s.sessions, sess.userId)
-	s.counter.Add(-1)
-}
-
-func (s *Server) stopSessions(purge, endGame bool, sess ...*session) {
-	for _, se := range sess {
-		if se.isClosed() {
-			if purge {
-				s.removeSession(se)
-				se.stop()
-			}
-			continue
-		}
-		if err := se.close(); err != nil {
-			s.l.Error(fmt.Sprintf("session '%s' close error: '%s'", se.id, err))
-			continue
-		}
-		s.l.Debug(fmt.Sprintf("session '%s' closed", se.id))
-		if purge {
-			s.removeSession(se)
-			se.stop()
-			s.l.Debug(fmt.Sprintf("session '%s' removed from cache", se.id))
-		}
-	}
-
-	if len(sess) == 0 {
-		return
-	}
-
-	t := time.Now().Unix()
-
-	if endGame {
-		events := make([]event.Event, 0, len(sess))
-		for _, s := range sess {
-			if !s.gameId.IsZero() {
-				events = append(events, event.EventGamePlayerLeft{
-					GameID:    s.gameId,
-					PlayerID:  s.userId,
-					Timestamp: t,
-				})
-				fmt.Println("publish event player leeft: ", s.userId, s.gameId)
-			}
-		}
-
-		if err := s.p.Publish(events...); err != nil {
-			s.l.Error(fmt.Sprintf("failed to publish game_player_left event: %v", err))
-		}
-	}
-
-	if purge {
-		ids := []types.ObjectId{}
-		for _, s := range sess {
-			ids = append(ids, s.userId)
-		}
-		if err := s.cache.DeleteSessions(context.Background(), ids...); err != nil {
-			s.l.Error(fmt.Sprintf("failed to delete sessions: %v", err))
-			return
-		}
-		s.l.Debug(fmt.Sprintf("user's sessions closed on redis: '%v'", ids))
-		return
-	}
-
+func (s *Server) stopSessions(ss ...*session) {
+	s.sm.remove(ss...)
 	events := []event.Event{}
-	for _, se := range sess {
-		if !se.gameId.IsZero() {
+	usersId := make(map[types.ObjectId]struct{})
+
+	for _, se := range ss {
+		if !se.playGameId.IsZero() {
+			usersId[se.userId] = struct{}{}
+		}
+		se.stop()
+	}
+
+	ids := make([]types.ObjectId, 0, len(usersId))
+	for id := range usersId {
+		ids = append(ids, id)
+	}
+	res, err := s.cache.countUsersGameSessions(context.Background(), ids...)
+	if err != nil {
+		s.l.Error(err.Error())
+	}
+
+	// only send these two events if user doesn't have any other active game session
+	t := time.Now().Unix()
+	for _, se := range ss {
+		if count := res[se.userId]; count < 2 {
 			events = append(events, event.EventGamePlayerConnectionUpdated{
 				ID:        types.NewObjectId(),
-				GameID:    se.gameId,
+				GameID:    se.playGameId,
 				PlayerID:  se.userId,
 				Connected: false,
 				Timestamp: t,
@@ -249,50 +136,33 @@ func (s *Server) stopSessions(purge, endGame bool, sess ...*session) {
 		}
 	}
 
-	if len(events) > 0 {
-		if err := s.p.Publish(events...); err != nil {
-			s.l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
-		}
+	if err := s.cache.deleteUsersSessions(context.Background(), ss...); err != nil {
+		s.l.Error(err.Error())
 	}
 
-	if err := s.cache.SaveSessionsState(context.Background(), sess...); err != nil {
-		s.l.Error(fmt.Sprintf("failed to save sessions state: %v", err))
-		return
+	if err := s.p.Publish(events...); err != nil {
+		s.l.Error(err.Error())
 	}
-	ids := []types.ObjectId{}
-	for _, s := range sess {
-		ids = append(ids, s.userId)
-	}
-	s.l.Debug(fmt.Sprintf("sessions '%v' closed on redis", ids))
 }
 
-func (s *Server) sessionReader(sess *session) {
+func (s *Server) sessionReader(se *session) {
 	defer func() {
-		s.l.Debug(fmt.Sprintf("session '%s' reader stopped", sess.id))
+		s.l.Debug(fmt.Sprintf("session '%s' reader stopped", se.id))
 	}()
 
 	for {
-		mt, recievedMsg, err := sess.ReadMessage()
+		mt, recievedMsg, err := se.ReadMessage()
 		if err != nil {
-			s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", sess.id, err))
-			if !sess.gameId.IsZero() {
-				s.stopSessions(false, false, sess)
-				if err := s.p.Publish(event.EventGamePlayerConnectionUpdated{
-					ID:        types.NewObjectId(),
-					GameID:    sess.gameId,
-					PlayerID:  sess.userId,
-					Connected: false,
-					Timestamp: time.Now().Unix(),
-				}); err != nil {
-					s.l.Error(fmt.Sprintf("failed to publish game_player_connection_updated event: %v", err))
-				}
+			if !se.isStopped() {
+				s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", se.id, err))
+				s.stopSessions(se)
 			}
 			return
 		}
 
 		if mt == websocket.BinaryMessage && len(recievedMsg) > 0 && recievedMsg[0] == 0x0 {
-			sess.lastHeartBeat.Store(time.Now())
-			sess.sendPong()
+			se.lastHeartBeat.Store(time.Now())
+			se.sendPong()
 			continue
 		}
 
@@ -301,30 +171,34 @@ func (s *Server) sessionReader(sess *session) {
 			if err := json.Unmarshal(recievedMsg, &msg); err != nil {
 				continue
 			}
-			s.handleMsg(sess, &msg)
+			s.handleMsg(se, &msg)
 		}
 	}
 }
 
-func (s *Server) sessionWriter(sess *session) {
+func (s *Server) sessionWriter(se *session) {
 	defer func() {
-		s.l.Debug(fmt.Sprintf("session '%s' writer stopped", sess.id))
+		s.l.Debug(fmt.Sprintf("session '%s' writer stopped", se.id))
 	}()
 
 	for {
 		select {
-		case <-sess.stopCh:
+		case <-se.stopCh:
 			return
-		case message := <-sess.msgCh:
-			if err := sess.WriteMessage(websocket.TextMessage, message); err != nil {
-				s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", sess.id, err))
-				s.stopSessions(false, false, sess)
+		case message := <-se.msgCh:
+			if err := se.WriteMessage(websocket.TextMessage, message); err != nil {
+				if !se.isStopped() {
+					s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", se.id, err))
+					s.stopSessions(se)
+				}
 				return
 			}
-		case <-sess.pongCh:
-			if err := sess.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
-				s.l.Debug(fmt.Sprintf("session '%s' write pong message error: %v", sess.id, err))
-				s.stopSessions(false, false, sess)
+		case <-se.pongCh:
+			if err := se.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
+				if !se.isStopped() {
+					s.l.Debug(fmt.Sprintf("session '%s' write pong message error: %v", se.id, err))
+					s.stopSessions(se)
+				}
 				return
 			}
 		}
@@ -334,11 +208,6 @@ func (s *Server) sessionWriter(sess *session) {
 func (s *Server) handleMsg(sess *session, msg *Msg) {
 	switch msg.Type {
 	case MsgTypeFindMatch:
-		if sess.isSubscribedToGame() {
-			sess.sendErr(msg.ID, "already subscribed to a game")
-			return
-		}
-
 		var d dataFindMatchRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
@@ -347,11 +216,6 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleFindMatchRequest(msg.ID, d)
 	case MsgTypeResumeGame:
-		if sess.isSubscribedToGame() {
-			sess.sendErr(msg.ID, "already subscribed to a game")
-			return
-		}
-
 		var d dataResumeGameRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
