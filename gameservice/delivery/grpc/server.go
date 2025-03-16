@@ -63,7 +63,9 @@ func (s *Server) GetUserLiveGameID(ctx context.Context, req *pb.GetUserLiveGameI
 	}
 
 	if res.IsZero() {
-		return nil, status.Errorf(codes.NotFound, "user live game not found")
+		return &pb.GetUserLiveGameIdResponse{
+			GameId: types.ObjectZero.String(),
+		}, nil
 	}
 
 	return &pb.GetUserLiveGameIdResponse{
@@ -83,7 +85,9 @@ func (s *Server) GetUserLiveGamePGN(ctx context.Context, req *pb.GetUserLiveGame
 	}
 
 	if res.ID.IsZero() {
-		return nil, status.Errorf(codes.NotFound, "user live game not found")
+		return &pb.GetUserLiveGamePgnResponse{
+			GameId: types.ObjectZero.String(),
+		}, nil
 	}
 
 	return &pb.GetUserLiveGamePgnResponse{
