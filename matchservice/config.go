@@ -2,9 +2,9 @@ package matchservice
 
 import (
 	"github.com/alikarimi999/shahboard/event/kafka"
-	"github.com/alikarimi999/shahboard/matchservice/delivery/game"
 	"github.com/alikarimi999/shahboard/matchservice/delivery/http"
 	match "github.com/alikarimi999/shahboard/matchservice/service"
+	"github.com/alikarimi999/shahboard/pkg/grpc"
 	"github.com/alikarimi999/shahboard/pkg/jwt"
 )
 
@@ -14,7 +14,7 @@ type Config struct {
 	Kafka        kafka.Config        `json:"kafka"`
 	Log          LogConfig           `json:"log"`
 	JwtValidator jwt.ValidatorConfig `json:"jwt_validator"`
-	GameService  game.Config         `json:"game_service_grpc"`
+	GameService  grpc.Config         `json:"game_service_grpc"`
 }
 
 type LogConfig struct {

@@ -2,32 +2,18 @@ package game
 
 import (
 	"context"
-	"fmt"
 
 	pb "github.com/alikarimi999/shahboard/proto/game/gamepb"
 	"github.com/alikarimi999/shahboard/types"
 	"google.golang.org/grpc"
 )
 
-type Config struct {
-	Target string `json:"target"`
-}
-
 type GameService struct {
 	client pb.GameServiceClient
 }
 
-func NewService(cfg Config, option grpc.DialOption) (*GameService, error) {
-	if cfg.Target == "" || option == nil {
-		return nil, fmt.Errorf("address and dial option are required")
-	}
-
-	conn, err := grpc.NewClient(cfg.Target, option)
-	if err != nil {
-		return nil, err
-	}
-
-	return &GameService{client: pb.NewGameServiceClient(conn)}, nil
+func NewService(client *grpc.ClientConn) *GameService {
+	return &GameService{client: pb.NewGameServiceClient(client)}
 }
 
 // GetUserLiveGameID returns the live game ID for a given user ID.

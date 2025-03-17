@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/pkg/grpc"
 	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/pkg/middleware"
@@ -12,8 +13,6 @@ import (
 	"github.com/alikarimi999/shahboard/wsgateway/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type application struct {
@@ -50,12 +49,12 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	game, err := game.NewService(cfg.GameService, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	client, err := grpc.NewClient(cfg.GameService, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	server, err := ws.NewServer(e, s, p, game, nil, c, v, l)
+	server, err := ws.NewServer(e, s, p, game.NewService(client), nil, c, v, l)
 	if err != nil {
 		return nil, err
 	}
