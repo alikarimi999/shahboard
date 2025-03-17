@@ -45,12 +45,14 @@ type session struct {
 	p event.Publisher
 	l log.Logger
 
+	game GameService
+
 	once    sync.Once
 	stopped *atomic.Bool
 }
 
-func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandler, rc *redisCache, userId types.ObjectId,
-	gameId types.ObjectId, p event.Publisher, l log.Logger) *session {
+func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandler, rc *redisCache,
+	userId types.ObjectId, gameId types.ObjectId, p event.Publisher, game GameService, l log.Logger) *session {
 	s := &session{
 		Conn:       conn,
 		id:         id,
@@ -224,14 +226,29 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data dataFindMatc
 
 func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGameRequest) {
 	var errMsg string
+	var msg *Msg
 	defer func() {
 		if errMsg != "" {
 			s.sendErr(msgId, errMsg)
+			return
+		}
+		if msg != nil {
+			s.send(msg)
 		}
 	}()
 
 	if s.matchId.IsZero() && s.playGameId.IsZero() {
-		// TODO: should get the game pgn from game service and pass it to the client
+		g, err := s.game.GetUserLiveGamePGN(context.Background(), s.userId)
+		if err != nil {
+			s.l.Error(err.Error())
+			errMsg = MsgDataInternalErrorr
+			return
+		}
+
+		if g == nil || g.GameId.String() != req.GameId.String() {
+			errMsg = MsgDataBadRequest
+			return
+		}
 
 		s.playGameId = req.GameId
 		if err := s.rc.updateUserSession(context.Background(), s); err != nil {
@@ -242,12 +259,26 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGa
 		}
 
 		s.h.subscribeToGameWithChat(s, req.GameId)
-		s.p.Publish(event.EventGamePlayerConnectionUpdated{
+		if err := s.p.Publish(event.EventGamePlayerConnectionUpdated{
 			GameID:    req.GameId,
 			PlayerID:  s.userId,
 			Connected: true,
 			Timestamp: time.Now().Unix(),
-		})
+		}); err != nil {
+			s.l.Error(err.Error())
+		}
+
+		msg = &Msg{
+			MsgBase: MsgBase{
+				ID:        msgId,
+				Type:      MsgTypeResumeGame,
+				Timestamp: time.Now().Unix(),
+			},
+			Data: dataResumeGameResponse{
+				GameId: req.GameId,
+				Pgn:    g.Pgn,
+			}.Encode(),
+		}
 
 		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
 		return

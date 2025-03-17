@@ -31,8 +31,8 @@ type Server struct {
 
 	h *sessionsEventsHandler
 
-	p event.Publisher
-
+	p     event.Publisher
+	game  GameService
 	cache *redisCache
 
 	stopCh chan struct{}
@@ -42,7 +42,7 @@ type Server struct {
 	l log.Logger
 }
 
-func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
+func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameService,
 	cfg *WsConfigs, c *redis.Client, v *jwt.Validator, l log.Logger) (*Server, error) {
 	if cfg == nil {
 		cfg = defaultConfigs
@@ -87,7 +87,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher,
 			return
 		}
 
-		sess := newSession(id, conn, server.h, server.cache, user.ID, types.ObjectZero, p, l)
+		sess := newSession(id, conn, server.h, server.cache, user.ID, types.ObjectZero, p, game, l)
 		server.sm.add(sess)
 
 		go server.sessionReader(sess)

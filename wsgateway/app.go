@@ -8,9 +8,12 @@ import (
 	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/pkg/middleware"
+	"github.com/alikarimi999/shahboard/wsgateway/services/game"
 	"github.com/alikarimi999/shahboard/wsgateway/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type application struct {
@@ -47,7 +50,12 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	server, err := ws.NewServer(e, s, p, nil, c, v, l)
+	game, err := game.NewService(cfg.GameService, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+
+	server, err := ws.NewServer(e, s, p, game, nil, c, v, l)
 	if err != nil {
 		return nil, err
 	}

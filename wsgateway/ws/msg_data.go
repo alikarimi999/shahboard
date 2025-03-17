@@ -75,3 +75,17 @@ func (m dataResumeGameRequest) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
+
+type dataResumeGameResponse struct {
+	GameId types.ObjectId `json:"game_id"`
+	Pgn    string         `json:"pgn"`
+}
+
+func (m dataResumeGameResponse) Type() MsgType {
+	return MsgTypeResumeGame
+}
+
+func (m dataResumeGameResponse) Encode() []byte {
+	b, _ := json.Marshal(m)
+	return b
+}
