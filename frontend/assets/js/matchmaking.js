@@ -29,8 +29,6 @@ export async function findMatch() {
         data: matchBase64
     };
 
-    console.log("message: ", message);
-
     // Send message over WebSocket
     currentGame.ws.sendMessage(message);
 }

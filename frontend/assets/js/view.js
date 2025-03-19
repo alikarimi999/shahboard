@@ -1,7 +1,10 @@
 import { currentGame } from './gameState.js';
 import { connectWebSocket } from './ws.js';
 import { initializeBoard } from './board.js';
-import { handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate, handleGameEnded, handleError } from './eventHandlers.js';
+import {
+    handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate,
+    handleGameEnded, handleError, handleViewGame
+} from './eventHandlers.js';
 import { showErrorMessage } from './error.js';
 
 function getGameIdFromURL() {
@@ -25,6 +28,7 @@ if (!gameId) {
         currentGame.ws.registerMessageHandler("move_approved", handleMoveApproved);
         currentGame.ws.registerMessageHandler("game_ended", handleGameEnded);
         currentGame.ws.registerMessageHandler("player_connection_updated", handlePlayerConnectionUpdate);
+        currentGame.ws.registerMessageHandler("view_game", handleViewGame);
         currentGame.ws.registerMessageHandler("err", handleError);
 
         const game = initializeBoard(false);
@@ -33,15 +37,6 @@ if (!gameId) {
             timestamp: Date.now()
         };
 
-        const jsonData = JSON.stringify(data);
-        const base64Data = btoa(jsonData);
-
-        // Send view game message
-        currentGame.ws.sendMessage({
-            type: "view",
-            data: base64Data
-        });
-
     }).catch(error => {
         console.error('Connection failed:', error);
     });
@@ -49,8 +44,10 @@ if (!gameId) {
 
 
 window.addEventListener("beforeunload", () => {
+    currentGame.ws.unregisterMessageHandler("msg_approved");
     currentGame.ws.unregisterMessageHandler("move_approved");
     currentGame.ws.unregisterMessageHandler("game_ended");
     currentGame.ws.unregisterMessageHandler("player_connection_updated");
+    currentGame.ws.unregisterMessageHandler("view_game");
     currentGame.ws.unregisterMessageHandler("err");
 });

@@ -65,15 +65,19 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		return
 	}
 
+	game.Lock()
 	if game.Turn().ID != d.PlayerID {
+		game.Unlock()
 		s.l.Debug(fmt.Sprintf("it's not player '%s' turn", d.PlayerID))
 		return
 	}
 
 	if err := game.Move(d.Move); err != nil {
+		game.Unlock()
 		s.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.GameID))
 		return
 	}
+	game.Unlock()
 
 	if game.Outcome() != entity.NoOutcome {
 		if !game.EndGame() {

@@ -82,12 +82,13 @@ func (s *Server) manageSessionsState() {
 			}
 
 			// publish event to game service to notify that the game has been left by one of the players
+			t := time.Now().Unix()
 			events := make([]event.Event, 0, len(deletedSessions))
 			for userId, gameId := range deletedSessions {
 				events = append(events, event.EventGamePlayerLeft{
 					GameID:    gameId,
 					PlayerID:  userId,
-					Timestamp: time.Now().Unix(),
+					Timestamp: t,
 				})
 			}
 

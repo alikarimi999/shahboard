@@ -1,6 +1,7 @@
 import { currentGame } from './gameState.js';
 import { updateBoardPosition, ColorWhite, ColorBlack } from './board.js';
 import { user } from './user.js'
+import { showErrorMessage } from './error.js';
 
 const GameOutcome = Object.freeze({
     NoOutcome: "*",
@@ -45,10 +46,17 @@ export function handleGameChatCreated(base64Data) {
 export function handleMoveApproved(base64Data) {
     const moveData = JSON.parse(atob(base64Data));
     if (currentGame.isPlayer && moveData.game_id === currentGame.gameId && moveData.player_id === currentGame.opponent.id) {
+        console.log("Move approved:  ", moveData.player_id, currentGame.opponent.id);
         currentGame.game.move(moveData.move);
         updateBoardPosition();
-    } else if (moveData.game_id === currentGame.gameId && (moveData.player_id === currentGame.player.id || moveData.player_id === currentGame.opponent.id)) {
+        return;
+    }
+
+    if (moveData.game_id === currentGame.gameId && (moveData.player_id === currentGame.player.id || moveData.player_id === currentGame.opponent.id)) {
+        console.log("Fen:  ", currentGame.game.fen());
+        console.log("history:  ", currentGame.game.history(), currentGame.game.history().length);
         currentGame.game.move(moveData.move);
+        console.log("Move approved:  ", moveData);
         updateBoardPosition();
     }
 }
@@ -120,10 +128,37 @@ export function handleGameEnded(base64Data) {
     document.dispatchEvent(event);
 }
 
+export function handleResumeGame(base64Data) {
+    const gameData = JSON.parse(atob(base64Data));
+    if (gameData.game_id !== currentGame.gameId) return;
+    const event = new CustomEvent("pgn_received", {
+        detail: {
+            gameId: gameData.game_id,
+            pgn: gameData.pgn
+        }
+    })
+
+    document.dispatchEvent(event);
+}
+
+export function handleViewGame(base64Data) {
+    const gameData = JSON.parse(atob(base64Data));
+    if (gameData.game_id !== currentGame.gameId) return;
+    const event = new CustomEvent("pgn_received", {
+        detail: {
+            gameId: gameData.game_id,
+            pgn: gameData.pgn
+        }
+    })
+    document.dispatchEvent(event);
+}
+
+
 export function handleError(base64Data) {
     try {
-        alert("Error: " + atob(base64Data));
+        showErrorMessage(atob(base64Data));
     } catch (e) {
-        alert("Error: " + base64Data);
+        console.error("Error decoding error message:", e);
     }
+
 }

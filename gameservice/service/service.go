@@ -41,7 +41,7 @@ func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub ev
 		cfg: cfg,
 
 		games: make(map[types.ObjectId]*entity.Game),
-		cache: newRedisGameCache(cfg.InstanceID, redis, 15*time.Minute),
+		cache: newRedisGameCache(cfg.InstanceID, redis, 15*time.Minute, l),
 		pub:   pub,
 		sub:   sub,
 		l:     l,

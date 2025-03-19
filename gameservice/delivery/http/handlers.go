@@ -82,13 +82,13 @@ func (r *Router) getLiveGameByUserId(ctx *gin.Context) {
 		return
 	}
 
-	res, err := r.s.GetLiveGamePgnByUserID(ctx, uid)
+	res, err := r.s.GetLiveGameIdByUserId(ctx, uid)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, err)
 		return
 	}
 
-	ctx.JSON(200, res)
+	ctx.JSON(200, GetLiveGameIdByUserIdRequest{GameId: res})
 }
 
 // func (r *Router) getGamesFen(ctx *gin.Context) {

@@ -21,7 +21,18 @@ message GetUserLiveGameIdResponse {
   string game_id = 1;
 }
 
+message GetLiveGamePGNRequest {
+  string game_id = 1;
+}
+
+message GetLiveGamePGNResponse {
+  string game_id = 1;
+  string pgn = 2;
+}
+
+
 service GameService {
     rpc GetUserLiveGameID(GetUserLiveGameIdRequest) returns (GetUserLiveGameIdResponse);
     rpc GetUserLiveGamePGN(GetUserLiveGamePgnRequest) returns (GetUserLiveGamePgnResponse);
+    rpc GetLiveGamePGN(GetLiveGamePGNRequest) returns (GetLiveGamePGNResponse);
 }

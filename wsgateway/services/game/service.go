@@ -25,12 +25,30 @@ func (s *Service) GetUserLiveGamePGN(ctx context.Context, userId types.ObjectId)
 		return nil, err
 	}
 
-	if resp.GameId == "" {
+	if resp == nil || resp.GameId == types.ObjectZero.String() || resp.GameId == "" {
 		return nil, nil
 	}
 
 	gameId, err := types.ParseObjectId(resp.GameId)
 	if err != nil {
+		return nil, nil
+	}
+
+	return &ws.GamePgn{
+		GameId: gameId,
+		Pgn:    resp.Pgn,
+	}, nil
+}
+
+// GetLiveGamePGN returns the live game PGN for a given game ID.
+// It returns nil if game doesn't exist.
+func (s *Service) GetLiveGamePGN(ctx context.Context, gameId types.ObjectId) (*ws.GamePgn, error) {
+	resp, err := s.client.GetLiveGamePGN(ctx, &pb.GetLiveGamePGNRequest{GameId: gameId.String()})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp == nil || resp.GameId == types.ObjectZero.String() || resp.GameId == "" {
 		return nil, nil
 	}
 

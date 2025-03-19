@@ -223,7 +223,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 		}
 
 		sess.handleResumeGameRequest(msg.ID, d)
-	case MsgTypeView:
+	case MsgTypeViewGame:
 		var d dataGameViewRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")

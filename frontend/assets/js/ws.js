@@ -99,7 +99,6 @@ export function connectWebSocket(url) {
                 // Dispatch connected event on first pong
                 document.dispatchEvent(new Event("websocket_connected"));
                 document.dispatchEvent(new Event("opponent_connected"));
-                console.log("WebSocket and opponent connected >>>>> ");
                 isFirstPong = false;
             }
 

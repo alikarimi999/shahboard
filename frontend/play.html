@@ -117,17 +117,18 @@
         document.addEventListener("game_created", function () {
             moveSound.play();
 
-            console.log("game_created event received, adjusting layout...");
             currentGame.player.name = "Player1";
             currentGame.opponent.name = "Player2";
+            currentGame.player.connected = true;
+            currentGame.opponent.connected = true;
 
             document.getElementById("find-match-btn").classList.add("hidden");
             document.querySelector(".player-info").classList.remove("hidden");
             document.querySelector(".opponent-info").classList.remove("hidden");
 
             // Update player names and avatars
-            document.getElementById("player-name-display").textContent = currentGame.player.name;
-            document.getElementById("opponent-name-display").textContent = currentGame.opponent.name;
+            document.getElementById("player-name-display").textContent = currentGame.player.id;
+            document.getElementById("opponent-name-display").textContent = currentGame.opponent.id;
 
             // Set player avatars
             document.getElementById("player-avatar").src = `./assets/img/${currentGame.player.avatar || "player1.webp"}`;
@@ -158,32 +159,32 @@
                     document.querySelector(".player-info").classList.remove("hidden");
                     document.querySelector(".opponent-info").classList.remove("hidden");
 
-                    document.querySelector("#player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
-                    document.querySelector("#opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+                    document.querySelector("#player-name").textContent = `✅ ${currentGame.player.id} Connected`;
+                    document.querySelector("#opponent-name").textContent = `✅ ${currentGame.opponent.id} Connected`;
                     document.querySelector(".messages").innerHTML = "";
 
-                }, 1000); // Delay after fade out
-            }, 3000); // Display animation for 3 seconds
+                }, 1000);
+            }, 3000);
         });
 
         document.addEventListener("opponent_disconnected", function () {
             currentGame.opponent.connected = false;
-            document.getElementById("opponent-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+            document.getElementById("opponent-name").textContent = `❌ ${currentGame.opponent.id} Disconnected`;
         });
 
         document.addEventListener("opponent_connected", function () {
             currentGame.opponent.connected = true;
-            document.getElementById("opponent-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+            document.getElementById("opponent-name").textContent = `✅ ${currentGame.opponent.id} Connected`;
         });
 
         document.addEventListener("websocket_connected", function () {
             currentGame.player.connected = true;
-            document.getElementById("player-name").textContent = `✅ ${currentGame.opponent.name} Connected`;
+            document.getElementById("player-name").textContent = `✅ ${currentGame.player.id} Connected`;
         });
 
         document.addEventListener("websocket_disconnected", function () {
             currentGame.player.connected = false;
-            document.getElementById("player-name").textContent = `❌ ${currentGame.opponent.name} Disconnected`;
+            document.getElementById("player-name").textContent = `❌ ${currentGame.player.id} Disconnected`;
         });
 
         document.addEventListener("chat_created", function () {
@@ -197,7 +198,6 @@
             chatInput.disabled = false;
             sendBtn.disabled = false;
         });
-
 
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -309,7 +309,6 @@
 
             // Process and display moves
             const moves = currentGame.game.history({ verbose: true });
-            console.log("pgn applied>>>> ", moves);
             moves.forEach((move, index) => {
                 let moveNumber;
                 const isWhiteMove = index % 2 === 0;
@@ -318,7 +317,6 @@
                 } else {
                     moveNumber = (index + 1) / 2;
                 }
-                console.log("move,index: ", moveNumber, isWhiteMove)
                 let moveRow = document.querySelector(`.move-row[data-move="${moveNumber}"]`);
                 if (!moveRow) {
                     moveRow = document.createElement("div");

@@ -95,3 +95,26 @@ func (s *Server) GetUserLiveGamePGN(ctx context.Context, req *pb.GetUserLiveGame
 		Pgn:    res.PGN,
 	}, nil
 }
+
+func (s *Server) GetLiveGamePGN(ctx context.Context, req *pb.GetLiveGamePGNRequest) (*pb.GetLiveGamePGNResponse, error) {
+	gameId, err := types.ParseObjectId(req.GameId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid game id: %v", err)
+	}
+
+	res, err := s.svc.GetLiveGamePGN(ctx, gameId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get live game: %v", err)
+	}
+
+	if res.ID.IsZero() {
+		return &pb.GetLiveGamePGNResponse{
+			GameId: types.ObjectZero.String(),
+		}, nil
+	}
+
+	return &pb.GetLiveGamePGNResponse{
+		GameId: res.ID.String(),
+		Pgn:    res.PGN,
+	}, nil
+}

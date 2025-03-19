@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alikarimi999/shahboard/gameservice/entity"
+	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -21,13 +22,15 @@ type redisGameCache struct {
 	serviceID    string
 	rc           *redis.Client
 	deactivedTTL time.Duration
+	l            log.Logger
 }
 
-func newRedisGameCache(sercviceID string, rc *redis.Client, deactivedTTL time.Duration) *redisGameCache {
+func newRedisGameCache(sercviceID string, rc *redis.Client, deactivedTTL time.Duration, l log.Logger) *redisGameCache {
 	return &redisGameCache{
 		serviceID:    sercviceID,
 		rc:           rc,
 		deactivedTTL: deactivedTTL,
+		l:            l,
 	}
 }
 
@@ -173,7 +176,7 @@ func (c *redisGameCache) getGamesIDs(ctx context.Context) ([]types.ObjectId, err
 	return gamesIDs, nil
 }
 
-func (c *redisGameCache) getGameByUserID(ctx context.Context, userID types.ObjectId) (types.ObjectId, error) {
+func (c *redisGameCache) getGameIdByUserID(ctx context.Context, userID types.ObjectId) (types.ObjectId, error) {
 	gameID, err := c.rc.Get(ctx, fmt.Sprintf("%s%s", keyPlayerGamePrefix, userID)).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -213,6 +216,7 @@ func (c *redisGameCache) getGames(ctx context.Context) ([]*entity.Game, error) {
 
 			game := &entity.Game{}
 			if err := game.Decode(g.Game); err != nil {
+				c.l.Debug(fmt.Sprintf("failed to decode game: %v", err))
 				continue
 			}
 
@@ -255,6 +259,7 @@ func (c *redisGameCache) getGamesByID(ctx context.Context, ids []types.ObjectId)
 
 		game := &entity.Game{}
 		if err := game.Decode(g.Game); err != nil {
+			c.l.Debug(fmt.Sprintf("failed to decode game: %v", err))
 			continue
 		}
 
@@ -303,6 +308,7 @@ func (c *redisGameCache) getGamesByServiceID(ctx context.Context, id string) ([]
 
 		game := &entity.Game{}
 		if err := game.Decode(g.Game); err != nil {
+			c.l.Debug(fmt.Sprintf("failed to decode game: %v", err))
 			continue
 		}
 
@@ -333,6 +339,7 @@ func (c *redisGameCache) getGameByID(ctx context.Context, id types.ObjectId) (*e
 
 	game := &entity.Game{}
 	if err := game.Decode(g.Game); err != nil {
+		c.l.Debug(fmt.Sprintf("failed to decode game: %v", err))
 		return nil, err
 	}
 	return game, nil

@@ -2,7 +2,6 @@ package game
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alikarimi999/shahboard/gameservice/entity"
 	"github.com/alikarimi999/shahboard/types"
@@ -13,7 +12,7 @@ func (s *Service) GetLiveGames(ctx context.Context) ([]types.ObjectId, error) {
 }
 
 func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (types.ObjectId, error) {
-	return s.cache.getGameByUserID(ctx, id)
+	return s.cache.getGameIdByUserID(ctx, id)
 
 }
 
@@ -22,7 +21,7 @@ func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) 
 // If the game ID is found, it retrieves the game from the cache.
 // If the game is not found, it returns an empty response with a zero ID.
 func (s *Service) GetLiveGamePgnByUserID(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
-	gameId, err := s.cache.getGameByUserID(ctx, id)
+	gameId, err := s.cache.getGameIdByUserID(ctx, id)
 	if err != nil {
 		return GetGamePGNResponse{}, err
 	}
@@ -36,7 +35,21 @@ func (s *Service) GetLiveGamePgnByUserID(ctx context.Context, id types.ObjectId)
 		return GetGamePGNResponse{}, err
 	}
 
-	if game == nil {
+	if game == nil || game.Status() == entity.GameStatusDeactive {
+		return GetGamePGNResponse{ID: types.ObjectZero}, nil
+	}
+
+	return GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}, nil
+}
+
+// GetLiveGamePGN returns the game ID and PGN for a given game ID.
+func (s *Service) GetLiveGamePGN(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
+	game, err := s.cache.getGameByID(ctx, id)
+	if err != nil {
+		return GetGamePGNResponse{}, err
+	}
+
+	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return GetGamePGNResponse{ID: types.ObjectZero}, nil
 	}
 
@@ -49,8 +62,8 @@ func (s *Service) GetLiveGameByID(ctx context.Context, id types.ObjectId) (GetGa
 		return GetGamePGNResponse{}, err
 	}
 
-	if game == nil {
-		return GetGamePGNResponse{}, fmt.Errorf("game not found")
+	if game == nil || game.Status() == entity.GameStatusDeactive {
+		return GetGamePGNResponse{ID: types.ObjectZero}, nil
 	}
 
 	return GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}, nil

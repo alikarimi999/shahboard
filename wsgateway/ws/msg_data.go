@@ -25,7 +25,7 @@ type dataGameViewRequest struct {
 }
 
 func (d dataGameViewRequest) Type() MsgType {
-	return MsgTypeView
+	return MsgTypeViewGame
 }
 
 func (d dataGameViewRequest) Encode() []byte {
@@ -86,6 +86,19 @@ func (m dataResumeGameResponse) Type() MsgType {
 }
 
 func (m dataResumeGameResponse) Encode() []byte {
+	b, _ := json.Marshal(m)
+	return b
+}
+
+type dataGameViewResponse struct {
+	GameId types.ObjectId `json:"game_id"`
+	Pgn    string         `json:"pgn"`
+}
+
+func (m dataGameViewResponse) Type() MsgType {
+	return MsgTypeViewGame
+}
+func (m dataGameViewResponse) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }

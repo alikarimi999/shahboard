@@ -80,14 +80,17 @@ func (c *redisCache) addUserSessionId(ctx context.Context, userId, sessionId typ
 	return result == 1, nil
 }
 
-func (c *redisCache) updateUserSession(ctx context.Context, s *session) error {
-	key := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, s.userId)
+func (c *redisCache) updateUserGameSession(ctx context.Context, s *session) error {
+	key0 := fmt.Sprintf("%s:%s", c.userSessionsPrefixKey, s.userId)
 
+	pipe := c.c.Pipeline()
+
+	t := time.Now()
 	sic := &sessionInCache{
 		SessionId: s.id.String(),
 		UserId:    s.userId.String(),
 		GameId:    s.playGameId.String(),
-		UpdatedAt: time.Now(),
+		UpdatedAt: t,
 	}
 
 	value, err := json.Marshal(sic)
@@ -95,7 +98,20 @@ func (c *redisCache) updateUserSession(ctx context.Context, s *session) error {
 		return fmt.Errorf("failed to serialize session: %v", err)
 	}
 
-	return c.c.HSet(ctx, key, s.id.String(), value).Err()
+	pipe.HSet(ctx, key0, s.id.String(), value)
+
+	// update heartbeat key if the session is playing a game
+	if !s.playGameId.IsZero() {
+		key1 := fmt.Sprintf("%s:%s:%s", c.userGameSessionsHeartbeatKey, s.userId, s.playGameId)
+		pipe.Set(ctx, key1, t.Unix(), 0)
+	}
+
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for updating session: %v", err)
+	}
+
+	return nil
 }
 
 // updateSessionsTimestamp is needed to update the timestamp of the live sessions
@@ -137,10 +153,11 @@ func (c *redisCache) updateUserGameSessionsHeartbeat(ctx context.Context, gamesB
 		return nil
 	}
 
+	t := time.Now().Unix()
 	pipe := c.c.Pipeline()
 	for userId, gameId := range gamesByUserId {
 		key := fmt.Sprintf("%s:%s:%s", c.userGameSessionsHeartbeatKey, userId.String(), gameId.String())
-		pipe.Set(ctx, key, time.Now().Unix(), 0)
+		pipe.Set(ctx, key, t, 0)
 	}
 
 	_, err := pipe.Exec(ctx)
@@ -172,15 +189,8 @@ func (c *redisCache) deleteExpiredUserGameSessionsHeartbeat(ctx context.Context,
 			if len(parts) != 3 {
 				continue
 			}
-			userId, err := strconv.ParseUint(parts[1], 10, 64)
-			if err != nil {
-				continue
-			}
-			gameId, err := strconv.ParseUint(parts[2], 10, 64)
-			if err != nil {
-				continue
-			}
-			deletedSessions[types.ObjectId(userId)] = types.ObjectId(gameId)
+
+			deletedSessions[types.ObjectId(parts[1])] = types.ObjectId(parts[2])
 			pipe.Del(ctx, key)
 		}
 	}

@@ -11,7 +11,7 @@ type MsgType string
 const (
 	MsgTypeWelcome                 MsgType = "welcome"
 	MsgTypeFindMatch               MsgType = "find_match"
-	MsgTypeView                    MsgType = "view"
+	MsgTypeViewGame                MsgType = "view_game"
 	MsgTypeData                    MsgType = "data"
 	MsgTypeError                   MsgType = "err"
 	MsgTypeGameCreate              MsgType = "game_created"
@@ -26,6 +26,7 @@ const (
 
 	MsgDataInternalErrorr string = "internal error"
 	MsgDataBadRequest     string = "bad request"
+	MsgDataNotFound       string = "not found"
 )
 
 type MsgBase struct {

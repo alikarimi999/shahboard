@@ -70,9 +70,11 @@ func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandle
 		h:             h,
 		lastHeartBeat: atomic.NewTime(time.Now()),
 
-		stopCh:  make(chan struct{}),
-		p:       p,
-		l:       l,
+		stopCh: make(chan struct{}),
+		p:      p,
+		l:      l,
+
+		game:    game,
 		stopped: atomic.NewBool(false),
 	}
 	go s.start()
@@ -118,7 +120,7 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 		eve := e.(*event.EventGameCreated)
 
 		s.playGameId = eve.GameID
-		if err := s.rc.updateUserSession(context.Background(), s); err != nil {
+		if err := s.rc.updateUserGameSession(context.Background(), s); err != nil {
 			s.l.Error(err.Error())
 			s.playGameId = types.ObjectZero
 
@@ -246,12 +248,12 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGa
 		}
 
 		if g == nil || g.GameId.String() != req.GameId.String() {
-			errMsg = MsgDataBadRequest
+			errMsg = MsgDataNotFound
 			return
 		}
 
 		s.playGameId = req.GameId
-		if err := s.rc.updateUserSession(context.Background(), s); err != nil {
+		if err := s.rc.updateUserGameSession(context.Background(), s); err != nil {
 			s.l.Error(err.Error())
 			s.playGameId = types.ObjectZero
 			errMsg = MsgDataInternalErrorr
@@ -291,16 +293,16 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 	var errMsg string
 	var msg *Msg
 	defer func() {
-		if msg != nil {
-			s.send(msg)
-		}
 		if errMsg != "" {
 			s.sendErr(msgId, errMsg)
+			return
+		}
+		if msg != nil {
+			s.send(msg)
 		}
 	}()
 
 	s.vmu.Lock()
-	defer s.vmu.Unlock()
 	if _, ok := s.viewGamsId[req.GameId]; ok {
 		errMsg = "already subscribed to this game"
 		return
@@ -312,6 +314,32 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 	}
 
 	s.viewGamsId[req.GameId] = struct{}{}
+	s.vmu.Unlock()
+
+	game, err := s.game.GetLiveGamePGN(context.Background(), req.GameId)
+	if err != nil {
+		s.l.Error(err.Error())
+		errMsg = MsgDataInternalErrorr
+		return
+	}
+
+	if game == nil || game.GameId.String() != req.GameId.String() {
+		errMsg = MsgDataNotFound
+		return
+	}
+
+	msg = &Msg{
+		MsgBase: MsgBase{
+			ID:        msgId,
+			Type:      MsgTypeViewGame,
+			Timestamp: time.Now().Unix(),
+		},
+		Data: dataGameViewResponse{
+			GameId: req.GameId,
+			Pgn:    game.Pgn,
+		}.Encode(),
+	}
+
 	s.h.subscribeToGameWithChat(s, req.GameId)
 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
 }

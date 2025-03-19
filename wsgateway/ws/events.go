@@ -239,6 +239,7 @@ func (m *sessionsEventsHandler) subscribeToGameWithChat(s *session, gameId types
 		gs.add(s)
 	} else {
 		m.gameWithChatSubSessions[gameId] = newGameSubscribers()
+		m.gameWithChatSubSessions[gameId].add(s)
 	}
 }
 

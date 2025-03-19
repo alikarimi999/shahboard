@@ -1,7 +1,10 @@
 import { currentGame } from './gameState.js';
 import { connectWebSocket } from './ws.js';
 import { initializeBoard } from './board.js';
-import { handleGameCreated, handleGameChatCreated, handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate, handleGameEnded, handleError } from './eventHandlers.js';
+import {
+    handleGameCreated, handleGameChatCreated, handleGameChatMsg, handleMoveApproved,
+    handlePlayerConnectionUpdate, handleGameEnded, handleError, handleResumeGame
+} from './eventHandlers.js';
 
 connectWebSocket('http://localhost:8083/ws').then(connection => {
     currentGame.ws = connection;
@@ -12,6 +15,7 @@ connectWebSocket('http://localhost:8083/ws').then(connection => {
     currentGame.ws.registerMessageHandler("move_approved", handleMoveApproved);
     currentGame.ws.registerMessageHandler("game_ended", handleGameEnded);
     currentGame.ws.registerMessageHandler("player_connection_updated", handlePlayerConnectionUpdate);
+    currentGame.ws.registerMessageHandler("resume_game", handleResumeGame);
     currentGame.ws.registerMessageHandler("err", handleError);
 
     const game = initializeBoard(true);
@@ -27,5 +31,6 @@ window.addEventListener("beforeunload", () => {
     currentGame.ws.unregisterMessageHandler("move_approved");
     currentGame.ws.unregisterMessageHandler("game_ended");
     currentGame.ws.unregisterMessageHandler("player_connection_updated");
+    currentGame.ws.unregisterMessageHandler("resume_game");
     currentGame.ws.unregisterMessageHandler("err");
 });

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	GameService_GetUserLiveGameID_FullMethodName  = "/game.GameService/GetUserLiveGameID"
 	GameService_GetUserLiveGamePGN_FullMethodName = "/game.GameService/GetUserLiveGamePGN"
+	GameService_GetLiveGamePGN_FullMethodName     = "/game.GameService/GetLiveGamePGN"
 )
 
 // GameServiceClient is the client API for GameService service.
@@ -29,6 +30,7 @@ const (
 type GameServiceClient interface {
 	GetUserLiveGameID(ctx context.Context, in *GetUserLiveGameIdRequest, opts ...grpc.CallOption) (*GetUserLiveGameIdResponse, error)
 	GetUserLiveGamePGN(ctx context.Context, in *GetUserLiveGamePgnRequest, opts ...grpc.CallOption) (*GetUserLiveGamePgnResponse, error)
+	GetLiveGamePGN(ctx context.Context, in *GetLiveGamePGNRequest, opts ...grpc.CallOption) (*GetLiveGamePGNResponse, error)
 }
 
 type gameServiceClient struct {
@@ -59,12 +61,23 @@ func (c *gameServiceClient) GetUserLiveGamePGN(ctx context.Context, in *GetUserL
 	return out, nil
 }
 
+func (c *gameServiceClient) GetLiveGamePGN(ctx context.Context, in *GetLiveGamePGNRequest, opts ...grpc.CallOption) (*GetLiveGamePGNResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetLiveGamePGNResponse)
+	err := c.cc.Invoke(ctx, GameService_GetLiveGamePGN_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GameServiceServer is the server API for GameService service.
 // All implementations must embed UnimplementedGameServiceServer
 // for forward compatibility.
 type GameServiceServer interface {
 	GetUserLiveGameID(context.Context, *GetUserLiveGameIdRequest) (*GetUserLiveGameIdResponse, error)
 	GetUserLiveGamePGN(context.Context, *GetUserLiveGamePgnRequest) (*GetUserLiveGamePgnResponse, error)
+	GetLiveGamePGN(context.Context, *GetLiveGamePGNRequest) (*GetLiveGamePGNResponse, error)
 	mustEmbedUnimplementedGameServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedGameServiceServer) GetUserLiveGameID(context.Context, *GetUse
 }
 func (UnimplementedGameServiceServer) GetUserLiveGamePGN(context.Context, *GetUserLiveGamePgnRequest) (*GetUserLiveGamePgnResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserLiveGamePGN not implemented")
+}
+func (UnimplementedGameServiceServer) GetLiveGamePGN(context.Context, *GetLiveGamePGNRequest) (*GetLiveGamePGNResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLiveGamePGN not implemented")
 }
 func (UnimplementedGameServiceServer) mustEmbedUnimplementedGameServiceServer() {}
 func (UnimplementedGameServiceServer) testEmbeddedByValue()                     {}
@@ -138,6 +154,24 @@ func _GameService_GetUserLiveGamePGN_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GameService_GetLiveGamePGN_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLiveGamePGNRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GameServiceServer).GetLiveGamePGN(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GameService_GetLiveGamePGN_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GameServiceServer).GetLiveGamePGN(ctx, req.(*GetLiveGamePGNRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GameService_ServiceDesc is the grpc.ServiceDesc for GameService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var GameService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUserLiveGamePGN",
 			Handler:    _GameService_GetUserLiveGamePGN_Handler,
+		},
+		{
+			MethodName: "GetLiveGamePGN",
+			Handler:    _GameService_GetLiveGamePGN_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"math/rand"
@@ -52,6 +53,7 @@ type Game struct {
 
 	setting GameSettings
 
+	lock sync.RWMutex
 	game *chess.Game
 
 	CreatedAt time.Time
@@ -97,6 +99,13 @@ func (g *Game) Player1() types.Player {
 
 func (g *Game) Player2() types.Player {
 	return g.player2
+}
+
+func (g *Game) Lock() {
+	g.lock.Lock()
+}
+func (g *Game) Unlock() {
+	g.lock.Unlock()
 }
 
 func (g *Game) Move(m string) error {

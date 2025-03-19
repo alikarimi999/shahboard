@@ -1,6 +1,6 @@
 import { currentGame } from './gameState.js';
-import { user } from './user.js'
-import { getLivePgnByGame, getLivePgnByUser } from './game_utils.js';
+import { user } from './user.js';
+import { getUserLiveGameId, parsePGN } from './game_utils.js';
 import { showErrorMessage } from './error.js';
 
 const whiteSquareYellow = '#DAA520';
@@ -10,7 +10,6 @@ export const ColorWhite = 'w';
 export const ColorBlack = 'b';
 
 let selectedSquare = null;
-// const moveSound = new Audio('../../assets/sounds/move2.mp3');
 
 export function initializeBoard(isPlayer) {
     currentGame.game = new Chess(); // Create a new game instance
@@ -28,67 +27,87 @@ export function initializeBoard(isPlayer) {
         onMouseoverSquare: onMouseoverSquare,
         onSnapEnd: onSnapEnd,
         pieceTheme: '../../assets/img/pieces/{piece}.svg',
-    }
+    };
     currentGame.board = Chessboard('board', config);
 
     if (user.loggedIn) {
-        // Check if the user is a player and call the respective function
-        const pgnPromise = isPlayer ? getLivePgnByUser(user.id) : getLivePgnByGame(currentGame.gameId);
+        let gameIdPromise = isPlayer ? getUserLiveGameId(user.id) : Promise.resolve(currentGame.gameId);
+        return gameIdPromise.then(gameId => {
+            if (!gameId) return;
+            currentGame.gameId = gameId;
 
-        return pgnPromise.then(game => {
-            if (game) {
-                currentGame.gameId = game.id;
-
-                if (isPlayer) {
-                    currentGame.player.id = user.id;
-
-                    // Determine player color and opponent ID based on PGN
-                    if (game.pgn.parsed.w === user.id) {
-                        currentGame.color = "w";
-                        currentGame.opponent.id = game.pgn.parsed.b;
-                    } else {
-                        currentGame.color = "b";
-                        currentGame.opponent.id = game.pgn.parsed.w;
-                    }
-                } else {
-                    currentGame.player.id = game.pgn.parsed.w;
-                    currentGame.opponent.id = game.pgn.parsed.b;
-                    currentGame.color = "w";  // Viewer always sees the game as if they are white
-                }
-
-                // Reset game and set board orientation
-                currentGame.game.reset();
-                currentGame.board.orientation(currentGame.color === 'w' ? 'white' : 'black');
-                currentGame.game.load_pgn(game.pgn.raw);
-                updateBoardPosition();
-
-                if (isPlayer) {
-
-                    // Send game resume message
-                    const data = {
-                        game_id: currentGame.gameId,
-                        timestamp: Date.now()
-                    };
-
-                    const jsonData = JSON.stringify(data);
-                    const base64Data = btoa(jsonData);
-
-                    currentGame.ws.sendMessage({
-                        type: "resume_game",
-                        data: base64Data
-                    });
-                }
-
-                // Dispatch events
-                document.dispatchEvent(new Event("game_created"));
-                document.dispatchEvent(new Event("pgn_applied"));
+            if (isPlayer) {
+                currentGame.player.id = user.id;
             }
+
+            const loadingSpinner = document.getElementById("loading-spinner");
+            loadingSpinner.classList.add("active");
+
+            // Prepare WebSocket message
+            const data = { game_id: gameId, timestamp: Date.now() };
+            const jsonData = JSON.stringify(data);
+            const base64Data = btoa(jsonData);
+            const messageType = isPlayer ? "resume_game" : "view_game";
+
+            currentGame.ws.sendMessage({
+                type: messageType,
+                data: base64Data
+            });
+
+            // Wait for "pgn_received" event with a 10-second timeout
+            return new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                    showErrorMessage("Game data could not be loaded.");
+                    loadingSpinner.classList.remove("active");
+                }, 20000);
+
+                function handlePgnReceived(event) {
+                    clearTimeout(timeout);
+                    document.removeEventListener("pgn_received", handlePgnReceived);
+
+                    const responseData = event.detail;
+
+                    if (!responseData || !responseData.pgn) {
+                        showErrorMessage("Game data could not be loaded.");
+                        return;
+                    }
+
+                    const pgn = parsePGN(responseData.pgn);
+
+                    if (isPlayer) {
+                        currentGame.player.id = user.id;
+
+                        if (pgn.parsed.w === user.id) {
+                            currentGame.color = "w";
+                            currentGame.opponent.id = pgn.parsed.b;
+                        } else {
+                            currentGame.color = "b";
+                            currentGame.opponent.id = pgn.parsed.w;
+                        }
+                    } else {
+                        currentGame.player.id = pgn.parsed.w;
+                        currentGame.opponent.id = pgn.parsed.b;
+                        currentGame.color = "w";  // Viewer always sees the game as if they are white
+                    }
+
+                    // Reset game and set board orientation
+                    currentGame.game.reset();
+                    currentGame.board.orientation(currentGame.color === 'w' ? 'white' : 'black');
+                    currentGame.game.load_pgn(pgn.raw);
+                    updateBoardPosition();
+                    loadingSpinner.classList.remove("active");
+
+                    document.dispatchEvent(new Event("game_created"));
+                    document.dispatchEvent(new Event("pgn_applied"));
+                    resolve();
+                }
+
+                // Attach the event listener
+                document.addEventListener("pgn_received", handlePgnReceived, { once: true });
+            });
         });
     }
-
-    return currentGame;
 }
-
 
 function highlightCurrentSquare(square) {
     const $square = $('#board .square-' + square);
