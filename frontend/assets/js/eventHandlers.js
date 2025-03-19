@@ -45,18 +45,28 @@ export function handleGameChatCreated(base64Data) {
 
 export function handleMoveApproved(base64Data) {
     const moveData = JSON.parse(atob(base64Data));
-    if (currentGame.isPlayer && moveData.game_id === currentGame.gameId && moveData.player_id === currentGame.opponent.id) {
-        console.log("Move approved:  ", moveData.player_id, currentGame.opponent.id);
+
+    // This is for validating and applying opponent's move in player mode.
+    if (currentGame.isPlayer && moveData.game_id === currentGame.gameId &&
+        moveData.player_id === currentGame.opponent.id && moveData.index - 1 === currentGame.game.history().length) {
         currentGame.game.move(moveData.move);
         updateBoardPosition();
         return;
     }
 
-    if (moveData.game_id === currentGame.gameId && (moveData.player_id === currentGame.player.id || moveData.player_id === currentGame.opponent.id)) {
-        console.log("Fen:  ", currentGame.game.fen());
-        console.log("history:  ", currentGame.game.history(), currentGame.game.history().length);
+    // This is for validating and applying player's move in player mode.
+    // this is for situations that user playing with multiple sessions.
+    if (currentGame.isPlayer && moveData.game_id === currentGame.gameId &&
+        moveData.player_id === currentGame.player.id && moveData.index - 1 === currentGame.game.history().length) {
         currentGame.game.move(moveData.move);
-        console.log("Move approved:  ", moveData);
+        updateBoardPosition();
+        return;
+    }
+
+    // This is for validating and applying players moves in view mode
+    if (moveData.game_id === currentGame.gameId && (moveData.player_id === currentGame.player.id ||
+        moveData.player_id === currentGame.opponent.id) && moveData.index - 1 === currentGame.game.history().length) {
+        currentGame.game.move(moveData.move);
         updateBoardPosition();
     }
 }
@@ -80,10 +90,8 @@ export function handlePlayerConnectionUpdate(base64Data) {
     if (currentGame.isPlayer && playerData.player_id === currentGame.opponent.id) {
         if (playerData.connected) {
             document.dispatchEvent(new Event("opponent_connected"));
-            console.log("Opponent connected");
         } else {
             document.dispatchEvent(new Event("opponent_disconnected"));
-            console.log("Opponent disconnected");
         }
     } else {
         // Dispatch player_disconnected event with player id 
@@ -97,7 +105,6 @@ export function handlePlayerConnectionUpdate(base64Data) {
 }
 
 export function handleGameEnded(base64Data) {
-    console.log("Game Ended:", base64Data);
 
     const gameData = JSON.parse(atob(base64Data));
 

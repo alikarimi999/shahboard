@@ -108,7 +108,11 @@ func (g *Game) Unlock() {
 	g.lock.Unlock()
 }
 
-func (g *Game) Move(m string) error {
+func (g *Game) Move(m string, index int) error {
+	if (index - 1) != len(g.game.Moves()) {
+		return fmt.Errorf("invalid move index")
+	}
+
 	if err := g.game.MoveStr(m); err != nil {
 		return err
 	}

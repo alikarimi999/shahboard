@@ -221,6 +221,7 @@ function sendMove(move) {
         game_id: currentGame.gameId,
         player_id: user.id,
         move: move,
+        index: currentGame.game.history().length,
         timestamp: Date.now()
     };
 

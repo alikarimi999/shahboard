@@ -34,11 +34,7 @@ func (d dataGameViewRequest) Encode() []byte {
 }
 
 type dataGamePlayerMoveRequest struct {
-	ID        types.ObjectId `json:"id"`
-	GameID    types.ObjectId `json:"game_id"`
-	PlayerID  types.ObjectId `json:"player_id"`
-	Move      string         `json:"move"`
-	Timestamp int64          `json:"timestamp"`
+	event.EventGamePlayerMoved
 }
 
 func (d dataGamePlayerMoveRequest) Type() MsgType {

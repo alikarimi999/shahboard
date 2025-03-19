@@ -52,6 +52,7 @@ type EventGamePlayerMoved struct {
 	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"player_id"`
 	Move      string         `json:"move"`
+	Index     int            `json:"index"`
 	Timestamp int64          `json:"timestamp"`
 }
 
@@ -81,6 +82,7 @@ type EventGameMoveApproved struct {
 	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"player_id"`
 	Move      string         `json:"move"`
+	Index     int            `json:"index"`
 	Timestamp int64          `json:"timestamp"`
 }
 

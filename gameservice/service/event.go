@@ -72,7 +72,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		return
 	}
 
-	if err := game.Move(d.Move); err != nil {
+	if err := game.Move(d.Move, d.Index); err != nil {
 		game.Unlock()
 		s.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.GameID))
 		return
@@ -94,6 +94,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			PlayerID:  d.PlayerID,
 			GameID:    d.GameID,
 			Move:      d.Move,
+			Index:     d.Index,
 			Timestamp: time.Now().Unix(),
 		},
 			event.EventGameEnded{
@@ -126,6 +127,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			PlayerID:  d.PlayerID,
 			GameID:    d.GameID,
 			Move:      d.Move,
+			Index:     d.Index,
 			Timestamp: time.Now().Unix(),
 		})
 		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))

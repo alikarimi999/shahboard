@@ -353,13 +353,7 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMove
 	}()
 
 	if s.userId == req.PlayerID && s.playGameId == req.GameID {
-		if err := s.p.Publish(event.EventGamePlayerMoved{
-			ID:        req.ID,
-			GameID:    req.GameID,
-			PlayerID:  req.PlayerID,
-			Move:      req.Move,
-			Timestamp: req.Timestamp,
-		}); err != nil {
+		if err := s.p.Publish(req.EventGamePlayerMoved); err != nil {
 			s.l.Error(fmt.Sprintf("failed to publish move event: %v", err))
 		}
 		return
@@ -377,13 +371,7 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
 	}()
 
 	if s.userId == req.SenderID && s.playGameId == req.GameID {
-		if err := s.p.Publish(event.EventGameChatMsgeSent{
-			ID:        req.ID,
-			GameID:    req.GameID,
-			SenderID:  req.SenderID,
-			Content:   req.Content,
-			Timestamp: time.Now().Unix(),
-		}); err != nil {
+		if err := s.p.Publish(req.EventGameChatMsgeSent); err != nil {
 			s.l.Error(fmt.Sprintf("failed to publish chat message event: %v", err))
 		}
 		return
