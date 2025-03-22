@@ -160,6 +160,19 @@ export function handleViewGame(base64Data) {
     document.dispatchEvent(event);
 }
 
+export function handleViewersList(base64Data) {
+    const gameData = JSON.parse(atob(base64Data));
+    if (gameData.game_id !== currentGame.gameId) return;
+    const event = new CustomEvent("viewers_list", {
+        detail: {
+            gameId: gameData.game_id,
+            list: gameData.list
+        }
+    })
+
+    document.dispatchEvent(event);
+}
+
 
 export function handleError(base64Data) {
     try {

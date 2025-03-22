@@ -23,6 +23,7 @@ const (
 	MsgTypeChatCreated             MsgType = "chat_created"
 	MsgTypeChatMsgSend             MsgType = "msg_send"
 	MsgTypeChatMsgApproved         MsgType = "msg_approved"
+	MsgTypeViewersList             MsgType = "viewers_list"
 
 	MsgDataInternalErrorr string = "internal error"
 	MsgDataBadRequest     string = "bad request"

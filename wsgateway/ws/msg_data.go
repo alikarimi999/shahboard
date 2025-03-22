@@ -98,3 +98,17 @@ func (m dataGameViewResponse) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
+
+type dataViwersListResponse struct {
+	GameId types.ObjectId   `json:"game_id"`
+	List   []types.ObjectId `json:"list"`
+}
+
+func (m dataViwersListResponse) Type() MsgType {
+	return MsgTypeViewersList
+}
+
+func (m dataViwersListResponse) Encode() []byte {
+	b, _ := json.Marshal(m)
+	return b
+}

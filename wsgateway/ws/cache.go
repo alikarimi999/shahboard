@@ -35,6 +35,7 @@ type redisCache struct {
 	c                            *redis.Client
 	userSessionsPrefixKey        string
 	userGameSessionsHeartbeatKey string
+	gameViewersListKey           string
 	expirationTime               time.Duration
 	userSessionsCap              int
 
@@ -47,6 +48,7 @@ func newRedisCache(c *redis.Client, userSessionsCap int, l log.Logger) *redisCac
 		c:                            c,
 		userSessionsPrefixKey:        "user_sessions",
 		userGameSessionsHeartbeatKey: "user_game_sessions_heartbeat",
+		gameViewersListKey:           "game_viewers",
 		expirationTime:               time.Hour * 24,
 		userSessionsCap:              userSessionsCap,
 		l:                            l,
@@ -294,6 +296,90 @@ func (c *redisCache) countUsersGameSessions(ctx context.Context, userIds ...type
 				res[userId]++
 			}
 		}
+	}
+
+	return res, nil
+}
+
+func (c *redisCache) addToGameViwersList(ctx context.Context, userId types.ObjectId, gameId ...types.ObjectId) error {
+	pipe := c.c.Pipeline()
+	for _, id := range gameId {
+		pipe.SAdd(ctx, fmt.Sprintf("%s:%s", c.gameViewersListKey, id.String()), userId.String())
+	}
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for adding to game viewers list: %v", err)
+	}
+
+	return nil
+}
+
+func (c *redisCache) addToGamesViwersList(ctx context.Context, gamesUsers map[types.ObjectId][]types.ObjectId) error {
+	pipe := c.c.Pipeline()
+	for gameId, usersId := range gamesUsers {
+		users := make([]string, 0, len(usersId))
+		for _, userId := range usersId {
+			users = append(users, userId.String())
+		}
+
+		pipe.SAdd(ctx, fmt.Sprintf("%s:%s", c.gameViewersListKey, gameId.String()), users)
+	}
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for adding to game viewers list: %v", err)
+	}
+
+	return nil
+}
+
+func (c *redisCache) removeFromGameViewersList(ctx context.Context, userId types.ObjectId,
+	gameId ...types.ObjectId) error {
+
+	pipe := c.c.Pipeline()
+	for _, id := range gameId {
+		pipe.SRem(ctx, fmt.Sprintf("%s:%s", c.gameViewersListKey, id.String()), userId.String())
+	}
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to execute Redis pipeline for removing from game viewers list: %v", err)
+	}
+
+	return nil
+}
+
+// func (c *redisCache) getGameViewers(ctx context.Context, gameId types.ObjectId) ([]string, error) {
+// 	return c.c.SMembers(ctx, fmt.Sprintf("%s:%s", c.gameViewersListKey, gameId.String())).Result()
+// }
+
+func (c *redisCache) getAllGamesViewersList(ctx context.Context) (map[types.ObjectId][]types.ObjectId, error) {
+	keys, err := c.c.Keys(ctx, fmt.Sprintf("%s:*", c.gameViewersListKey)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get keys: %v", err)
+	}
+
+	res := make(map[types.ObjectId][]types.ObjectId)
+	for _, key := range keys {
+		id := strings.TrimPrefix(key, c.gameViewersListKey+":")
+		users, err := c.c.SMembers(ctx, key).Result()
+		if err != nil {
+			c.l.Error(fmt.Sprintf("failed to get users for key %s: %v", key, err))
+			continue
+		}
+
+		gameId, err := types.ParseObjectId(id)
+		if err != nil {
+			continue
+		}
+
+		usersId := make([]types.ObjectId, 0, len(users))
+		for _, user := range users {
+			userId, err := types.ParseObjectId(user)
+			if err == nil {
+				usersId = append(usersId, userId)
+			}
+		}
+
+		res[gameId] = usersId
 	}
 
 	return res, nil

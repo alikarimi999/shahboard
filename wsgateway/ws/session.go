@@ -2,7 +2,6 @@ package ws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -31,9 +30,9 @@ type session struct {
 
 	playGameId types.ObjectId
 
-	vmu        sync.Mutex
-	viewGamsId map[types.ObjectId]struct{}
-	viewCap    int
+	vmu         sync.RWMutex
+	viewGamesId map[types.ObjectId]struct{}
+	viewCaps    int
 
 	rc *redisCache
 
@@ -59,12 +58,12 @@ func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandle
 		userId:     userId,
 		playGameId: gameId,
 
-		eventCh: make(chan event.Event, 100),
-		msgCh:   make(chan []byte, 100),
+		eventCh: make(chan event.Event, 1000),
+		msgCh:   make(chan []byte, 1000),
 		pongCh:  make(chan struct{}),
 
-		viewGamsId: make(map[types.ObjectId]struct{}),
-		viewCap:    defaultViewGamesCap,
+		viewGamesId: make(map[types.ObjectId]struct{}),
+		viewCaps:    defaultViewGamesCap,
 
 		rc:            rc,
 		h:             h,
@@ -155,13 +154,7 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 			s.playGameId = types.ObjectZero
 		}
 
-		s.vmu.Lock()
-		for id := range s.viewGamsId {
-			if id == eve.GameID {
-				delete(s.viewGamsId, id)
-			}
-		}
-		s.vmu.Unlock()
+		s.removeViewGames(eve.GameID)
 
 		s.h.unsubscribeFromGameWithChat(s, eve.GameID)
 
@@ -302,29 +295,18 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 		}
 	}()
 
-	s.vmu.Lock()
-	if _, ok := s.viewGamsId[req.GameId]; ok {
-		errMsg = "already subscribed to this game"
-		return
-	}
-
-	if len(s.viewGamsId) >= s.viewCap {
-		errMsg = "view cap reached"
-		return
-	}
-
-	s.viewGamsId[req.GameId] = struct{}{}
-	s.vmu.Unlock()
-
+	s.addViewGame(req.GameId)
 	game, err := s.game.GetLiveGamePGN(context.Background(), req.GameId)
 	if err != nil {
 		s.l.Error(err.Error())
 		errMsg = MsgDataInternalErrorr
+		s.removeViewGames(req.GameId)
 		return
 	}
 
 	if game == nil || game.GameId.String() != req.GameId.String() {
 		errMsg = MsgDataNotFound
+		s.removeViewGames(req.GameId)
 		return
 	}
 
@@ -341,6 +323,11 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 	}
 
 	s.h.subscribeToGameWithChat(s, req.GameId)
+
+	if err := s.rc.addToGameViwersList(context.Background(), s.userId, req.GameId); err != nil {
+		s.l.Error(err.Error())
+	}
+
 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
 }
 
@@ -381,12 +368,11 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
 }
 
 func (s *session) send(msg *Msg) {
-	b, err := json.Marshal(msg)
-	if err != nil {
-		s.l.Error(fmt.Sprintf("failed to marshal message: %v", err))
-		return
+	select {
+	case s.msgCh <- msg.Encode():
+	default:
+		s.l.Error("failed to send message: channel is full")
 	}
-	s.msgCh <- b
 }
 
 func (s *session) sendErr(id types.ObjectId, err string) {
@@ -411,6 +397,20 @@ func (s *session) sendWelcome() {
 	})
 }
 
+func (s *session) sendViwersList(gameId types.ObjectId, viewers []types.ObjectId) {
+	s.send(&Msg{
+		MsgBase: MsgBase{
+			ID:        types.NewObjectId(),
+			Type:      MsgTypeViewersList,
+			Timestamp: time.Now().Unix(),
+		},
+		Data: dataViwersListResponse{
+			GameId: gameId,
+			List:   viewers,
+		}.Encode(),
+	})
+}
+
 func (s *session) sendPong() {
 	s.pongCh <- struct{}{}
 }
@@ -431,11 +431,13 @@ func (s *session) stop() {
 			gamesId = append(gamesId, s.playGameId)
 		}
 
-		s.vmu.Lock()
-		for id := range s.viewGamsId {
-			gamesId = append(gamesId, id)
+		ids := s.removeAllViewGames()
+		if len(ids) > 0 {
+			if err := s.rc.removeFromGameViewersList(context.Background(), s.userId, ids...); err != nil {
+				s.l.Error(err.Error())
+			}
+			gamesId = append(gamesId, ids...)
 		}
-		s.vmu.Unlock()
 
 		s.h.unsubscribeFromBasicEvents(s)
 		s.h.unsubscribeFromGameWithChat(s, gamesId...)
@@ -444,4 +446,53 @@ func (s *session) stop() {
 			s.h.unsubscribeFromMatch(s)
 		}
 	})
+}
+
+func (s *session) addViewGame(gameId types.ObjectId) (msg string) {
+	s.vmu.Lock()
+	defer s.vmu.Unlock()
+
+	if _, ok := s.viewGamesId[gameId]; ok {
+		return "already subscribed to this game"
+	}
+
+	if len(s.viewGamesId) >= s.viewCaps {
+		return "view cap reached"
+	}
+
+	s.viewGamesId[gameId] = struct{}{}
+
+	return ""
+}
+
+func (s *session) getAllViewGames() []types.ObjectId {
+	s.vmu.RLock()
+	defer s.vmu.RUnlock()
+
+	var gamesId []types.ObjectId
+	for id := range s.viewGamesId {
+		gamesId = append(gamesId, id)
+	}
+
+	return gamesId
+}
+
+func (s *session) removeViewGames(gameId types.ObjectId) {
+	s.vmu.Lock()
+	defer s.vmu.Unlock()
+
+	delete(s.viewGamesId, gameId)
+}
+
+func (s *session) removeAllViewGames() []types.ObjectId {
+	s.vmu.Lock()
+	defer s.vmu.Unlock()
+
+	var gamesId []types.ObjectId
+	for id := range s.viewGamesId {
+		gamesId = append(gamesId, id)
+	}
+
+	s.viewGamesId = make(map[types.ObjectId]struct{})
+	return gamesId
 }

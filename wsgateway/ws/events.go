@@ -61,8 +61,9 @@ func newSessionsEventsHandler(s event.Subscriber, l log.Logger) *sessionsEventsH
 			addedAt time.Time
 		}),
 		gameWithChatSubSessions: make(map[types.ObjectId]*gameSubscribers),
-		l:                       l,
-		stopCh:                  make(chan struct{}),
+
+		l:      l,
+		stopCh: make(chan struct{}),
 	}
 
 	m.run()
@@ -137,7 +138,6 @@ func (h *sessionsEventsHandler) startEventListener() {
 				if ok {
 					gs.sendEvent(e)
 				}
-
 			}
 		}
 	}()

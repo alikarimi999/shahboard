@@ -40,6 +40,50 @@ func (s *Server) manageSessionsState() {
 				s.stopSessions(disconnectedSessions...)
 			}
 
+			// add userId of sessions that are viewing a game
+			// there are multiple approaches to do this, but this approach
+			// balances efficiency and scalability and minimizes the need for complex logic.
+			viewGamesUsers := make(map[types.ObjectId][]types.ObjectId)
+			ss := s.sm.getAll()
+			for _, se := range ss {
+				gamesId := se.getAllViewGames()
+				if len(gamesId) > 0 {
+					for _, gameId := range gamesId {
+						viewGamesUsers[gameId] = append(viewGamesUsers[gameId], se.userId)
+					}
+				}
+			}
+
+			if err := s.cache.addToGamesViwersList(context.Background(), viewGamesUsers); err != nil {
+				s.l.Error(err.Error())
+				continue
+			}
+
+			viewersList, err := s.cache.getAllGamesViewersList(context.Background())
+			if err != nil {
+				s.l.Error(err.Error())
+				continue
+			}
+
+			for _, se := range ss {
+				viewers := viewersList[se.playGameId]
+				if len(viewers) > 0 {
+					se.sendViwersList(se.playGameId, viewers)
+				}
+
+				gamesId := se.getAllViewGames()
+
+				if len(gamesId) > 0 {
+					for _, gameId := range gamesId {
+						viewers := viewersList[gameId]
+						if len(viewers) > 0 {
+							se.sendViwersList(gameId, viewers)
+						}
+					}
+				}
+
+			}
+
 		case <-cleanCachTicker.C:
 			ss := s.sm.getAll()
 			// update sessions timestamp in redis cache, every 1 minute

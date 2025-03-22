@@ -3,7 +3,7 @@ import { connectWebSocket } from './ws.js';
 import { initializeBoard } from './board.js';
 import {
     handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate,
-    handleGameEnded, handleError, handleViewGame
+    handleGameEnded, handleError, handleViewGame, handleViewersList
 } from './eventHandlers.js';
 import { showErrorMessage } from './error.js';
 
@@ -29,6 +29,7 @@ if (!gameId) {
         currentGame.ws.registerMessageHandler("game_ended", handleGameEnded);
         currentGame.ws.registerMessageHandler("player_connection_updated", handlePlayerConnectionUpdate);
         currentGame.ws.registerMessageHandler("view_game", handleViewGame);
+        currentGame.ws.registerMessageHandler("viewers_list", handleViewersList);
         currentGame.ws.registerMessageHandler("err", handleError);
 
         const game = initializeBoard(false);
@@ -49,5 +50,6 @@ window.addEventListener("beforeunload", () => {
     currentGame.ws.unregisterMessageHandler("game_ended");
     currentGame.ws.unregisterMessageHandler("player_connection_updated");
     currentGame.ws.unregisterMessageHandler("view_game");
+    currentGame.ws.unregisterMessageHandler("viewers_list");
     currentGame.ws.unregisterMessageHandler("err");
 });

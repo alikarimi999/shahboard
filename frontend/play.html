@@ -16,6 +16,7 @@
 
     <script src="./assets/css/style.css"></script>
     <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="./assets/css/viewers.css">
 
 
 </head>
@@ -46,8 +47,6 @@
     <div class="container">
         <div class="board-container">
 
-
-
             <div class="hidden opponent-info">
                 <img id="opponent-avatar" class="avatar" src="./assets/img/player2.webp" alt="Opponent Avatar">
                 <span id="opponent-name"></span>
@@ -62,6 +61,14 @@
             <button id="find-match-btn">Find Match</button>
         </div>
         <div class=" game-sidebar">
+
+            <div class="viewer-container">
+                <div class="viewer-count" id="viewerCount">
+                    <span id="viewerNumber">0</span> Viewers
+                </div>
+                <div class="viewer-list" id="viewerList"></div>
+            </div>
+
             <div class="moves"></div>
             <div class="chat">
                 <div class="chat-messages-container messages"></div>
@@ -72,10 +79,10 @@
             </div>
         </div>
     </div>
+
     <script type="module" src="./assets/js/play.js"></script>
-
     <script type="module" src="/assets/js/sidebar.js"></script>
-
+    <script type="module" src="assets/js/viewers.js"></script>
     <script type="module">
         import { currentGame } from "./assets/js/gameState.js";
         import { sendGameChatMsg } from './assets/js/chat.js';

@@ -1,0 +1,52 @@
+.viewer-container {
+    position: relative;
+    display: inline-block;
+}
+
+.viewer-count {
+    text-align: right;
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffcc00;
+    margin: 10px;
+    cursor: pointer;
+}
+
+.viewer-list {
+    display: none;
+    position: absolute;
+    top: 25px;
+    right: 0;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    backdrop-filter: blur(3px);
+    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.2);
+    min-width: 150px;
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.viewer-list .viewer {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.viewer-list .viewer:last-child {
+    margin-bottom: 0;
+}
+
+.viewer-list img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.viewer-container:hover .viewer-list,
+.viewer-list:hover {
+    display: block;
+}

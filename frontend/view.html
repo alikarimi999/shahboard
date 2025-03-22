@@ -16,6 +16,8 @@
 
     <script src="./assets/css/style.css"></script>
     <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="./assets/css/viewers.css">
+
 
 
 </head>
@@ -61,6 +63,14 @@
             </div>
         </div>
         <div class=" game-sidebar">
+
+            <div class="viewer-container">
+                <div class="viewer-count" id="viewerCount">
+                    <span id="viewerNumber">0</span> Viewers
+                </div>
+                <div class="viewer-list" id="viewerList"></div>
+            </div>
+
             <div class="moves"></div>
             <div class="chat">
                 <div class="chat-messages-container messages"></div>
@@ -71,7 +81,7 @@
         </div>
     </div>
     <script type="module" src="./assets/js/view.js"></script>
-
+    <script type="module" src="assets/js/viewers.js"></script>
     <script type="module" src="/assets/js/sidebar.js"></script>
 
     <script type="module">
