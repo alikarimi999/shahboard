@@ -16,3 +16,12 @@ type Rating struct {
 	GamesDraw    int64
 	LastUpdated  time.Time
 }
+
+type GameEloChange struct {
+	Id         int64
+	UserId     types.ObjectId
+	EloChange  int64
+	GameId     types.ObjectId
+	OpponentId types.ObjectId
+	UpdatedAt  time.Time
+}

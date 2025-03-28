@@ -31,7 +31,7 @@ func NewHandler(cfg router.Config, u *user.Service, r *rating.Service, l log.Log
 }
 
 func (h *Handler) Run() error {
-	return h.Run()
+	return h.Router.Run()
 }
 
 func (h *Handler) setup() error {

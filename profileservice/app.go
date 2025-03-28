@@ -39,7 +39,7 @@ func SetupApplication(cfg Config) (*application, error) {
 	}
 
 	userRepo := repository.NewUserRepo(userDB)
-	ratingRepo := repository.NewRatingRepo(ratingDB)
+	ratingRepo := repository.NewRatingRepo(ratingDB, l)
 
 	userService := user.NewService(cfg.User, userRepo, s, l)
 	ratingService := rating.NewService(cfg.Rating, ratingRepo, s, l)

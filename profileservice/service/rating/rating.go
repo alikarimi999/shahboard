@@ -14,7 +14,10 @@ import (
 type Repository interface {
 	// return nil if not found
 	GetByUserId(ctx context.Context, id types.ObjectId) (*entity.Rating, error)
-	Update(ctx context.Context, ratings ...*entity.Rating) error
+	// update ratings and game elo changes atomically
+	Update(ctx context.Context, ratings []*entity.Rating, changes []*entity.GameEloChange) error
+
+	GetGameEloChangesByUserId(ctx context.Context, userId types.ObjectId) ([]*entity.GameEloChange, error)
 }
 
 type Config struct {
@@ -58,6 +61,10 @@ func (s *Service) GetUserRating(ctx context.Context, userId types.ObjectId) (*en
 	}
 
 	return r, nil
+}
+
+func (s *Service) GetUserChangeHistory(ctx context.Context, userId types.ObjectId) ([]*entity.GameEloChange, error) {
+	return s.repo.GetGameEloChangesByUserId(ctx, userId)
 }
 
 func (s *Service) handleEvent(e event.Event) {
@@ -104,11 +111,26 @@ func (s *Service) handleGameEnded(e event.EventGameEnded) {
 	s1 := calcScore1(e.Outcome)
 	elo1 := elo.CalculateElo(r1.CurrentScore, r2.CurrentScore, s1)
 	elo2 := elo.CalculateElo(r2.CurrentScore, r1.CurrentScore, 1-s1)
+	t := time.Now()
+
+	c1 := &entity.GameEloChange{
+		UserId:     e.Player1.ID,
+		EloChange:  elo1 - r1.CurrentScore,
+		GameId:     e.GameID,
+		OpponentId: e.Player2.ID,
+		UpdatedAt:  t,
+	}
+	c2 := &entity.GameEloChange{
+		UserId:     e.Player2.ID,
+		EloChange:  elo2 - r2.CurrentScore,
+		GameId:     e.GameID,
+		OpponentId: e.Player1.ID,
+		UpdatedAt:  t,
+	}
 
 	r1.CurrentScore = elo1
 	r2.CurrentScore = elo2
 
-	t := time.Now()
 	r1.LastUpdated = t
 	r2.LastUpdated = t
 
@@ -122,7 +144,7 @@ func (s *Service) handleGameEnded(e event.EventGameEnded) {
 
 	updateGameStats(r1, r2, e.Outcome)
 
-	if err := s.repo.Update(ctx, r1, r2); err != nil {
+	if err := s.repo.Update(ctx, []*entity.Rating{r1, r2}, []*entity.GameEloChange{c1, c2}); err != nil {
 		// TODO: handle this situation better
 		s.l.Error(err.Error())
 	}

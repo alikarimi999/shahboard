@@ -8,6 +8,7 @@ import (
 func (h *Handler) setupRatingRoutes() {
 	r := h.Group("/rating")
 	r.GET("/:userId", h.getUserRating)
+	r.GET("/history/:userId", h.getUserRatingHistory)
 }
 func (h *Handler) getUserRating(c *gin.Context) {
 	sid := c.Param("userId")
@@ -33,4 +34,32 @@ func (h *Handler) getUserRating(c *gin.Context) {
 		GamesDraw:    rating.GamesDraw,
 		LastUpdated:  rating.LastUpdated.Unix(),
 	})
+}
+
+func (h *Handler) getUserRatingHistory(c *gin.Context) {
+	sid := c.Param("userId")
+	userId, err := types.ParseObjectId(sid)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	history, err := h.rating.GetUserChangeHistory(c, userId)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	res := UserRatingHistoryResponse{}
+
+	for _, change := range history {
+		res.History = append(res.History, UserGameEloChange{
+			UserId:     change.UserId.String(),
+			GameId:     change.GameId.String(),
+			OpponentId: change.OpponentId.String(),
+			Change:     change.EloChange,
+			Timestamp:  change.UpdatedAt.Unix(),
+		})
+	}
+
+	c.JSON(200, res)
 }

@@ -19,3 +19,15 @@ type UserInfoResponse struct {
 	CreatedAt    int64  `json:"created_at"`
 	LastActiveAt int64  `json:"last_active_at"`
 }
+
+type UserRatingHistoryResponse struct {
+	History []UserGameEloChange `json:"history"`
+}
+
+type UserGameEloChange struct {
+	UserId     string `json:"user_id"`
+	GameId     string `json:"game_id"`
+	OpponentId string `json:"opponent_id"`
+	Change     int64  `json:"change"`
+	Timestamp  int64  `json:"timestamp"`
+}
