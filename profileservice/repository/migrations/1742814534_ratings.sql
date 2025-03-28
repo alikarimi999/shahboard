@@ -1,0 +1,10 @@
+CREATE TABLE ratings (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    current_score BIGINT NOT NULL DEFAULT 1000,
+    best_score BIGINT NOT NULL DEFAULT 1000,
+    games_played BIGINT NOT NULL DEFAULT 0,
+    games_won BIGINT NOT NULL DEFAULT 0,
+    games_lost BIGINT NOT NULL DEFAULT 0,
+    games_draw BIGINT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

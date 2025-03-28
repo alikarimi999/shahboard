@@ -22,24 +22,6 @@ const (
 	GameStatusDeactive
 )
 
-// A Outcome is the result of a game.
-type GameOutcome string
-
-const (
-	// NoOutcome indicates that a game is in progress or ended without a result.
-	NoOutcome GameOutcome = "*"
-	// WhiteWon indicates that white won the game.
-	WhiteWon GameOutcome = "1-0"
-	// BlackWon indicates that black won the game.
-	BlackWon GameOutcome = "0-1"
-	// Draw indicates that game was a draw.
-	Draw GameOutcome = "1/2-1/2"
-)
-
-func (o GameOutcome) String() string {
-	return string(o)
-}
-
 type GameSettings struct {
 	Time time.Duration
 }
@@ -149,8 +131,8 @@ func (g *Game) black() types.Player {
 	return g.player2
 }
 
-func (g *Game) Outcome() GameOutcome {
-	return GameOutcome(g.game.Outcome().String())
+func (g *Game) Outcome() types.GameOutcome {
+	return types.GameOutcome(g.game.Outcome().String())
 }
 
 func (g *Game) ValidMoves() []string {

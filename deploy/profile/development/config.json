@@ -1,0 +1,47 @@
+{
+    "kafka": {
+        "brokers": [
+            "localhost:9092"
+        ],
+        "group_id": "profile_service_0"
+    },
+    "jwt_validator": {
+        "public_key_path": "./data/jwt/public_key.pem"
+    },
+    "users_db": {
+        "host": "localhost",
+        "port": 5432,
+        "user": "postgres",
+        "password": "postgres",
+        "db_name": "users_db",
+        "ssl_mode": "disable",
+        "max_idle_conns": 15,
+        "max_open_conns": 100,
+        "conn_max_lifetime": 5
+    },
+    "rating_db": {
+        "host": "localhost",
+        "port": 5432,
+        "user": "postgres",
+        "password": "postgres",
+        "db_name": "rating_db",
+        "ssl_mode": "disable",
+        "max_idle_conns": 15,
+        "max_open_conns": 100,
+        "conn_max_lifetime": 5
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379
+    },
+    "http": {
+        "port": 8085
+    },
+    "grpc": {
+        "port": 9095
+    },
+    "log": {
+        "file": "./data/log/profile_service.log",
+        "verbose": true
+    }
+}

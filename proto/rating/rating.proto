@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package game;
+option go_package = "./ratingpb";
+
+
+message GetUserRatingRequest {
+  string user_id = 1;
+}
+
+message GetUserRatingResponse {
+    string user_id = 1;
+    int64 current_score = 2;
+    int64 best_score = 3;
+    int64 games_played = 4;
+    int64 games_won = 5;
+    int64 games_lost = 6;
+    int64 games_draw = 7;
+    int64 last_updated=8;
+}    
+
+
+service RatingService {
+    rpc GetUserRating(GetUserRatingRequest) returns (GetUserRatingResponse);
+}

@@ -79,7 +79,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 	}
 	game.Unlock()
 
-	if game.Outcome() != entity.NoOutcome {
+	if game.Outcome() != types.NoOutcome {
 		if !game.EndGame() {
 			return
 		}
@@ -102,7 +102,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 				GameID:    game.ID(),
 				Player1:   game.Player1(),
 				Player2:   game.Player2(),
-				Outcome:   string(game.Outcome()),
+				Outcome:   game.Outcome(),
 				Timestamp: time.Now().Unix(),
 			}); err != nil {
 			s.l.Error(err.Error())
@@ -161,7 +161,7 @@ func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 		GameID:    d.GameID,
 		Player1:   game.Player1(),
 		Player2:   game.Player2(),
-		Outcome:   game.Outcome().String(),
+		Outcome:   game.Outcome(),
 		Desc:      entity.EndDescriptionPlayerLeft.String(),
 		Timestamp: time.Now().Unix(),
 	})

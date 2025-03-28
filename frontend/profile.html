@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - Chess Platform</title>
+    <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="./assets/css/profile.css">
+    <link rel="stylesheet" href="./assets/css/profile-summary.css">
+</head>
+
+<body>
+    <div class="container">
+        <div id="sidebar-container"></div>
+        <div class="main-content">
+            <div class="profile-section">
+                <div class="profile-header">
+                    <img src="./assets/images/avatar.png" alt="User Avatar" class="profile-avatar">
+                    <div class="profile-info">
+                        <h2>ali****@gmail.com</h2>
+                        <p>UID: 249449147 <i class="fas fa-copy"></i> <i class="fas fa-eye"></i></p>
+                        <p>Level: 5</p>
+                        <p>Ranking: #1203</p>
+                    </div>
+                </div>
+            </div>
+            <div class="game-history">
+                <h2>Game History</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Opponent</th>
+                            <th>Date</th>
+                            <th>Result</th>
+                            <th>Elo Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <span class="username" data-email="opponent1@example.com" data-uid="123456789"
+                                    data-level="4" data-ranking="#1500">Opponent1</span>
+                            </td>
+                            <td>2023-10-01</td>
+                            <td>Win</td>
+                            <td>+10</td>
+                        </tr>
+                        <tr>
+                            <td>Opponent2</td>
+                            <td>2023-10-02</td>
+                            <td>Loss</td>
+                            <td>-15</td>
+                        </tr>
+                        <tr>
+                            <td>Opponent3</td>
+                            <td>2023-10-03</td>
+                            <td>Draw</td>
+                            <td>0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/assets/js/sidebar.js"></script>
+    <script src="./assets/js/profile-summary.js"></script>
+</body>
+
+</html>
+
+<style>
+
+</style>

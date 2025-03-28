@@ -1,0 +1,33 @@
+/* Profile Summary Box Styles */
+.profile-summary {
+    /* display: none; */
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    width: 200px;
+    font-size: 0.9rem;
+    top: 40px;
+    left: 0;
+    z-index: 10;
+}
+
+.username {
+    position: relative;
+    cursor: pointer;
+}
+
+/* This will show the profile summary when hovering over the username */
+.username:hover+.profile-summary {
+    display: block;
+}
+
+.profile-summary:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+.game-history table td {
+    position: relative;
+}
