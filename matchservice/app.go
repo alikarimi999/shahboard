@@ -1,17 +1,15 @@
 package matchservice
 
 import (
-	"math/rand"
-
 	"github.com/alikarimi999/shahboard/event/kafka"
 	"github.com/alikarimi999/shahboard/matchservice/delivery/http"
 	match "github.com/alikarimi999/shahboard/matchservice/service"
+	"github.com/alikarimi999/shahboard/matchservice/services"
 	"github.com/alikarimi999/shahboard/matchservice/services/game"
 
 	"github.com/alikarimi999/shahboard/pkg/grpc"
 	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
-	"github.com/alikarimi999/shahboard/types"
 )
 
 type application struct {
@@ -33,12 +31,17 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	client, err := grpc.NewClient(cfg.GameService, nil)
+	gc, err := grpc.NewClient(cfg.GameService, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := match.NewService(cfg.Match, p, &mockScoreService{}, game.NewService(client), l)
+	rc, err := grpc.NewClient(cfg.RatingService, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := match.NewService(cfg.Match, p, services.NewRatingService(rc), game.NewService(gc), l)
 	if err != nil {
 		return nil, err
 	}
@@ -53,10 +56,4 @@ func SetupApplication(cfg Config) (*application, error) {
 
 func (a *application) Run() error {
 	return a.Router.Run()
-}
-
-type mockScoreService struct{}
-
-func (s *mockScoreService) GetUserLevel(id types.ObjectId) (types.Level, error) {
-	return types.Level(rand.Intn(int(types.LevelKing)) + 1), nil
 }

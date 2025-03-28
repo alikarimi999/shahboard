@@ -20,9 +20,9 @@ type Service struct {
 	cfg Config
 	e   *engine
 
-	p     event.Publisher
-	score ScoreService
-	game  GameService
+	p      event.Publisher
+	rating RatingService
+	game   GameService
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup
@@ -30,12 +30,12 @@ type Service struct {
 	l log.Logger
 }
 
-func NewService(cfg Config, p event.Publisher, score ScoreService, game GameService, l log.Logger) (*Service, error) {
+func NewService(cfg Config, p event.Publisher, score RatingService, game GameService, l log.Logger) (*Service, error) {
 	s := &Service{
 		cfg:    cfg,
 		e:      newEngine(time.Duration(cfg.EngineTicker) * time.Second),
 		p:      p,
-		score:  score,
+		rating: score,
 		game:   game,
 		stopCh: make(chan struct{}),
 		l:      l,
@@ -60,9 +60,10 @@ func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*
 		return nil, fmt.Errorf("user is already in a game")
 	}
 
-	level, err := s.score.GetUserLevel(userId)
+	level, err := s.rating.GetUserLevel(userId)
 	if err != nil {
-		return nil, err
+		s.l.Error(fmt.Sprintf("failed to get user '%s' level: %s", userId, err.Error()))
+		level = types.LevelPawn
 	}
 
 	req, ok := s.e.addToQueue(userId, level)

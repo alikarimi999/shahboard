@@ -9,12 +9,13 @@ import (
 )
 
 type Config struct {
-	Match        match.Config        `json:"match_service"`
-	Http         http.Config         `json:"http"`
-	Kafka        kafka.Config        `json:"kafka"`
-	Log          LogConfig           `json:"log"`
-	JwtValidator jwt.ValidatorConfig `json:"jwt_validator"`
-	GameService  grpc.Config         `json:"game_service_grpc"`
+	Match         match.Config        `json:"match_service"`
+	Http          http.Config         `json:"http"`
+	Kafka         kafka.Config        `json:"kafka"`
+	Log           LogConfig           `json:"log"`
+	JwtValidator  jwt.ValidatorConfig `json:"jwt_validator"`
+	GameService   grpc.Config         `json:"game_service_grpc"`
+	RatingService grpc.Config         `json:"rating_service_grpc"`
 }
 
 type LogConfig struct {

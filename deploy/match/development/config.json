@@ -21,5 +21,8 @@
     },
     "game_service_grpc": {
         "target": "localhost:9091"
+    },
+    "rating_service_grpc": {
+        "target": "localhost:9095"
     }
 }
