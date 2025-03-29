@@ -263,6 +263,18 @@ func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 		default:
 			return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
 		}
+	case event.DomainUser:
+		switch event.Action(action) {
+		case event.ActionCreated:
+			e = &event.EventUserCreated{}
+		case event.ActionLoggedIn:
+			e = &event.EventUserLoggedIn{}
+		case event.ActionLoggedOut:
+			e = &event.EventUserLoggedOut{}
+		default:
+			return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
+		}
+
 	default:
 		return nil, fmt.Errorf("unknown event type for topic: %s.%s", domain, action)
 	}

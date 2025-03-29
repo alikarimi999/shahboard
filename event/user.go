@@ -34,7 +34,7 @@ func (e EventUserCreated) GetResource() string {
 }
 
 func (e EventUserCreated) GetTopic() Topic {
-	return TopicUser.SetResource(e.GetResource())
+	return TopicUserCreated.SetResource(e.GetResource())
 }
 
 func (e EventUserCreated) GetAction() Action {
@@ -62,7 +62,7 @@ func (e EventUserLoggedIn) GetResource() string {
 }
 
 func (e EventUserLoggedIn) GetTopic() Topic {
-	return TopicUser.SetResource(e.GetResource())
+	return TopicUserLoggedIn.SetResource(e.GetResource())
 }
 
 func (e EventUserLoggedIn) GetAction() Action {
@@ -88,7 +88,7 @@ func (e EventUserLoggedOut) GetResource() string {
 }
 
 func (e EventUserLoggedOut) GetTopic() Topic {
-	return TopicUser.SetResource(e.GetResource())
+	return TopicUserLoggedOut.SetResource(e.GetResource())
 }
 
 func (e EventUserLoggedOut) GetAction() Action {

@@ -1,7 +1,8 @@
 import { user } from './user.js';
+import { logout } from './auth.js';
 
 export function connectWebSocket(url) {
-    if (user.jwt_token === "") {
+    if (user.jwt_token === null || user.jwt_token === "") {
         console.error("User is not authenticated");
         return null;
     }
@@ -59,8 +60,12 @@ export function connectWebSocket(url) {
 
         socket.onclose = (event) => {
             clearInterval(pingInterval);
-            console.warn("Unexpected disconnection:", event);
-            alert("Connection closed: " + event.reason);
+            if (event.code === 1006) {
+                logout();
+            } else {
+                console.warn("Unexpected disconnection:", event);
+                alert("Connection closed: " + event.reason);
+            }
             window.location.reload();
         };
     }
@@ -118,7 +123,11 @@ export function connectWebSocket(url) {
     }
 
     function checkServerHealth() {
-        if (Date.now() - lastReceivedTime > 10000) {
+        if (user.jwt_token === null || user.jwt_token === "") {
+            return;
+        }
+
+        if (user.jwt_token != null && Date.now() - lastReceivedTime > 10000) {
             console.log("Server unresponsive: ", Date.now() - lastReceivedTime);
             // WebSocket disconnected event 
             document.dispatchEvent(new Event("websocket_disconnected"));

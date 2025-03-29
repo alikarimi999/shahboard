@@ -45,19 +45,19 @@ func (r *ratingRepo) Update(ctx context.Context, ratings []*entity.Rating, chang
 	// Update ratings table
 	for _, r := range ratings {
 		query := `
-            UPDATE ratings
-            SET 
-                current_score = $1,
-                best_score = $2,
-                games_played = games_played + 1,
-                games_won = games_won + $3,
-                games_lost = games_lost + $4,
-                games_draw = games_draw + $5,
-                last_updated = $6
-            WHERE user_id = $7
+            INSERT INTO ratings (user_id, current_score, best_score, games_played, games_won, games_lost, games_draw, last_updated)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (user_id)
+				DO UPDATE SET 
+				current_score = EXCLUDED.current_score,
+				best_score = EXCLUDED.best_score,
+				games_played = EXCLUDED.games_played,
+				games_won = EXCLUDED.games_won,
+				games_lost = EXCLUDED.games_lost,
+				games_draw = EXCLUDED.games_draw,
+				last_updated = EXCLUDED.last_updated
         `
-		_, err := tx.ExecContext(ctx, query, r.CurrentScore, r.BestScore,
-			r.GamesWon, r.GamesLost, r.GamesDraw, r.LastUpdated, r.UserId.String())
+		_, err := tx.ExecContext(ctx, query, r.UserId, r.CurrentScore, r.BestScore, r.GamesPlayed,
+			r.GamesWon, r.GamesLost, r.GamesDraw, r.LastUpdated)
 		if err != nil {
 			return fmt.Errorf("failed to update rating for user %s: %w", r.UserId, err)
 		}

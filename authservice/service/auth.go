@@ -52,6 +52,9 @@ func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (Go
 	// }
 
 	token, err := ValidateGoogleJWT(req.Token, s.cfg.GoogleClientID)
+	if err != nil {
+		return GoogleAuthResponse{}, err
+	}
 
 	user, err := s.repo.GetByEmail(ctx, token.Email)
 	if err != nil {
@@ -150,16 +153,16 @@ type GoogleCerts struct {
 var staticGoogleCerts = GoogleCerts{
 	Keys: []GoogleKey{
 		{
-			Kid: "5d12ab782cb6096285f69e48aea99079bb59cb86",
+			Kid: "ee193d4647ab4a3585aa9b2b3b484a87aa68bb42",
 			Use: "sig",
 			Kty: "RSA",
-			N:   "uac7NRcojCutcceWq1nrpLGJjQ7ywvgWsUcb1DWMKJ3KNNHiRzh9jshoi9tmq1zlarJ_h7GQg8iU1qD7SgpVYJmjlKG1MNVRAtuNrNMC0UAnNfG7mBBNorHFndfp-9cLTiMjXSXRzhNqiMvTVKeolRdMB2lH9RzJnwlpXtvUbD7M1pXOlPlMaOy1zxUnHn0uszU5mPRQk79i03BNrAdhwrAUB-ZuMnqpjaUcb9VU3KIwuZNPtsVenLN12sRYpaZ6WBw8Q9q7fAoaJUovM0Go8deC9pJYyxJuHdVo9HP0osyzg3g_rOYi14wmvMBuiDf3F4pTnudAfFyl3d0Mn_i4ZQ",
+			N:   "rxLSY1w1gu-IzjVkBEqZXWcA1adZ15VmGpPYKpt8N_MXbgwICCy__iPVvuvSqetTvshwxEEK8ZcbmEyG_rcPiIBBoHYdtVb_cTlNR7JfT2ZOFKZUW1y3FBnZ2TTBHCgCJ9N7d-r6doQ-NI0GXOWzZh5Q9CPc9NDZoe8RfH-RE4m1RNGAukKThomofesSyw5OY92WxK9sfwTshmlK-J-wFB2OlN7xuwF3Rns_CJLdnajhf5XVMdNqEeSk3Fyoi72qWRQbDhfEhT5qcpkMX42BgWbmlom0ZPwPPhyyd9jrfFNN0BNgvF2kPD2eJ8qsaaUAZn4DBvcTpC5RhiwSY_AB8w",
 			E:   "AQAB",
 			Alg: "RS256",
 		},
 		{
-			Kid: "763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b",
-			N:   "y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw",
+			Kid: "821f3bc66f0751f7840606799b1adf9e9fb60dfb",
+			N:   "mvcbc7gZu7VixykOM8JawiiNEco0ZJj9mJ3zezm034iO5w7AbLFOXut2zgWc-uOifuJUHHDSbG5Plk8ObhTxgIOD0ar9Qep5BSH1fFBhNPOfDM8h44Ru7O9_IZ7wyijlhDpzXsb403Z6FrIMAPMJJGjHGrc1f2p-_KojzTTlaAjsolrFgq19NAxQx0qrGvQrMeGB7x1iej_9AO65WGDj4xTNoihAsKgVqvARz-kryDetAlaKnpyORDuceYaMRTTUrRJjue8Sa9eSc72n53eAaau8i2MnDsPtyWnRFondswSxesBEujEgmWZui2X_JePvEDk0xnYcc2CjSWRLELy_NQ",
 			E:   "AQAB",
 			Kty: "RSA",
 			Use: "sig",

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
@@ -56,14 +57,14 @@ func (s *Service) handleEvent(e event.Event) {
 	case event.DomainUser:
 		switch t.Action() {
 		case event.ActionCreated:
-			s.handleUserCreated(e.(event.EventUserCreated))
+			s.handleUserCreated(e.(*event.EventUserCreated))
 		case event.ActionLoggedIn:
-			s.handleUserLoggedIn(e.(event.EventUserLoggedIn))
+			s.handleUserLoggedIn(e.(*event.EventUserLoggedIn))
 		}
 	}
 }
 
-func (s *Service) handleUserCreated(e event.EventUserCreated) {
+func (s *Service) handleUserCreated(e *event.EventUserCreated) {
 	t := time.Now()
 	if err := s.repo.Create(context.Background(), &entity.UserInfo{
 		ID:           e.UserID,
@@ -74,11 +75,16 @@ func (s *Service) handleUserCreated(e event.EventUserCreated) {
 		LastActiveAt: t,
 	}); err != nil {
 		s.l.Error(err.Error())
+		return
 	}
+	s.l.Debug(fmt.Sprintf("user created with UID: '%s' Email: '%s'", e.UserID, e.Email))
 }
 
-func (s *Service) handleUserLoggedIn(e event.EventUserLoggedIn) {
+func (s *Service) handleUserLoggedIn(e *event.EventUserLoggedIn) {
 	if err := s.repo.UpdateLastActiveAt(context.Background(), e.UserID, time.Now()); err != nil {
 		s.l.Error(err.Error())
+		return
 	}
+
+	s.l.Debug(fmt.Sprintf("user logged in with UID: '%s' Email: '%s'", e.UserID, e.Email))
 }

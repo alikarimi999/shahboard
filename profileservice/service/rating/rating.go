@@ -2,6 +2,7 @@ package rating
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
@@ -68,17 +69,16 @@ func (s *Service) GetUserChangeHistory(ctx context.Context, userId types.ObjectI
 }
 
 func (s *Service) handleEvent(e event.Event) {
-	t := e.GetTopic()
-	switch t {
-	case event.TopicGame:
-		switch t.Action() {
+	switch e.GetTopic().Domain() {
+	case event.DomainGame:
+		switch e.GetTopic().Action() {
 		case event.ActionEnded:
-			s.handleGameEnded(e.(event.EventGameEnded))
+			s.handleGameEnded(e.(*event.EventGameEnded))
 		}
 	}
 }
 
-func (s *Service) handleGameEnded(e event.EventGameEnded) {
+func (s *Service) handleGameEnded(e *event.EventGameEnded) {
 	ctx := context.Background()
 	r1, err := s.repo.GetByUserId(ctx, e.Player1.ID)
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *Service) handleGameEnded(e event.EventGameEnded) {
 		}
 	}
 
-	s1 := calcScore1(e.Outcome)
+	s1 := calcScore1(e.Outcome, e.Player1.Color)
 	elo1 := elo.CalculateElo(r1.CurrentScore, r2.CurrentScore, s1)
 	elo2 := elo.CalculateElo(r2.CurrentScore, r1.CurrentScore, 1-s1)
 	t := time.Now()
@@ -142,19 +142,28 @@ func (s *Service) handleGameEnded(e event.EventGameEnded) {
 		r2.BestScore = elo2
 	}
 
-	updateGameStats(r1, r2, e.Outcome)
+	updateGameStats(r1, r2, e.Outcome, e.Player1.Color)
 
 	if err := s.repo.Update(ctx, []*entity.Rating{r1, r2}, []*entity.GameEloChange{c1, c2}); err != nil {
 		// TODO: handle this situation better
 		s.l.Error(err.Error())
+		return
 	}
+
+	s.l.Debug(fmt.Sprintf("Game '%s' ended, players ratings updated", e.GameID))
 }
 
-func calcScore1(o types.GameOutcome) float64 {
+func calcScore1(o types.GameOutcome, p1Color types.Color) float64 {
 	switch o {
 	case types.WhiteWon:
-		return 1
+		if p1Color == types.ColorWhite {
+			return 1
+		}
+		return 0
 	case types.BlackWon:
+		if p1Color == types.ColorBlack {
+			return 1
+		}
 		return 0
 	default:
 		return 0.5
@@ -162,16 +171,28 @@ func calcScore1(o types.GameOutcome) float64 {
 	}
 }
 
-func updateGameStats(r1, r2 *entity.Rating, outcome types.GameOutcome) {
+func updateGameStats(r1, r2 *entity.Rating, outcome types.GameOutcome, p1Color types.Color) {
 	r1.GamesPlayed++
 	r2.GamesPlayed++
-	if outcome == types.WhiteWon {
-		r1.GamesWon++
-		r2.GamesLost++
-	} else if outcome == types.BlackWon {
-		r1.GamesLost++
-		r2.GamesWon++
-	} else {
+
+	switch outcome {
+	case types.WhiteWon:
+		winner, loser := r1, r2
+		if p1Color != types.ColorWhite {
+			winner, loser = r2, r1
+		}
+		winner.GamesWon++
+		loser.GamesLost++
+
+	case types.BlackWon:
+		winner, loser := r1, r2
+		if p1Color != types.ColorBlack {
+			winner, loser = r2, r1
+		}
+		winner.GamesWon++
+		loser.GamesLost++
+
+	case types.Draw:
 		r1.GamesDraw++
 		r2.GamesDraw++
 	}
