@@ -26,7 +26,8 @@ func (r *ratingRepo) GetByUserId(ctx context.Context, id types.ObjectId) (*entit
 	query := "SELECT user_id, current_score, best_score, games_played, games_won, games_lost, games_draw, last_updated FROM ratings WHERE user_id = $1"
 	row := r.db.QueryRowContext(ctx, query, id)
 	var rating entity.Rating
-	err := row.Scan(&rating.UserId, &rating.CurrentScore, &rating.BestScore, &rating.GamesPlayed, &rating.GamesWon, &rating.GamesLost, &rating.GamesDraw, &rating.LastUpdated)
+	err := row.Scan(&rating.UserId, &rating.CurrentScore, &rating.BestScore, &rating.GamesPlayed,
+		&rating.GamesWon, &rating.GamesLost, &rating.GamesDraw, &rating.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -66,11 +67,11 @@ func (r *ratingRepo) Update(ctx context.Context, ratings []*entity.Rating, chang
 	// Insert game Elo changes into the game_elo_changes table
 	for _, c := range changes {
 		query := `
-            INSERT INTO game_elo_changes (user_id, game_id, opponent_id, elo_change, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO game_elo_changes (user_id, game_id, opponent_id, elo_change, result, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
         `
 		_, err := tx.ExecContext(ctx, query, c.UserId.String(), c.GameId.String(), c.OpponentId.String(),
-			c.EloChange, c.UpdatedAt)
+			c.EloChange, c.Result, c.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("failed to insert Elo change for game %s: %w", c.GameId, err)
 		}
@@ -84,7 +85,7 @@ func (r *ratingRepo) Update(ctx context.Context, ratings []*entity.Rating, chang
 }
 
 func (r *ratingRepo) GetGameEloChangesByUserId(ctx context.Context, userId types.ObjectId) ([]*entity.GameEloChange, error) {
-	query := "SELECT id, user_id, game_id, opponent_id, elo_change, updated_at FROM game_elo_changes WHERE user_id = $1"
+	query := "SELECT id, user_id, game_id, opponent_id, elo_change, result, updated_at FROM game_elo_changes WHERE user_id = $1"
 	rows, err := r.db.QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, err
@@ -93,7 +94,7 @@ func (r *ratingRepo) GetGameEloChangesByUserId(ctx context.Context, userId types
 	var changes []*entity.GameEloChange
 	for rows.Next() {
 		var c entity.GameEloChange
-		err := rows.Scan(&c.Id, &c.UserId, &c.GameId, &c.OpponentId, &c.EloChange, &c.UpdatedAt)
+		err := rows.Scan(&c.Id, &c.UserId, &c.GameId, &c.OpponentId, &c.EloChange, &c.Result, &c.UpdatedAt)
 		if err != nil {
 			r.l.Error(fmt.Sprintf("failed to scan row: %v", err))
 			continue

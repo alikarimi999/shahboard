@@ -1,7 +1,7 @@
       :root {
           --primary-color: #F5C518;
           /* A vibrant yellow for highlights */
-          --background-color: #1C2526;
+          --background-color: linear-gradient(to right, #D4AF37, #FFD700);
           /* Dark background for contrast */
           --text-color: #FFFFFF;
           /* White text for readability */
@@ -35,6 +35,22 @@
           flex-wrap: wrap;
           justify-content: center;
           align-items: stretch;
+      }
+
+      .default-button {
+          background: linear-gradient(to right, #D4AF37, #FFD700);
+          border: none;
+          color: black;
+          font-size: 12px;
+          padding: 8px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: 0.3s;
+      }
+
+      .default-button:hover {
+          background: linear-gradient(to right, #FFD700, #FFA500);
+          box-shadow: 0 0 8px rgba(255, 215, 0, 0.7);
       }
 
       .board-container {

@@ -17,11 +17,20 @@ type Rating struct {
 	LastUpdated  time.Time
 }
 
+type GameResult int8
+
+const (
+	GameResultLoss GameResult = iota - 1
+	GameResultDraw
+	GameResultWin
+)
+
 type GameEloChange struct {
 	Id         int64
 	UserId     types.ObjectId
 	EloChange  int64
 	GameId     types.ObjectId
 	OpponentId types.ObjectId
+	Result     GameResult
 	UpdatedAt  time.Time
 }

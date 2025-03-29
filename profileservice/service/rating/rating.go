@@ -113,11 +113,24 @@ func (s *Service) handleGameEnded(e *event.EventGameEnded) {
 	elo2 := elo.CalculateElo(r2.CurrentScore, r1.CurrentScore, 1-s1)
 	t := time.Now()
 
+	var result1, result2 entity.GameResult
+	if s1 == 1 {
+		result1 = entity.GameResultWin
+		result2 = entity.GameResultLoss
+	} else if s1 == 0 {
+		result1 = entity.GameResultLoss
+		result2 = entity.GameResultWin
+	} else {
+		result1 = entity.GameResultDraw
+		result2 = entity.GameResultDraw
+	}
+
 	c1 := &entity.GameEloChange{
 		UserId:     e.Player1.ID,
 		EloChange:  elo1 - r1.CurrentScore,
 		GameId:     e.GameID,
 		OpponentId: e.Player2.ID,
+		Result:     result1,
 		UpdatedAt:  t,
 	}
 	c2 := &entity.GameEloChange{
@@ -125,6 +138,7 @@ func (s *Service) handleGameEnded(e *event.EventGameEnded) {
 		EloChange:  elo2 - r2.CurrentScore,
 		GameId:     e.GameID,
 		OpponentId: e.Player1.ID,
+		Result:     result2,
 		UpdatedAt:  t,
 	}
 
