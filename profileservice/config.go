@@ -20,7 +20,7 @@ type Config struct {
 	RatingDB     postgres.Config     `json:"rating_db"`
 	Redis        RedisConfig         `json:"redis"`
 	Http         router.Config       `json:"http"`
-	Grpc         grpc.Config         `json:"grpc_server"`
+	Grpc         grpc.Config         `json:"grpc"`
 }
 
 type LogConfig struct {

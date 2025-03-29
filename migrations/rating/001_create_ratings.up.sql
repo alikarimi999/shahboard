@@ -1,5 +1,5 @@
 CREATE TABLE ratings (
-    user_id VARCHAR(64) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) PRIMARY KEY,
     current_score BIGINT NOT NULL DEFAULT 1000,
     best_score BIGINT NOT NULL DEFAULT 1000,
     games_played BIGINT NOT NULL DEFAULT 0,

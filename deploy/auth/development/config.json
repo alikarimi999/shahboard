@@ -21,7 +21,8 @@
         "ssl_mode": "disable",
         "max_idle_conns": 15,
         "max_open_conns": 100,
-        "conn_max_lifetime": 5
+        "conn_max_lifetime": 5,
+        "path_of_migration": "./migrations/auth/"
     },
     "http": {
         "port": 8084
