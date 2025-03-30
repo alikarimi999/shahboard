@@ -66,6 +66,9 @@ function updateUserProfile() {
         document.getElementById("user-uid").classList.remove("hidden");
         document.getElementById("uid-text").innerText = maskText(user.id);
         document.getElementById("uid-text").dataset.full = user.id; // Store full UID
+
+        const profileLink = document.getElementById("profile-menu-link");
+        profileLink.href = `/profile.html?userId=${user.id}`;
     }
 
     // Add copy functionality

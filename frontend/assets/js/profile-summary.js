@@ -1,3 +1,14 @@
+export function showUserProfile(id, profile, element, connected) {
+    if (connected) {
+        element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">✅ ${profile.name} (${profile.score})</a>`;
+    } else {
+        element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">❌ ${profile.name} (${profile.score})</a>`;
+    }
+    element.onmouseenter = () => {
+        showProfileSummary(id, profile, element);
+    };
+}
+
 export function showProfileSummary(id, profile, element) {
     hideProfileSummary(); // Remove any existing tooltip
 
@@ -14,8 +25,12 @@ export function showProfileSummary(id, profile, element) {
         : 'Unknown';
 
     // Create tooltip container
-    const tooltip = document.createElement('div');
+    const tooltip = document.createElement('a');
     tooltip.className = 'custom-tooltip';
+    tooltip.href = `/profile.html?userId=${id}`;
+    tooltip.target = '_blank';
+    tooltip.rel = 'noopener noreferrer';
+    tooltip.style.textDecoration = 'none';
 
     // Tooltip content
     tooltip.innerHTML = `

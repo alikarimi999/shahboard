@@ -61,7 +61,7 @@ export function connectWebSocket(url) {
         socket.onclose = (event) => {
             clearInterval(pingInterval);
             if (event.code === 1006) {
-                logout();
+                alert("Connection closed: " + event.reason);
             } else {
                 console.warn("Unexpected disconnection:", event);
                 alert("Connection closed: " + event.reason);
@@ -102,8 +102,8 @@ export function connectWebSocket(url) {
             pongReceived = true;
             if (isFirstPong) {
                 // Dispatch connected event on first pong
-                document.dispatchEvent(new Event("websocket_connected"));
-                document.dispatchEvent(new Event("opponent_connected"));
+                // document.dispatchEvent(new Event("websocket_connected"));
+                // document.dispatchEvent(new Event("opponent_connected"));
                 isFirstPong = false;
             }
 

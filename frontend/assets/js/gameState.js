@@ -6,6 +6,6 @@ export const currentGame = {
     matchId: null,
     isPlayer: null,
     color: null,
-    player: { id: null, name: null, connected: false },
-    opponent: { id: null, name: null, connected: false },
+    player: { id: null, email: null, name: null, avatar_url: null, connected: false, profile: null },
+    opponent: { id: null, email: null, name: null, avatar_url: null, connected: false, profile: null },
 };

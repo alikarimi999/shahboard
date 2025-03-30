@@ -1,6 +1,8 @@
-import { showProfileSummary, hideProfileSummary } from './profile-summary.js';
+import { showProfileSummary } from './profile-summary.js';
 import { getUserProfile, getUserRating } from './user_info.js';
 import { showErrorMessage } from './error.js';
+
+const opponentProfiles = new Map();
 
 let currentPage = 1;
 const pageSize = 10;
@@ -100,14 +102,26 @@ async function processGameHistory(data) {
             eloChangeCell.textContent = `${game.change > 0 ? '+' : ''}${game.change}`;
             eloChangeCell.classList.add(game.change > 0 ? 'positive' : 'negative');
 
-            getUserProfile(game.opponent_id).then(profile => {
+            opponentProfiles.keys()
+            // Check if opponent profile is already cached
+            if (opponentProfiles.has(game.opponent_id)) {
+                // Use the cached profile
+                const profile = opponentProfiles.get(game.opponent_id);
                 opponentCell.innerHTML = `<a href="/profile.html?userId=${game.opponent_id}" class="profile-link" target="_blank" rel="noopener noreferrer">${profile.name}</a>`;
 
                 const opponentLink = opponentCell.querySelector('.profile-link');
                 opponentLink.addEventListener('mouseenter', () => showProfileSummary(game.opponent_id, profile, opponentCell));
-            }).catch(() => {
-                opponentCell.textContent = 'Unknown';
-            });
+            } else {
+                getUserProfile(game.opponent_id).then(profile => {
+                    opponentProfiles.set(game.opponent_id, profile);
+                    opponentCell.innerHTML = `<a href="/profile.html?userId=${game.opponent_id}" class="profile-link" target="_blank" rel="noopener noreferrer">${profile.name}</a>`;
+
+                    const opponentLink = opponentCell.querySelector('.profile-link');
+                    opponentLink.addEventListener('mouseenter', () => showProfileSummary(game.opponent_id, profile, opponentCell));
+                }).catch(() => {
+                    opponentCell.textContent = 'Unknown';
+                });
+            }
         }
     } else {
         gameHistoryTable.innerHTML = '<tr><td colspan="5">No game history available.</td></tr>';
@@ -115,20 +129,41 @@ async function processGameHistory(data) {
 }
 
 function formatDate(timestamp) {
-    return new Date(timestamp * 1000).toLocaleDateString();
+    const date = new Date(timestamp * 1000);
+
+    // Use toLocaleString to format both date and time (hours, minutes, seconds)
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',  // Abbreviated month (Jan, Feb, etc.)
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true  // Optional: Use 12-hour format (AM/PM)
+    });
 }
-
-
 
 
 function getCurrentPage() {
     return currentPage;
 }
 
-// Attach functions to window for global access
-window.fetchGameHistory = fetchGameHistory;
-window.getCurrentPage = getCurrentPage;
+document.addEventListener("DOMContentLoaded", () => {
+    const fetchHistoryBtn = document.getElementById("next-btn");
 
-// Initial fetch
-// fetchUserProfile(userId);
-// fetchGameHistory(userId,currentPage);
+    if (fetchHistoryBtn) {
+        fetchHistoryBtn.addEventListener("click", () => {
+            fetchGameHistory(userId, getCurrentPage() + 1);
+        });
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const fetchHistoryBtn = document.getElementById("prev-btn");
+
+    if (fetchHistoryBtn) {
+        fetchHistoryBtn.addEventListener("click", () => {
+            fetchGameHistory(userId, getCurrentPage() - 1);
+        });
+    }
+});
