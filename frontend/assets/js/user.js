@@ -2,7 +2,7 @@ export const user = {
     id: null,
     email: null,
     name: null,
-    picture: null,
+    avatar_url: null,
     jwt_token: null,
 
     update: function () {
@@ -12,7 +12,7 @@ export const user = {
             this.id = parsed.id || null;
             this.email = parsed.email || null;
             this.name = parsed.name || null;
-            this.picture = parsed.picture || null;
+            this.avatar_url = parsed.picture || null;
             this.jwt_token = parsed.jwt_token || null;
         }
     },
@@ -21,7 +21,7 @@ export const user = {
         this.id = null;
         this.email = null;
         this.name = null;
-        this.picture = null;
+        this.avatar_url = null;
         this.jwt_token = null;
     },
 

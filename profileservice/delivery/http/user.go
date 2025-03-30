@@ -1,12 +1,13 @@
 package http
 
 import (
+	"github.com/alikarimi999/shahboard/pkg/elo"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) setupUserRoutes() {
-	u := h.Group("/user")
+	u := h.Group("/users")
 	u.GET("/:userId", h.getUserInfo)
 }
 
@@ -18,24 +19,33 @@ func (h *Handler) getUserInfo(c *gin.Context) {
 		return
 	}
 
-	user, err := h.user.GetUserInfo(c, userId)
+	u, r, err := h.user.GetUserInfo(c, userId)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	if user == nil {
+	if u == nil {
 		c.JSON(404, gin.H{"error": "User not found"})
 		return
 	}
 
+	var score int64
+	var level string
+	if r != nil {
+		score = r.CurrentScore
+		level = elo.GetPlayerLevel(score).String()
+	}
+
 	c.JSON(200, UserInfoResponse{
-		Name:         user.Name,
-		Email:        user.Email,
-		AvatarUrl:    user.AvatarUrl,
-		Bio:          user.Bio,
-		Country:      user.Country,
-		CreatedAt:    user.CreatedAt.Unix(),
-		LastActiveAt: user.LastActiveAt.Unix(),
+		Name:         u.Name,
+		Email:        u.Email,
+		AvatarUrl:    u.AvatarUrl,
+		Bio:          u.Bio,
+		Country:      u.Country,
+		Score:        score,
+		Level:        level,
+		CreatedAt:    u.CreatedAt.Unix(),
+		LastActiveAt: u.LastActiveAt.Unix(),
 	})
 }

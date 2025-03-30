@@ -50,9 +50,8 @@ function setupSidebar() {
 }
 
 function updateUserProfile() {
-    console.log("Updating user profile...   ", user);
-    if (user.picture && user.name) {
-        document.getElementById("user-avatar").src = user.picture;
+    if (user.avatar_url && user.name) {
+        document.getElementById("user-avatar").src = user.avatar_url;
         document.getElementById("user-name").innerText = user.name;
         document.getElementById("logout-btn").classList.remove("hidden");
     }

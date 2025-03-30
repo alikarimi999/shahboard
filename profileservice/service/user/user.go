@@ -19,6 +19,10 @@ type Repository interface {
 	UpdateLastActiveAt(ctx context.Context, id types.ObjectId, lastActiveAt time.Time) error
 }
 
+type RatingService interface {
+	GetUserRating(ctx context.Context, userId types.ObjectId) (*entity.Rating, error)
+}
+
 type Config struct {
 }
 
@@ -27,14 +31,16 @@ type Service struct {
 	repo Repository
 	sub  event.Subscriber
 	sm   *event.SubscriptionManager
+	rs   RatingService
 	l    log.Logger
 }
 
-func NewService(cfg Config, repo Repository, sub event.Subscriber, l log.Logger) *Service {
+func NewService(cfg Config, repo Repository, sub event.Subscriber, rs RatingService, l log.Logger) *Service {
 	s := &Service{
 		cfg:  cfg,
 		repo: repo,
 		sub:  sub,
+		rs:   rs,
 		l:    l,
 	}
 
@@ -43,8 +49,22 @@ func NewService(cfg Config, repo Repository, sub event.Subscriber, l log.Logger)
 	return s
 }
 
-func (s *Service) GetUserInfo(ctx context.Context, id types.ObjectId) (*entity.UserInfo, error) {
-	return s.repo.GetByID(ctx, id)
+func (s *Service) GetUserInfo(ctx context.Context, id types.ObjectId) (*entity.UserInfo, *entity.Rating, error) {
+	u, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if u == nil {
+		return nil, nil, nil
+	}
+
+	r, err := s.rs.GetUserRating(ctx, id)
+	if err != nil || r == nil {
+		s.l.Error(fmt.Sprintf("failed to get user rating: %v", err))
+		return u, nil, nil
+	}
+
+	return u, r, nil
 }
 
 func (s *Service) UpdateUser(ctx context.Context, user *entity.UserInfo) error {

@@ -1,35 +1,65 @@
-// JavaScript to handle profile summary on hover
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.username').forEach(username => {
-        username.addEventListener('mouseenter', (e) => {
-            console.log('Profile summary script loaded>>>>> ');
-            const usernameElement = e.target;
-            const profileSummary = document.createElement('div');
-            profileSummary.classList.add('profile-summary');
+export function showProfileSummary(id, profile, element) {
+    hideProfileSummary(); // Remove any existing tooltip
 
-            // Get data attributes
-            const email = usernameElement.getAttribute('data-email');
-            const uid = usernameElement.getAttribute('data-uid');
-            const level = usernameElement.getAttribute('data-level');
-            const ranking = usernameElement.getAttribute('data-ranking');
+    const lastActive = profile.last_active_at
+        ? new Date(profile.last_active_at * 1000).toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false, // 24-hour format
+        })
+        : 'Unknown';
 
-            // Set the content of the profile summary
-            profileSummary.innerHTML = `
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>UID:</strong> ${uid}</p>
-                <p><strong>Level:</strong> ${level}</p>
-                <p><strong>Ranking:</strong> ${ranking}</p>
-            `;
+    // Create tooltip container
+    const tooltip = document.createElement('div');
+    tooltip.className = 'custom-tooltip';
 
-            // Append to the parent of the username (where we want the summary to appear)
-            usernameElement.appendChild(profileSummary);
-        });
+    // Tooltip content
+    tooltip.innerHTML = `
+        <img src="${profile.avatar_url || 'default-avatar.jpg'}" alt="Profile Picture">
+        <div class="tooltip-content">
+            <strong>${profile.email || 'Unknown'}</strong>
+            <p>UID: <span>${id}</span>
+            <p>Score: ${profile.score || 'N/A'}</p>
+            <p>Level: ${profile.level || 'N/A'}</p>
+            <p>Last Active: ${lastActive}</p>
+        </div>
+    `;
 
-        username.addEventListener('mouseleave', (e) => {
-            const profileSummary = e.target.querySelector('.profile-summary');
-            if (profileSummary) {
-                profileSummary.remove();  // Remove the profile summary when mouse leaves
+    // Append tooltip to the body
+    document.body.appendChild(tooltip);
+
+    // Position tooltip near opponent name
+    const rect = element.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + window.scrollX + 20}px`;
+    tooltip.style.top = `${rect.top + window.scrollY - 10}px`;
+
+    // Delay hiding when mouse leaves element
+    element.onmouseleave = () => {
+        setTimeout(() => {
+            if (!tooltip.matches(':hover')) {
+                hideProfileSummary();
             }
-        });
-    });
-});
+        }, 200); // Short delay to allow mouse movement
+    };
+
+    // Prevent tooltip from closing when hovered
+    tooltip.onmouseenter = () => {
+        tooltip.dataset.locked = "true"; // Prevent hiding
+    };
+
+    tooltip.onmouseleave = () => {
+        tooltip.dataset.locked = "false"; // Allow hiding
+        hideProfileSummary();
+    };
+}
+
+export function hideProfileSummary() {
+    const tooltip = document.querySelector('.custom-tooltip');
+    if (tooltip && tooltip.dataset.locked !== "true") {
+        tooltip.remove();
+    }
+}

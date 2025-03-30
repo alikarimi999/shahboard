@@ -8,6 +8,7 @@ import (
 	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/pkg/elo"
 	"github.com/alikarimi999/shahboard/pkg/log"
+	"github.com/alikarimi999/shahboard/pkg/paginate"
 	"github.com/alikarimi999/shahboard/profileservice/entity"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -19,6 +20,8 @@ type Repository interface {
 	Update(ctx context.Context, ratings []*entity.Rating, changes []*entity.GameEloChange) error
 
 	GetGameEloChangesByUserId(ctx context.Context, userId types.ObjectId) ([]*entity.GameEloChange, error)
+
+	GetGameEloChanges(context.Context, *paginate.Paginated) ([]*entity.GameEloChange, uint64, error)
 }
 
 type Config struct {
@@ -64,8 +67,14 @@ func (s *Service) GetUserRating(ctx context.Context, userId types.ObjectId) (*en
 	return r, nil
 }
 
-func (s *Service) GetUserChangeHistory(ctx context.Context, userId types.ObjectId) ([]*entity.GameEloChange, error) {
-	return s.repo.GetGameEloChangesByUserId(ctx, userId)
+func (s *Service) GetUserChangeHistory(ctx context.Context, userId types.ObjectId,
+	p *paginate.Paginated) ([]*entity.GameEloChange, uint64, error) {
+	p.Filters["user_id"] = paginate.Filter{
+		Operator: paginate.FilterOperatorEqual,
+		Values:   []interface{}{userId},
+	}
+
+	return s.repo.GetGameEloChanges(ctx, p)
 }
 
 func (s *Service) handleEvent(e event.Event) {

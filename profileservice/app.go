@@ -41,8 +41,8 @@ func SetupApplication(cfg Config) (*application, error) {
 	userRepo := repository.NewUserRepo(userDB)
 	ratingRepo := repository.NewRatingRepo(ratingDB, l)
 
-	userService := user.NewService(cfg.User, userRepo, s, l)
 	ratingService := rating.NewService(cfg.Rating, ratingRepo, s, l)
+	userService := user.NewService(cfg.User, userRepo, s, ratingService, l)
 
 	h, err := http.NewHandler(cfg.Http, userService, ratingService, l)
 	if err != nil {

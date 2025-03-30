@@ -25,6 +25,17 @@ const (
 	GameResultWin
 )
 
+func (r GameResult) String() string {
+	switch r {
+	case GameResultWin:
+		return "win"
+	case GameResultLoss:
+		return "loss"
+	default:
+		return "draw"
+	}
+}
+
 type GameEloChange struct {
 	Id         int64
 	UserId     types.ObjectId

@@ -23,7 +23,9 @@ func (r *userRepo) GetByID(ctx context.Context, id types.ObjectId) (*entity.User
 	query := "SELECT id, email, name, avatar_url, bio, country, created_at, last_active_at FROM users WHERE id = $1"
 	row := r.db.QueryRowContext(ctx, query, id)
 	var user entity.UserInfo
-	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.LastActiveAt)
+	err := row.Scan(&user.ID, &user.Email, &user.Name, &user.AvatarUrl, &user.Bio, &user.Country,
+		&user.CreatedAt, &user.LastActiveAt)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil

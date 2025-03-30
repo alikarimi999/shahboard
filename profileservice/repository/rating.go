@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/alikarimi999/shahboard/pkg/log"
+	"github.com/alikarimi999/shahboard/pkg/paginate"
+	pagesql "github.com/alikarimi999/shahboard/pkg/paginate/sql"
 	"github.com/alikarimi999/shahboard/profileservice/entity"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -102,5 +104,53 @@ func (r *ratingRepo) GetGameEloChangesByUserId(ctx context.Context, userId types
 		changes = append(changes, &c)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error during row iteration: %v", err)
+	}
+
 	return changes, nil
+}
+
+func (r *ratingRepo) GetGameEloChanges(c context.Context, p *paginate.Paginated) ([]*entity.GameEloChange, uint64, error) {
+	limit := p.PerPage
+	offset := (p.Page - 1) * limit
+
+	q, cq, args := pagesql.WriteQuery("game_elo_changes", p.Filters, p.SortColumn, p.Decscending, limit, offset)
+
+	rows, err := r.db.QueryContext(c, q, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute query: %v", err)
+	}
+	defer rows.Close()
+
+	var changes []*entity.GameEloChange
+	for rows.Next() {
+		var c entity.GameEloChange
+		err := rows.Scan(&c.Id, &c.UserId, &c.GameId, &c.OpponentId, &c.EloChange, &c.UpdatedAt, &c.Result)
+		if err != nil {
+			r.l.Error(fmt.Sprintf("failed to scan row: %v", err))
+			continue
+		}
+		changes = append(changes, &c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate over rows: %v", err)
+	}
+
+	var totalCount int
+	cArgs := []interface{}{}
+	if len(args) > 0 && len(args) < 3 {
+		cArgs = append(cArgs, args[0])
+	}
+	if len(args) > 0 && len(args) >= 3 {
+		cArgs = append(cArgs, args[:len(args)-2]...)
+	}
+
+	err = r.db.QueryRowContext(c, cq, cArgs...).Scan(&totalCount)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute count query: %v", err)
+	}
+
+	return changes, uint64(totalCount), nil
 }

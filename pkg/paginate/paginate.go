@@ -24,6 +24,22 @@ type Paginated struct {
 	Decscending bool                       `json:"descending"`
 }
 
+func (p *Paginated) Validate() error {
+	if p.Page == 0 {
+		p.Page = 1
+	}
+
+	if p.PerPage < DefaultMinPageSize {
+		p.PerPage = DefaultMinPageSize
+	}
+
+	if p.PerPage > DefaultMaxPageSize {
+		p.PerPage = DefaultMaxPageSize
+	}
+
+	return nil
+}
+
 /*
 // Example of how the Paginated struct can be used in a database implementation:
 // type PaginationSupportDB struct {
@@ -65,7 +81,7 @@ type PaginatedResponseBase struct {
 	CurrentPage  uint64 `json:"current_page"`
 	PageSize     uint64 `json:"page_size"`
 	TotalNumbers uint64 `json:"total_numbers"`
-	TotalPage    uint64 `json:"total_page"`
+	TotalPages   uint64 `json:"total_pages"`
 }
 
 func (r *PaginateRequestBase) Validate() error {

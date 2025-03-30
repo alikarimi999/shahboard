@@ -1,5 +1,7 @@
 package http
 
+import "github.com/alikarimi999/shahboard/pkg/paginate"
+
 type UserRatingResponse struct {
 	CurrentScore int64 `json:"current_score"`
 	BestScore    int64 `json:"best_score"`
@@ -16,12 +18,15 @@ type UserInfoResponse struct {
 	AvatarUrl    string `json:"avatar_url"`
 	Bio          string `json:"bio"`
 	Country      string `json:"country"`
+	Score        int64  `json:"score"`
+	Level        string `json:"level"`
 	CreatedAt    int64  `json:"created_at"`
 	LastActiveAt int64  `json:"last_active_at"`
 }
 
 type UserRatingHistoryResponse struct {
-	History []UserGameEloChange `json:"history"`
+	paginate.PaginatedResponseBase
+	List []UserGameEloChange `json:"list"`
 }
 
 type UserGameEloChange struct {
@@ -29,5 +34,6 @@ type UserGameEloChange struct {
 	GameId     string `json:"game_id"`
 	OpponentId string `json:"opponent_id"`
 	Change     int64  `json:"change"`
+	Result     string `json:"result"`
 	Timestamp  int64  `json:"timestamp"`
 }

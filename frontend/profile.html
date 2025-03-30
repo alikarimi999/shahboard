@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Profile - Chess Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="./assets/css/style.css">
     <link rel="stylesheet" href="./assets/css/profile.css">
     <link rel="stylesheet" href="./assets/css/profile-summary.css">
@@ -15,62 +16,40 @@
         <div id="sidebar-container"></div>
         <div class="main-content">
             <div class="profile-section">
-                <div class="profile-header">
-                    <img src="./assets/images/avatar.png" alt="User Avatar" class="profile-avatar">
-                    <div class="profile-info">
-                        <h2>ali****@gmail.com</h2>
-                        <p>UID: 249449147 <i class="fas fa-copy"></i> <i class="fas fa-eye"></i></p>
-                        <p>Level: 5</p>
-                        <p>Ranking: #1203</p>
-                    </div>
+                <div id="profile-header" class="profile-header">
+                    <!-- <img src="./assets/images/avatar.png" alt="User Avatar" class="profile-avatar"> -->
+                    <!-- <div id="profile-info" class="profile-info"></div> -->
                 </div>
             </div>
             <div class="game-history">
                 <h2>Game History</h2>
-                <table>
+                <table id="game-history-table">
                     <thead>
                         <tr>
                             <th>Opponent</th>
+                            <th>Game</th>
                             <th>Date</th>
                             <th>Result</th>
-                            <th>Elo Change</th>
+                            <th>Change</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>
-                                <span class="username" data-email="opponent1@example.com" data-uid="123456789"
-                                    data-level="4" data-ranking="#1500">Opponent1</span>
-                            </td>
-                            <td>2023-10-01</td>
-                            <td>Win</td>
-                            <td>+10</td>
-                        </tr>
-                        <tr>
-                            <td>Opponent2</td>
-                            <td>2023-10-02</td>
-                            <td>Loss</td>
-                            <td>-15</td>
-                        </tr>
-                        <tr>
-                            <td>Opponent3</td>
-                            <td>2023-10-03</td>
-                            <td>Draw</td>
-                            <td>0</td>
-                        </tr>
+                        <!-- Game history rows will be populated here -->
                     </tbody>
                 </table>
-                <button id="prev-btn" class="default-button" onclick="prevPage()" disabled>Previous</button>
-                <button id="next-btn" class="default-button" onclick="nextPage()">Next</button>
+                <div id="pagination-buttons">
+                    <button id="prev-btn" class="default-button" onclick="fetchGameHistory(getCurrentPage() - 1)"
+                        disabled>Previous</button>
+                    <span id="page-info">Page 1</span>
+                    <button id="next-btn" class="default-button"
+                        onclick="fetchGameHistory(getCurrentPage() + 1)">Next</button>
+                </div>
             </div>
         </div>
     </div>
+
     <script type="module" src="/assets/js/sidebar.js"></script>
-    <script src="./assets/js/profile-summary.js"></script>
+    <script type="module" src="./assets/js/profile.js"></script>
 </body>
 
 </html>
-
-<style>
-
-</style>
