@@ -347,6 +347,15 @@ func (c *redisCache) removeFromGameViewersList(ctx context.Context, userId types
 	return nil
 }
 
+func (c *redisCache) removeGamesViewersLists(ctx context.Context, gamesId []types.ObjectId) error {
+	keys := make([]string, 0, len(gamesId))
+	for _, id := range gamesId {
+		keys = append(keys, fmt.Sprintf("%s:%s", c.gameViewersListKey, id.String()))
+	}
+
+	return c.c.Del(ctx, keys...).Err()
+}
+
 // func (c *redisCache) getGameViewers(ctx context.Context, gameId types.ObjectId) ([]string, error) {
 // 	return c.c.SMembers(ctx, fmt.Sprintf("%s:%s", c.gameViewersListKey, gameId.String())).Result()
 // }

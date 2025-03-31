@@ -28,6 +28,7 @@ type Server struct {
 	cfg *WsConfigs
 
 	sm *sessionsManager
+	em *endedGamesList
 
 	h *sessionsEventsHandler
 
@@ -48,11 +49,13 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 		cfg = defaultConfigs
 	}
 
+	em := newEndedGamesList()
 	server := &Server{
 		cfg:          cfg,
 		cache:        newRedisCache(c, cfg.UserSessionsCap, l),
 		sm:           newSessionsManager(),
-		h:            newSessionsEventsHandler(s, l),
+		em:           em,
+		h:            newSessionsEventsHandler(s, em, l),
 		p:            p,
 		stopCh:       make(chan struct{}),
 		jwtValidator: v,

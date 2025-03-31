@@ -20,6 +20,8 @@ type sessionsEventsHandler struct {
 	gameSub     event.Subscription
 	gameChatSub event.Subscription
 
+	em *endedGamesList
+
 	gmu               sync.RWMutex
 	createdGameEvents map[types.ObjectId]event.Event // map by matchId
 
@@ -43,10 +45,11 @@ type sessionsEventsHandler struct {
 	stopCh         chan struct{}
 }
 
-func newSessionsEventsHandler(s event.Subscriber, l log.Logger) *sessionsEventsHandler {
+func newSessionsEventsHandler(s event.Subscriber, em *endedGamesList, l log.Logger) *sessionsEventsHandler {
 	m := &sessionsEventsHandler{
 		gameSub:       s.Subscribe(event.TopicGame),
 		gameChatSub:   s.Subscribe(event.TopicGameChat),
+		em:            em,
 		directChatSub: s.Subscribe(event.TopicDirectChat),
 
 		gameExpireTime:    defaultMatchAndGameExpireTime,
@@ -107,9 +110,14 @@ func (h *sessionsEventsHandler) startEventListener() {
 					h.createdGameEvents[eve.MatchID] = e
 					h.gmu.Unlock()
 				default:
+
 					gameID, err := types.ParseObjectId(e.GetTopic().Resource())
 					if err != nil {
 						continue
+					}
+
+					if e.GetTopic().Action() == event.ActionEnded {
+						h.em.add(gameID)
 					}
 
 					var gs *gameSubscribers

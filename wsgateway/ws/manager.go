@@ -48,3 +48,41 @@ func (m *sessionsManager) getAll() []*session {
 	}
 	return sessions
 }
+
+type endedGamesList struct {
+	mu   sync.RWMutex
+	list map[types.ObjectId]struct{}
+}
+
+func newEndedGamesList() *endedGamesList {
+	return &endedGamesList{
+		list: make(map[types.ObjectId]struct{}),
+	}
+}
+
+func (l *endedGamesList) add(id types.ObjectId) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.list[id] = struct{}{}
+}
+
+func (l *endedGamesList) getAll() []types.ObjectId {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	list := make([]types.ObjectId, 0, len(l.list))
+	for id := range l.list {
+		list = append(list, id)
+	}
+
+	return list
+}
+
+func (l *endedGamesList) remove(ids []types.ObjectId) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for _, id := range ids {
+		delete(l.list, id)
+	}
+}

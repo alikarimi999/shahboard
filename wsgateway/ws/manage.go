@@ -85,6 +85,17 @@ func (s *Server) manageSessionsState() {
 			}
 
 		case <-cleanCachTicker.C:
+
+			// remove list of viewers of games that ended
+			// it's better to be done in only one instance of wsGateway with a master/slave mechanism!
+			gamesId := s.em.getAll()
+			err := s.cache.removeGamesViewersLists(context.Background(), gamesId)
+			if err != nil {
+				s.l.Error(err.Error())
+			} else {
+				s.em.remove(gamesId)
+			}
+
 			ss := s.sm.getAll()
 			// update sessions timestamp in redis cache, every 1 minute
 			// this should be done in every wsGateway instances
