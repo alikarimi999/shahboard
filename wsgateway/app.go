@@ -9,6 +9,7 @@ import (
 	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/pkg/middleware"
+	wsgrpc "github.com/alikarimi999/shahboard/wsgateway/grpc"
 	"github.com/alikarimi999/shahboard/wsgateway/services/game"
 	"github.com/alikarimi999/shahboard/wsgateway/ws"
 	"github.com/gin-gonic/gin"
@@ -16,9 +17,10 @@ import (
 )
 
 type application struct {
-	server *ws.Server
-	e      *gin.Engine
-	cfg    Config
+	cfg        Config
+	server     *ws.Server
+	e          *gin.Engine
+	grpcServer *wsgrpc.Server
 }
 
 func SetupApplication(cfg Config) (*application, error) {
@@ -59,13 +61,29 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
+	gs, err := wsgrpc.NewServer(cfg.Grpc, server)
+	if err != nil {
+		return nil, err
+	}
+
 	return &application{
-		server: server,
-		e:      e,
-		cfg:    cfg,
+		cfg:        cfg,
+		server:     server,
+		e:          e,
+		grpcServer: gs,
 	}, nil
 }
 
-func (a *application) Start() error {
-	return a.e.Run(fmt.Sprintf(":%s", a.cfg.Http.Port))
+func (a *application) Run() error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- a.grpcServer.Run()
+	}()
+
+	go func() {
+		errCh <- a.e.Run(fmt.Sprintf(":%d", a.cfg.Http.Port))
+	}()
+
+	return <-errCh
 }

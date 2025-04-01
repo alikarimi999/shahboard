@@ -42,16 +42,18 @@ type Game struct {
 	UpdatedAt time.Time
 }
 
-func NewGame(player1 types.ObjectId, player2 types.ObjectId, s GameSettings) *Game {
+func NewGame(u1 types.User, u2 types.User, s GameSettings) *Game {
 
-	p1, p2 := setPlayersId(player1, player2)
+	p1, p2 := setPlayersId(u1, u2)
 	c1, c2 := setColors()
+	p1.Color = c1
+	p2.Color = c2
 	t := time.Now()
 	g := &Game{
 		id:        types.NewObjectId(),
 		status:    GameStatusActive,
-		player1:   types.Player{ID: p1, Color: c1},
-		player2:   types.Player{ID: p2, Color: c2},
+		player1:   p1,
+		player2:   p2,
 		setting:   s,
 		game:      chess.NewGame(chess.UseNotation(defaultNotation)),
 		CreatedAt: t,
@@ -236,11 +238,11 @@ func (g *Game) Decode(data []byte) error {
 	return nil
 }
 
-func setPlayersId(pa, pb types.ObjectId) (p1, p2 types.ObjectId) {
-	if pa < pb {
-		return pa, pb
+func setPlayersId(u1, u2 types.User) (p1, p2 types.Player) {
+	if u1.ID < u2.ID {
+		return types.Player{ID: u1.ID, Score: u1.Score}, types.Player{ID: u2.ID, Score: u2.Score}
 	}
-	return pb, pa
+	return types.Player{ID: u2.ID, Score: u2.Score}, types.Player{ID: u1.ID, Score: u1.Score}
 }
 
 func setColors() (types.Color, types.Color) {

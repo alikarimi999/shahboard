@@ -87,6 +87,10 @@ func (s *session) start() {
 }
 
 func (s *session) consume(e event.Event) {
+	if s.isStopped() {
+		return
+	}
+
 	select {
 	case s.eventCh <- e:
 	default:

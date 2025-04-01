@@ -61,7 +61,21 @@ func (r *Router) getLiveGames(ctx *gin.Context) {
 		return
 	}
 
-	games, err := r.s.GetLiveGames(ctx)
+	games, err := r.s.GetLiveGamesIDs(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, list{
+		List: []interface{}{
+			games,
+		},
+	})
+}
+
+func (r *Router) getLiveGamesData(ctx *gin.Context) {
+	games, err := r.s.GetLiveGamesData(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, err)
 		return

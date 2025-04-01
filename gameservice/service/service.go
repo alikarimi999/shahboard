@@ -23,16 +23,18 @@ type Service struct {
 
 	cache *redisGameCache
 
+	live *liveGamesService
+
 	pub event.Publisher
 	sub event.Subscriber
 
 	l log.Logger
 
 	closeCh chan struct{}
-	wg      sync.WaitGroup
 }
 
-func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub event.Subscriber, l log.Logger) (*Service, error) {
+func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub event.Subscriber,
+	ws WsGateway, l log.Logger) (*Service, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -42,12 +44,14 @@ func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub ev
 
 		games: make(map[types.ObjectId]*entity.Game),
 		cache: newRedisGameCache(cfg.InstanceID, redis, 15*time.Minute, l),
-		pub:   pub,
-		sub:   sub,
-		l:     l,
+
+		pub: pub,
+		sub: sub,
+		l:   l,
 
 		closeCh: make(chan struct{}),
 	}
+	s.live = newLiveGamesService(s.cache, ws, l)
 
 	s.sm = event.NewManager(l, s.handleEvents)
 	s.sm.AddSubscription(s.sub.Subscribe(event.TopicUsersMatchedCreated))

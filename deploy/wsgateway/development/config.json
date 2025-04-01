@@ -10,7 +10,10 @@
         "verbose": true
     },
     "http": {
-        "port": "8083"
+        "port": 8083
+    },
+    "grpc": {
+        "port": 9093
     },
     "jwt_validator": {
         "public_key_path": "./data/jwt/public_key.pem"

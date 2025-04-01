@@ -102,7 +102,6 @@ async function processGameHistory(data) {
             eloChangeCell.textContent = `${game.change > 0 ? '+' : ''}${game.change}`;
             eloChangeCell.classList.add(game.change > 0 ? 'positive' : 'negative');
 
-            opponentProfiles.keys()
             // Check if opponent profile is already cached
             if (opponentProfiles.has(game.opponent_id)) {
                 // Use the cached profile

@@ -7,8 +7,12 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-func (s *Service) GetLiveGames(ctx context.Context) ([]types.ObjectId, error) {
+func (s *Service) GetLiveGamesIDs(ctx context.Context) ([]types.ObjectId, error) {
 	return s.cache.getGamesIDs(ctx)
+}
+
+func (s *Service) GetLiveGamesData(ctx context.Context) ([]*LiveGameData, error) {
+	return s.live.getLiveGames(), nil
 }
 
 func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (types.ObjectId, error) {

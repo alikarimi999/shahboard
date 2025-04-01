@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package wsgateway;
+option go_package = "./wsgatewaypb";
+
+message LiveGamesViewersNumberRequest {}
+
+message LiveGamesViewersNumberResponse {
+    map<string, int64> games_viewers_number = 1;
+}
+
+service WsGatewayService {
+rpc GetLiveGamesViewersNumber(LiveGamesViewersNumberRequest) returns (LiveGamesViewersNumberResponse);
+}

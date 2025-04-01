@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 
-	"github.com/alikarimi999/shahboard/pkg/elo"
 	pb "github.com/alikarimi999/shahboard/proto/rating/ratingpb"
 	"github.com/alikarimi999/shahboard/types"
 	"google.golang.org/grpc"
@@ -19,11 +18,11 @@ func NewRatingService(client *grpc.ClientConn) *RatingService {
 	}
 }
 
-func (s *RatingService) GetUserLevel(id types.ObjectId) (types.Level, error) {
+func (s *RatingService) GetUserScore(id types.ObjectId) (int64, error) {
 	res, err := s.c.GetUserRating(context.Background(), &pb.GetUserRatingRequest{UserId: id.String()})
 	if err != nil {
 		return 0, err
 	}
 
-	return elo.GetPlayerLevel(res.CurrentScore), nil
+	return res.CurrentScore, nil
 }

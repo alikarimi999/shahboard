@@ -7,6 +7,8 @@ import (
 	"github.com/alikarimi999/shahboard/gameservice/delivery/grpc"
 	"github.com/alikarimi999/shahboard/gameservice/delivery/http"
 	game "github.com/alikarimi999/shahboard/gameservice/service"
+	"github.com/alikarimi999/shahboard/gameservice/services"
+	gc "github.com/alikarimi999/shahboard/pkg/grpc"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/redis/go-redis/v9"
 )
@@ -36,7 +38,12 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	gs, err := game.NewGameService(cfg.GameService, r, p, s, l)
+	wc, err := gc.NewClient(cfg.WsGatewayService, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	gs, err := game.NewGameService(cfg.GameService, r, p, s, services.NewService(wc), l)
 	if err != nil {
 		return nil, err
 	}

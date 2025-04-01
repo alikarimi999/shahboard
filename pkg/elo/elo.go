@@ -11,16 +11,16 @@ const (
 	KIntermediate = 24
 	KExpert       = 16
 
-	MinRating  = 1000
-	BaseRating = 1000
+	MinScore  = 1000
+	BaseScore = 1000
 )
 
 func CalculateElo(s1, s2 int64, score float64) int64 {
-	if s1 < BaseRating {
-		s1 = BaseRating
+	if s1 < BaseScore {
+		s1 = BaseScore
 	}
-	if s2 < BaseRating {
-		s2 = BaseRating
+	if s2 < BaseScore {
+		s2 = BaseScore
 	}
 
 	expectedScore := 1 / (1 + math.Pow(10, float64(s2-s1)/400))
@@ -28,8 +28,8 @@ func CalculateElo(s1, s2 int64, score float64) int64 {
 	k := calculateKFactor(s1)
 
 	newRating := float64(s1) + float64(k)*(score-expectedScore)
-	if newRating < float64(MinRating) {
-		return MinRating
+	if newRating < float64(MinScore) {
+		return MinScore
 	}
 	return int64(newRating)
 }

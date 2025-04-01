@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShahBoard - Live Games</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .default-button {
+            background-color: #facc15;
+            color: #1e293b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .default-button:hover {
+            background-color: #eab308;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto p-8 flex flex-col items-center">
+        <header class="text-center mb-6">
+            <h2 class="text-3xl font-bold text-yellow-400">Live Chess Games</h2>
+        </header>
+
+        <div class="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h3 class="text-lg font-bold">Magnus Carlsen vs Hikaru Nakamura</h3>
+                <p class="text-gray-400">Game ID: 54321 | Viewers: 98</p>
+                <p class="text-gray-400">Move 21: Black to move</p>
+                <p class="text-gray-400">Time Control: Blitz 3+2</p>
+                <p class="text-gray-400">Type: Rated</p>
+                <a href="/play.html?gameId=12345" class="default-button mt-2 inline-block">Watch</a>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h3 class="text-lg font-bold">Alireza Firouzja vs Fabiano Caruana</h3>
+                <p class="text-gray-400">Game ID: 54321 | Viewers: 98</p>
+                <p class="text-gray-400">Move 34: White to move</p>
+                <p class="text-gray-400">Time Control: Rapid 10+5</p>
+                <p class="text-gray-400">Type: Casual</p>
+                <a href="/play.html?gameId=67890" class="default-button mt-2 inline-block">Watch</a>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h3 class="text-lg font-bold">Levon Aronian vs Ian Nepomniachtchi</h3>
+                <p class="text-gray-400">Game ID: 54321 | Viewers: 98</p>
+                <p class="text-gray-400">Move 12: Black to move</p>
+                <p class="text-gray-400">Time Control: Classical 30+0</p>
+                <p class="text-gray-400">Type: Rated</p>
+                <a href="/play.html?gameId=54321" class="default-button mt-2 inline-block">Watch</a>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h3 class="text-lg font-bold">Levon Aronian vs Ian Nepomniachtchi</h3>
+                <p class="text-gray-400">Game ID: 54321 | Viewers: 98</p>
+                <p class="text-gray-400">Move 12: Black to move</p>
+                <p class="text-gray-400">Time Control: Classical 30+0</p>
+                <p class="text-gray-400">Type: Rated</p>
+                <a href="/play.html?gameId=54321" class="default-button mt-2 inline-block">Watch</a>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h3 class="text-lg font-bold">Levon Aronian vs Ian Nepomniachtchi</h3>
+                <p class="text-gray-400">Game ID: 54321 | Viewers: 98</p>
+                <p class="text-gray-400">Move 12: Black to move</p>
+                <p class="text-gray-400">Time Control: Classical 30+0</p>
+                <p class="text-gray-400">Type: Rated</p>
+                <a href="/play.html?gameId=54321" class="default-button mt-2 inline-block">Watch</a>
+            </div>
+
+        </div>
+    </div>
+</body>
+
+</html>

@@ -23,7 +23,7 @@ func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
 	}
 
 	// create a new game
-	game := entity.NewGame(d.User1.ID, d.User2.ID, s.cfg.DefaultGameSettings)
+	game := entity.NewGame(d.User1, d.User2, s.cfg.DefaultGameSettings)
 
 	// add the game to the cache
 	if ok, err := s.cache.addGame(context.Background(), game); err != nil {

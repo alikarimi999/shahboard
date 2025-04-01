@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
+	"github.com/alikarimi999/shahboard/pkg/elo"
 	"github.com/alikarimi999/shahboard/types"
 )
 
@@ -54,7 +55,7 @@ func (e *engine) stop() {
 	e.wg.Wait()
 }
 
-func (e *engine) addToQueue(pId types.ObjectId, l types.Level) (*matchRequest, bool) {
+func (e *engine) addToQueue(pId types.ObjectId, s int64) (*matchRequest, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -66,7 +67,8 @@ func (e *engine) addToQueue(pId types.ObjectId, l types.Level) (*matchRequest, b
 		}
 	}
 
-	r := newMatchRequest(pId, l)
+	l := elo.GetPlayerLevel(s)
+	r := newMatchRequest(pId, s, l)
 	e.queue[l] = append(e.queue[l], r)
 
 	return r, true
@@ -102,8 +104,8 @@ func (e *engine) findMatches() []*event.EventUsersMatchCreated {
 			u2 := currentQueue[1]
 			m := &event.EventUsersMatchCreated{
 				ID:        types.NewObjectId(),
-				User1:     types.User{ID: u1.userId, Level: u1.level},
-				User2:     types.User{ID: u2.userId, Level: u2.level},
+				User1:     types.User{ID: u1.userId, Score: u1.score},
+				User2:     types.User{ID: u2.userId, Score: u2.score},
 				Timestamp: t,
 			}
 
@@ -132,13 +134,15 @@ func (e *engine) findMatches() []*event.EventUsersMatchCreated {
 
 type matchRequest struct {
 	userId types.ObjectId
+	score  int64
 	level  types.Level
 	ch     chan *event.EventUsersMatchCreated
 }
 
-func newMatchRequest(pId types.ObjectId, l types.Level) *matchRequest {
+func newMatchRequest(pId types.ObjectId, s int64, l types.Level) *matchRequest {
 	return &matchRequest{
 		userId: pId,
+		score:  s,
 		level:  l,
 		ch:     make(chan *event.EventUsersMatchCreated, 1),
 	}

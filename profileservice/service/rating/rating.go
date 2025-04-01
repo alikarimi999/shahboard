@@ -60,7 +60,7 @@ func (s *Service) GetUserRating(ctx context.Context, userId types.ObjectId) (*en
 	if r == nil {
 		r = &entity.Rating{
 			UserId:       userId,
-			CurrentScore: elo.BaseRating,
+			CurrentScore: elo.BaseScore,
 		}
 	}
 
@@ -99,7 +99,7 @@ func (s *Service) handleGameEnded(e *event.EventGameEnded) {
 	if r1 == nil {
 		r1 = &entity.Rating{
 			UserId:       e.Player1.ID,
-			CurrentScore: elo.BaseRating,
+			CurrentScore: elo.BaseScore,
 		}
 	}
 
@@ -113,7 +113,7 @@ func (s *Service) handleGameEnded(e *event.EventGameEnded) {
 	if r2 == nil {
 		r2 = &entity.Rating{
 			UserId:       e.Player2.ID,
-			CurrentScore: elo.BaseRating,
+			CurrentScore: elo.BaseScore,
 		}
 	}
 

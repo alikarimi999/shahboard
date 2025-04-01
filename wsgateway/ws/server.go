@@ -255,3 +255,12 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 		// handle data message
 	}
 }
+
+func (s *Server) GetLiveGamesViewersNumber(ctx context.Context) (map[types.ObjectId]int64, error) {
+	games, err := s.cache.countAllGamesViewers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return games, nil
+}

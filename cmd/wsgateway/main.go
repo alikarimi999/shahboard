@@ -19,7 +19,7 @@ func main() {
 		panic(err)
 	}
 
-	app.Start()
+	app.Run()
 }
 
 func loadConfig(file string) (wsgateway.Config, error) {

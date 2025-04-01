@@ -394,6 +394,31 @@ func (c *redisCache) getAllGamesViewersList(ctx context.Context) (map[types.Obje
 	return res, nil
 }
 
+func (c *redisCache) countAllGamesViewers(ctx context.Context) (map[types.ObjectId]int64, error) {
+	keys, err := c.c.Keys(ctx, fmt.Sprintf("%s:*", c.gameViewersListKey)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get keys: %v", err)
+	}
+
+	res := make(map[types.ObjectId]int64)
+	for _, key := range keys {
+		i, err := c.c.SCard(ctx, key).Result()
+		if err != nil {
+			c.l.Error(fmt.Sprintf("failed to get the size of '%s': %v", key, err))
+			continue
+		}
+
+		gameId, err := types.ParseObjectId(strings.TrimPrefix(key, c.gameViewersListKey+":"))
+		if err != nil {
+			continue
+		}
+
+		res[gameId] = i
+	}
+
+	return res, nil
+}
+
 func extractGameID(jsonStr string) int64 {
 	var sic sessionInCache
 	if err := json.Unmarshal([]byte(jsonStr), &sic); err != nil {

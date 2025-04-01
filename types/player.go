@@ -16,6 +16,6 @@ func (c Color) String() string {
 
 type Player struct {
 	ID    ObjectId `json:"id"`
-	Level Level    `json:"level"`
+	Score int64    `json:"score"`
 	Color Color    `json:"color"`
 }

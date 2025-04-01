@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
+	"github.com/alikarimi999/shahboard/pkg/elo"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -60,18 +61,18 @@ func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*
 		return nil, fmt.Errorf("user is already in a game")
 	}
 
-	level, err := s.rating.GetUserLevel(userId)
+	score, err := s.rating.GetUserScore(userId)
 	if err != nil {
 		s.l.Error(fmt.Sprintf("failed to get user '%s' level: %s", userId, err.Error()))
-		level = types.LevelPawn
+		score = elo.BaseScore
 	}
 
-	req, ok := s.e.addToQueue(userId, level)
+	req, ok := s.e.addToQueue(userId, score)
 	if !ok {
 		return nil, fmt.Errorf("user '%s' already has a match request", userId)
 	}
 
-	s.l.Debug(fmt.Sprintf("New match request for user '%s' with level %d", userId, level))
+	s.l.Debug(fmt.Sprintf("New match request for user '%s' with level %d", userId, score))
 	select {
 	case <-ctx.Done():
 		s.e.cancelRequest(req)

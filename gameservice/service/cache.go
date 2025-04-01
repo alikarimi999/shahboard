@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	keyPlayerGamePrefix = "player_game:"
-	keyGamePrefix       = "game:"
+	keyPlayerGamePrefix  = "player_game:"
+	keyGamePrefix        = "game:"
+	keyLiveGamesDataHash = "live_games_data"
 )
 
 type redisGameCache struct {
@@ -55,6 +56,7 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 	local gameID = ARGV[1]
 	local keyGamePrefix = KEYS[2]
 	local keyPlayerGamePrefix = KEYS[3]
+	local keyLiveGamesDataHash = KEYS[4]
 	local gameKey = keyGamePrefix .. gameID
 	local playerGameKey1 = keyPlayerGamePrefix .. ARGV[2]
 	local playerGameKey2 = keyPlayerGamePrefix .. ARGV[3]
@@ -78,6 +80,9 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 	redis.call('SET', playerGameKey1, gameID)
 	redis.call('SET', playerGameKey2, gameID)
 
+	-- Add the game to the live games hash
+    redis.call('HSET', keyLiveGamesDataHash, gameID, ARGV[6])
+
 	return 1
 	`
 
@@ -85,18 +90,27 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 		Status: g.Status(),
 		Game:   g.Encode(),
 	}
-	bGame := cGame.encode()
+
+	dGame := LiveGameData{
+		GameID:    g.ID(),
+		Player1:   g.Player1(),
+		Player2:   g.Player2(),
+		StartedAt: time.Now(),
+	}
+
 	// Execute the Lua script with expiration time as an argument
 	return c.rc.Eval(ctx, script, []string{
 		c.serviceID,
 		keyGamePrefix,
 		keyPlayerGamePrefix,
+		keyLiveGamesDataHash,
 	}, []interface{}{
 		g.ID().String(),
 		g.Player1().ID.String(),
 		g.Player2().ID.String(),
 		0,
-		bGame,
+		cGame.encode(),
+		dGame.encode(),
 	}).Bool()
 }
 
@@ -132,6 +146,9 @@ func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, g *entity.
 	// remove the game from the service's game list
 	tx.LRem(ctx, fmt.Sprintf("%s:games", c.serviceID), 0, g.ID().String())
 
+	// remove the game from the live games hash
+	tx.HDel(ctx, keyLiveGamesDataHash, g.ID().String())
+
 	// set the game data with a deactivation TTL
 	cGame := &inCacheGame{
 		Status: g.Status(),
@@ -142,6 +159,25 @@ func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, g *entity.
 
 	_, err := tx.Exec(ctx)
 	return err
+}
+
+func (c *redisGameCache) getLiveGamesData(ctx context.Context) ([]*LiveGameData, error) {
+	m, err := c.rc.HGetAll(ctx, keyLiveGamesDataHash).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	list := []*LiveGameData{}
+	for _, v := range m {
+		d := &LiveGameData{}
+		if err := json.Unmarshal([]byte(v), d); err != nil {
+			c.l.Error(fmt.Sprintf("failed to unmarshal game data: %s", err.Error()))
+			continue
+		}
+		list = append(list, d)
+	}
+
+	return list, nil
 }
 
 func (c *redisGameCache) getGamesIDs(ctx context.Context) ([]types.ObjectId, error) {
