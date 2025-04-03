@@ -353,6 +353,24 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMove
 	errMsg = "not allowed to move"
 }
 
+func (s *session) handlePlayerResignRequest(msgId types.ObjectId, req dataGamePlayerResignRequest) {
+	var errMsg string
+	defer func() {
+		if errMsg != "" {
+			s.sendErr(msgId, errMsg)
+		}
+	}()
+
+	if s.userId == req.PlayerID && s.playGameId == req.GameID {
+		if err := s.p.Publish(req.EventGamePlayerResigned); err != nil {
+			s.l.Error(fmt.Sprintf("failed to publish resign event: %v", err))
+		}
+		return
+	}
+
+	errMsg = "not allowed to resign"
+}
+
 func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
 	var errMsg string
 	defer func() {

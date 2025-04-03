@@ -216,7 +216,6 @@
           flex: 3;
           background: #212020;
           overflow-y: auto;
-          margin-top: 10px;
           padding: 10px;
           min-height: 120px;
           width: 100%;
@@ -353,6 +352,30 @@
               margin-left: 10px;
               /* Reduce spacing */
           }
+      }
+
+      .resign-draw-container {
+          display: flex;
+          border-top: 1px solid #2a2a2a;
+          justify-content: space-around;
+          padding-left: 10px;
+          padding-right: 10px
+      }
+
+      .resign-draw-button {
+          text-align: center;
+          color: #ddd;
+          padding: 4px 7px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+          border-radius: 5px;
+          border: 1px solid transparent;
+      }
+
+      .resign-draw-button:hover {
+          background-color: #333;
+          border-color: #555;
       }
 
 

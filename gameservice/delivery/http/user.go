@@ -8,6 +8,8 @@ func (r *Router) setupUserRoutes() {
 		g.GET("/live/data", r.getLiveGamesData)
 		g.GET("/live/user/:id", r.getLiveGameByUserId)
 
+		// The service isn't statless and this endpoint can't be used in a multi instance setup.
+		g.GET("/live/resign/:gameId", r.resignByPlayer)
 		// g.POST("/fen", r.getGamesFen)
 	}
 }

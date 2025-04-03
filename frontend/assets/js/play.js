@@ -19,7 +19,7 @@ connectWebSocket('http://localhost:8083/ws').then(connection => {
     currentGame.ws.registerMessageHandler("viewers_list", handleViewersList);
     currentGame.ws.registerMessageHandler("err", handleError);
 
-    const game = initializeBoard(true);
+    initializeBoard(true);
 
 }).catch(error => {
     console.error('Connection failed:', error);

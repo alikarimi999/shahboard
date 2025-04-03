@@ -38,6 +38,8 @@ type Game struct {
 	lock sync.RWMutex
 	game *chess.Game
 
+	do *drawOffer
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -85,26 +87,30 @@ func (g *Game) Player2() types.Player {
 	return g.player2
 }
 
-func (g *Game) Lock() {
-	g.lock.Lock()
-}
-func (g *Game) Unlock() {
-	g.lock.Unlock()
+func (g *Game) IsPlayer(player types.ObjectId) bool {
+	return g.player1.ID == player || g.player2.ID == player
 }
 
-func (g *Game) Move(m string, index int) error {
+func (g *Game) Move(playerId types.ObjectId, move string, index int) error {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	if g.turn().ID != playerId {
+		return fmt.Errorf("it's not your turn")
+	}
+
 	if (index - 1) != len(g.game.Moves()) {
 		return fmt.Errorf("invalid move index")
 	}
 
-	if err := g.game.MoveStr(m); err != nil {
+	if err := g.game.MoveStr(move); err != nil {
 		return err
 	}
 	g.UpdatedAt = time.Now()
 	return nil
 }
 
-func (g *Game) Turn() types.Player {
+func (g *Game) turn() types.Player {
 	if g.game.Position().Turn() == chess.White {
 		return g.white()
 	}
@@ -117,6 +123,98 @@ func (g *Game) PGN() string {
 
 func (g *Game) FEN() string {
 	return g.game.FEN()
+}
+
+// TODO: implement some rules and limitations for sending draw offer by players
+func (g *Game) OfferDraw(offerer types.ObjectId) bool {
+	if !g.IsPlayer(offerer) {
+		return false
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// player can't offer draw if it's not his turn
+	if g.turn().ID != offerer {
+		return false
+	}
+
+	// the offer should not proccess if another offer is already in progress
+	if g.do != nil {
+		return false
+	}
+
+	g.do = &drawOffer{
+		offerer:   offerer,
+		method:    chess.DrawOffer,
+		timestamp: time.Now(),
+	}
+
+	return true
+}
+
+func (g *Game) AcceptDraw(acceptor types.ObjectId) bool {
+	if !g.IsPlayer(acceptor) {
+		return false
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	if g.do == nil {
+		return false
+	}
+
+	if acceptor == g.do.offerer {
+		return false
+	}
+
+	if err := g.game.Draw(chess.DrawOffer); err != nil {
+		return false
+	}
+
+	g.do.accepted = true
+
+	return true
+}
+
+func (g *Game) RejectDraw(rejector types.ObjectId) bool {
+	if !g.IsPlayer(rejector) {
+		return false
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if g.do == nil {
+		return false
+	}
+
+	if rejector == g.do.offerer {
+		return false
+	}
+
+	g.do = nil
+	return true
+}
+
+// only accept ThreefoldRepetition and FiftyMoveRule draw methods
+func (g *Game) ClaimDraw(playerId types.ObjectId, method chess.Method) bool {
+	if method != chess.ThreefoldRepetition && method != chess.FiftyMoveRule {
+		return false
+	}
+
+	if !g.IsPlayer(playerId) {
+		return false
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	if err := g.game.Draw(method); err != nil {
+		return false
+	}
+
+	return true
 }
 
 func (g *Game) white() types.Player {
@@ -145,6 +243,7 @@ func (g *Game) ValidMoves() []string {
 	return moves
 }
 
+// return false if player is not in game
 func (g *Game) Resign(player types.ObjectId) bool {
 	return g.resign(player, EndDescriptionPlayerResigned)
 }
@@ -260,4 +359,11 @@ func colorToChessColor(c types.Color) chess.Color {
 		return chess.White
 	}
 	return chess.Black
+}
+
+type drawOffer struct {
+	offerer   types.ObjectId
+	method    chess.Method
+	accepted  bool
+	timestamp time.Time
 }

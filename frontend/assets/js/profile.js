@@ -1,6 +1,7 @@
 import { showProfileSummary } from './profile-summary.js';
 import { getUserProfile, getUserRating } from './user_info.js';
 import { showErrorMessage } from './error.js';
+import { user } from './user.js';
 
 const opponentProfiles = new Map();
 
@@ -61,7 +62,15 @@ async function fetchGameHistory(userId, page) {
     try {
         if (page < 1) return;
 
-        const response = await fetch(`http://localhost:8085/rating/history/${userId}?page=${page}&limit=${pageSize}`);
+        const response = await fetch(`http://localhost:8085/rating/history/${userId}?page=${page}&limit=${pageSize}`,
+            {
+                method: 'GET',
+                headers: {
+                    "Authorization": `Bearer ${user.jwt_token}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
 
         if (!response.ok) {
             throw new Error('Network response was not ok');

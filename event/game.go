@@ -4,17 +4,34 @@ import (
 	"encoding/json"
 
 	"github.com/alikarimi999/shahboard/types"
+	"github.com/notnil/chess"
+)
+
+const (
+	ActionGamePlayerMoved              Action = "playerMoved"
+	ActionGameMoveApprove              Action = "moveApproved"
+	ActionGamePlayerClaimDraw          Action = "claimDraw"
+	ActionGamePlayerResponsedDrawOffer Action = "playerResponsedDrawOffer"
+	ActionGamePlayerClaimDrawApproved  Action = "claimDrawApproved"
+	ActionGamePlayerResigned           Action = "playerResigned"
+	ActionGamePlayerLeft               Action = "playerLeft"
+	ActionGamePlayerConnectionUpdated  Action = "playerConnectionUpdated"
+	ActionGamePlayerSelectSquare       Action = "selectSquare"
 )
 
 var (
-	TopicGame                        = NewTopic(DomainGame, ActionAny)
-	TopicGameCreated                 = NewTopic(DomainGame, ActionCreated)
-	TopicGamePlayerMoved             = NewTopic(DomainGame, ActionGamePlayerMoved)
-	TopicGameMoveApproved            = NewTopic(DomainGame, ActionGameMoveApprove)
-	TopicGamePlayerConnectionUpdated = NewTopic(DomainGame, ActionGamePlayerConnectionUpdated)
-	TopicGameEnded                   = NewTopic(DomainGame, ActionEnded)
-	TopicGamePlayerLeft              = NewTopic(DomainGame, ActionGamePlayerLeft)
-	TopicGamePlayerSelectSquare      = NewTopic(DomainGame, ActionGamePlayerSelectSquare)
+	TopicGame                         = NewTopic(DomainGame, ActionAny)
+	TopicGameCreated                  = NewTopic(DomainGame, ActionCreated)
+	TopicGamePlayerMoved              = NewTopic(DomainGame, ActionGamePlayerMoved)
+	TopicGameMoveApproved             = NewTopic(DomainGame, ActionGameMoveApprove)
+	TopicGamePlayerConnectionUpdated  = NewTopic(DomainGame, ActionGamePlayerConnectionUpdated)
+	TopicGameEnded                    = NewTopic(DomainGame, ActionEnded)
+	TopicGamePlayerClaimDraw          = NewTopic(DomainGame, ActionGamePlayerClaimDraw)
+	TopicGamePlayerResponsedDrawOffer = NewTopic(DomainGame, ActionGamePlayerResponsedDrawOffer)
+	TopicGamePlayerClaimDrawApproved  = NewTopic(DomainGame, ActionGamePlayerClaimDrawApproved)
+	TopicGamePlayerResigned           = NewTopic(DomainGame, ActionGamePlayerResigned)
+	TopicGamePlayerLeft               = NewTopic(DomainGame, ActionGamePlayerLeft)
+	TopicGamePlayerSelectSquare       = NewTopic(DomainGame, ActionGamePlayerSelectSquare)
 )
 
 type EventGameCreated struct {
@@ -163,6 +180,122 @@ func (e EventGameEnded) TimeStamp() int64 {
 }
 
 func (e EventGameEnded) Encode() []byte {
+	b, _ := json.Marshal(e)
+	return b
+}
+
+type EventGamePlayerClaimDraw struct {
+	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
+	PlayerID  types.ObjectId `json:"player_id"`
+	Method    chess.Method   `json:"method"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+func (e EventGamePlayerClaimDraw) GetResource() string {
+	return e.GameID.String()
+}
+
+func (e EventGamePlayerClaimDraw) GetTopic() Topic {
+	return TopicGamePlayerClaimDraw.SetResource(e.GetResource())
+}
+func (e EventGamePlayerClaimDraw) GetAction() Action {
+	return ActionGamePlayerClaimDraw
+}
+
+func (e EventGamePlayerClaimDraw) TimeStamp() int64 {
+	return e.Timestamp
+}
+
+func (e EventGamePlayerClaimDraw) Encode() []byte {
+	b, _ := json.Marshal(e)
+	return b
+}
+
+type EventGamePlayerResponsedDrawOffer struct {
+	ID        types.ObjectId `json:"id"`
+	ClaimID   types.ObjectId `json:"claim_id"`
+	GameID    types.ObjectId `json:"game_id"`
+	PlayerID  types.ObjectId `json:"player_id"`
+	Accept    bool           `json:"accept"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+func (e EventGamePlayerResponsedDrawOffer) GetResource() string {
+	return e.GameID.String()
+}
+
+func (e EventGamePlayerResponsedDrawOffer) GetTopic() Topic {
+	return TopicGamePlayerResponsedDrawOffer.SetResource(e.GetResource())
+}
+
+func (e EventGamePlayerResponsedDrawOffer) GetAction() Action {
+	return ActionGamePlayerResponsedDrawOffer
+}
+
+func (e EventGamePlayerResponsedDrawOffer) TimeStamp() int64 {
+	return e.Timestamp
+}
+
+func (e EventGamePlayerResponsedDrawOffer) Encode() []byte {
+	b, _ := json.Marshal(e)
+	return b
+}
+
+type EventGamePlayerClaimDrawApproved struct {
+	ID        types.ObjectId `json:"id"`
+	ClaimID   types.ObjectId `json:"claim_id"`
+	GameID    types.ObjectId `json:"game_id"`
+	PlayerID  types.ObjectId `json:"player_id"`
+	Method    chess.Method   `json:"method"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+func (e EventGamePlayerClaimDrawApproved) GetResource() string {
+	return e.GameID.String()
+}
+
+func (e EventGamePlayerClaimDrawApproved) GetTopic() Topic {
+	return TopicGamePlayerClaimDrawApproved.SetResource(e.GetResource())
+}
+
+func (e EventGamePlayerClaimDrawApproved) GetAction() Action {
+	return ActionGamePlayerClaimDraw
+}
+
+func (e EventGamePlayerClaimDrawApproved) TimeStamp() int64 {
+	return e.Timestamp
+}
+
+func (e EventGamePlayerClaimDrawApproved) Encode() []byte {
+	b, _ := json.Marshal(e)
+	return b
+}
+
+type EventGamePlayerResigned struct {
+	ID        types.ObjectId `json:"id"`
+	GameID    types.ObjectId `json:"game_id"`
+	PlayerID  types.ObjectId `json:"player_id"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+func (e EventGamePlayerResigned) GetResource() string {
+	return e.GameID.String()
+}
+
+func (e EventGamePlayerResigned) GetTopic() Topic {
+	return TopicGamePlayerResigned.SetResource(e.GetResource())
+}
+
+func (e EventGamePlayerResigned) GetAction() Action {
+	return ActionGamePlayerLeft
+}
+
+func (e EventGamePlayerResigned) TimeStamp() int64 {
+	return e.Timestamp
+}
+
+func (e EventGamePlayerResigned) Encode() []byte {
 	b, _ := json.Marshal(e)
 	return b
 }

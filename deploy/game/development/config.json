@@ -28,5 +28,8 @@
     },
     "wsgateway_service_grpc": {
         "target": "localhost:9093"
+    },
+    "jwt_validator": {
+        "public_key_path": "./data/jwt/public_key.pem"
     }
 }

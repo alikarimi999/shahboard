@@ -7,6 +7,7 @@ export async function getUserLiveGameId() {
         const response = await fetch(apiUrl, {
             method: 'GET',
             headers: {
+                "Authorization": `Bearer ${user.jwt_token}`,
                 'Content-Type': 'application/json',
             },
         });

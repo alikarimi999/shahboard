@@ -112,3 +112,16 @@ func (m dataViwersListResponse) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
+
+type dataGamePlayerResignRequest struct {
+	event.EventGamePlayerResigned
+}
+
+func (m dataGamePlayerResignRequest) Type() MsgType {
+	return MsgTypePlayerResigned
+}
+
+func (m dataGamePlayerResignRequest) Encode() []byte {
+	b, _ := json.Marshal(m)
+	return b
+}

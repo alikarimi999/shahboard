@@ -19,7 +19,6 @@
     <link rel="stylesheet" href="./assets/css/profile.css">
     <link rel="stylesheet" href="./assets/css/profile-summary.css">
 
-
 </head>
 
 <body>
@@ -73,6 +72,10 @@
             </div>
 
             <div class="moves"></div>
+            <div class="resign-draw-container hidden">
+                <div class="resign-draw-button" id="resign-button">Resign</div>
+                <div class="resign-draw-button" id="draw-button">Draw</div>
+            </div>
             <div class="chat">
                 <div class="chat-messages-container messages"></div>
                 <div class="chat-input-container">
@@ -90,10 +93,33 @@
         import { currentGame } from "./assets/js/gameState.js";
         import { sendGameChatMsg } from './assets/js/chat.js';
         import { showUserProfile } from "./assets/js/profile-summary.js";
+        import { getUserProfile } from './assets/js/user_info.js';
 
         const moveSound = new Audio('./assets/sounds/move2.mp3');
         const playerNameBoard = document.querySelector("#player-name");
         const opponentNameBoard = document.querySelector("#opponent-name");
+
+        document.getElementById("resign-button").addEventListener("click", () => {
+            const loadingSpinner = document.getElementById("loading-spinner");
+            loadingSpinner.classList.add("active");
+
+            const data = {
+                game_id: currentGame.gameId,
+                player_id: currentGame.player.id,
+                timestamp: Date.now()
+            }
+
+            const jsonData = JSON.stringify(data);
+            const base64Data = btoa(jsonData);
+
+
+            const msg = {
+                type: "player_resigned",
+                data: base64Data
+            };
+
+            currentGame.ws.sendMessage(msg);
+        })
 
         document.getElementById("find-match-btn").addEventListener("click", async () => {
             const findMatchBtn = document.getElementById("find-match-btn");
@@ -127,54 +153,77 @@
         });
 
         document.addEventListener("game_created", function () {
-            moveSound.play();
+            // Fetch player and opponent profiles
+            Promise.all([
+                getUserProfile(currentGame.player.id).then(profile => {
+                    currentGame.player.profile = profile;
+                    currentGame.player.email = profile.email;
+                    currentGame.player.name = profile.name;
+                    currentGame.player.avatar_url = profile.avatar_url
+                }),
+                getUserProfile(currentGame.opponent.id).then(profile => {
+                    currentGame.opponent.profile = profile;
+                    currentGame.opponent.email = profile.email;
+                    currentGame.opponent.name = profile.name;
+                    currentGame.opponent.avatar_url = profile.avatar_url
+                })
+            ]).then(() => {
 
-            currentGame.player.connected = true;
-            currentGame.opponent.connected = true;
+                moveSound.play();
 
-            document.getElementById("find-match-btn").classList.add("hidden");
-            document.querySelector(".player-info").classList.remove("hidden");
-            document.querySelector(".opponent-info").classList.remove("hidden");
-            document.querySelector(".game-info").classList.remove("hidden");
+                currentGame.player.connected = true;
+                currentGame.opponent.connected = true;
 
-            // Update player names and avatars
-            document.getElementById("player-name-animation").textContent = `${currentGame.player.profile.name} (${currentGame.player.profile.score})`;
-            document.getElementById("opponent-name-animation").textContent = `${currentGame.opponent.profile.name} (${currentGame.opponent.profile.score})`;
+                document.getElementById("find-match-btn").classList.add("hidden");
+                document.querySelector(".player-info").classList.remove("hidden");
+                document.querySelector(".opponent-info").classList.remove("hidden");
+                document.querySelector(".game-info").classList.remove("hidden");
+                document.querySelector(".resign-draw-container").classList.remove("hidden");
 
-            const playerAvatarUrl = currentGame.player.avatar_url || "./assets/img/player1.webp";
-            const opponentAvatarUrl = currentGame.opponent.avatar_url || "./assets/img/player2.webp";
+                // Update player names and avatars
+                document.getElementById("player-name-animation").textContent = `${currentGame.player.profile.name} (${currentGame.player.profile.score})`;
+                document.getElementById("opponent-name-animation").textContent = `${currentGame.opponent.profile.name} (${currentGame.opponent.profile.score})`;
+                console.log(currentGame.player.profile.name);
+                console.log(currentGame.opponent.profile.name);
+                const playerAvatarUrl = currentGame.player.avatar_url || "./assets/img/player1.webp";
+                const opponentAvatarUrl = currentGame.opponent.avatar_url || "./assets/img/player2.webp";
 
-            document.getElementById("player-avatar-animation").src = playerAvatarUrl;
-            document.getElementById("opponent-avatar-animation").src = opponentAvatarUrl;
+                document.getElementById("player-avatar-animation").src = playerAvatarUrl;
+                document.getElementById("opponent-avatar-animation").src = opponentAvatarUrl;
 
-            // Set player avatars
-            document.getElementById("player-avatar-board").src = playerAvatarUrl;
-            document.getElementById("opponent-avatar-board").src = opponentAvatarUrl;
+                // Set player avatars
+                document.getElementById("player-avatar-board").src = playerAvatarUrl;
+                document.getElementById("opponent-avatar-board").src = opponentAvatarUrl;
 
-            showUserProfile(currentGame.player.id, currentGame.player.profile, playerNameBoard, true);
-            showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, true);
+                showUserProfile(currentGame.player.id, currentGame.player.profile, playerNameBoard, true);
+                showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, true);
 
-            // Show animation
-            const animationOverlay = document.getElementById("game-start-animation");
-            animationOverlay.style.opacity = "1";
-            animationOverlay.style.pointerEvents = "auto";
+                // Show animation
+                const animationOverlay = document.getElementById("game-start-animation");
+                animationOverlay.style.opacity = "1";
+                animationOverlay.style.pointerEvents = "auto";
 
-            // add game id 
-            document.getElementById("gameId").textContent = `Game: ${currentGame.gameId}`;
+                // add game id 
+                document.getElementById("gameId").textContent = `Game: ${currentGame.gameId}`;
 
-            // After 3 seconds, fade out animation and proceed with UI updates
-            setTimeout(() => {
-                animationOverlay.style.animation = "fadeOut 1s forwards";
-
-                // Hide elements and clear move/chat after fade-out
+                // After 3 seconds, fade out animation and proceed with UI updates
                 setTimeout(() => {
-                    animationOverlay.style.opacity = "0";
-                    animationOverlay.style.pointerEvents = "none";
-                    animationOverlay.style.animation = ""; // Reset animation
-                    document.querySelector(".messages").innerHTML = "";
+                    animationOverlay.style.animation = "fadeOut 1s forwards";
 
-                }, 100);
-            }, 3000);
+                    // Hide elements and clear move/chat after fade-out
+                    setTimeout(() => {
+                        animationOverlay.style.opacity = "0";
+                        animationOverlay.style.pointerEvents = "none";
+                        animationOverlay.style.animation = ""; // Reset animation
+                        document.querySelector(".messages").innerHTML = "";
+
+                    }, 100);
+                }, 3000);
+            }).catch(() => {
+                showErrorMessage("Failed to load player profiles.");
+                resolve();
+            });
+
         });
 
         document.addEventListener("opponent_disconnected", function () {
@@ -457,6 +506,9 @@
         }
 
         document.addEventListener("game_ended", function (event) {
+            const loadingSpinner = document.getElementById("loading-spinner");
+            loadingSpinner.classList.remove("active");
+
             const { gameId, result, desc } = event.detail;
             if (result === "win") {
                 triggerWin(desc);
@@ -469,6 +521,8 @@
             document.querySelector(".player-info").classList.add("hidden");
             document.querySelector(".opponent-info").classList.add("hidden");
             document.getElementById("find-match-btn").classList.remove("hidden");
+            document.querySelector(".resign-draw-container").classList.add("hidden");
+            document.querySelector(".game-info").classList.add("hidden");
 
             // clear chat box
             const chatContainer = document.querySelector(".chat-input-container");

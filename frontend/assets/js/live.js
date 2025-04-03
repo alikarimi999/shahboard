@@ -1,11 +1,21 @@
 import { getUserProfile } from "./user_info.js";
 import { showProfileSummary } from "./profile-summary.js";
+import { user } from "./user.js";
+
 const profileCache = new Map();
 
 
 async function fetchLiveGamesData() {
     try {
-        const response = await fetch('http://localhost:8081/games/live/data'); // Replace with actual API endpoint
+        const response = await fetch('http://localhost:8081/games/live/data',
+            {
+                method: 'GET',
+                headers: {
+                    "Authorization": `Bearer ${user.jwt_token}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        ); // Replace with actual API endpoint
         const data = await response.json();
 
         if (Array.isArray(data.list) && Array.isArray(data.list[0])) {

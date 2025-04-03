@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 
+	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/gin-gonic/gin"
 )
@@ -103,6 +104,29 @@ func (r *Router) getLiveGameByUserId(ctx *gin.Context) {
 	}
 
 	ctx.JSON(200, GetLiveGameIdByUserIdRequest{GameId: res})
+}
+
+func (r *Router) resignByPlayer(ctx *gin.Context) {
+	gameId := ctx.Param("gameId")
+	gid, err := types.ParseObjectId(gameId)
+	if err != nil {
+		ctx.JSON(400, err)
+		return
+	}
+
+	userID, ok := middleware.ExtractUser(ctx)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	err = r.s.ResingByPlayer(ctx, gid, userID.ID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, err)
+		return
+	}
+
+	ctx.JSON(200, "ok")
 }
 
 // func (r *Router) getGamesFen(ctx *gin.Context) {

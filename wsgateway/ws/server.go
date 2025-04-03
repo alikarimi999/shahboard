@@ -65,8 +65,12 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 	go server.manageSessionsState()
 
 	e.GET("/ws", middleware.ParseQueryToken(v), func(ctx *gin.Context) {
-		u, _ := ctx.Get("user")
-		user := u.(types.User)
+		user, ok := middleware.ExtractUser(ctx)
+		if !ok {
+			ctx.JSON(400, gin.H{"error": "failed to parse token"})
+			ctx.Abort()
+			return
+		}
 
 		conn, er := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 		if er != nil {
@@ -242,6 +246,14 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 		}
 
 		sess.handleMoveRequest(msg.ID, d)
+	case MsgTypePlayerResigned:
+		var d dataGamePlayerResignRequest
+		if err := json.Unmarshal(msg.Data, &d); err != nil {
+			sess.sendErr(msg.ID, "invalid data")
+			return
+		}
+
+		sess.handlePlayerResignRequest(msg.ID, d)
 	case MsgTypeChatMsgSend:
 		var d dataGameChatMsgSend
 		if err := json.Unmarshal(msg.Data, &d); err != nil {

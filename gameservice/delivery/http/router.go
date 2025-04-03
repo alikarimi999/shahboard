@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	game "github.com/alikarimi999/shahboard/gameservice/service"
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -16,17 +17,19 @@ type Router struct {
 	cfg Config
 	gin *gin.Engine
 	s   *game.Service
+	v   *jwt.Validator
 }
 
-func NewRouter(cfg Config, s *game.Service) (*Router, error) {
+func NewRouter(cfg Config, s *game.Service, v *jwt.Validator) (*Router, error) {
 	// gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
-	engine.Use(middleware.Cors())
+	engine.Use(middleware.Cors(), middleware.ParsUserHeader(v))
 
 	r := &Router{
 		cfg: cfg,
 		gin: engine,
 		s:   s,
+		v:   v,
 	}
 
 	return r, r.setup()

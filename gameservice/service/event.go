@@ -8,6 +8,7 @@ import (
 	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/gameservice/entity"
 	"github.com/alikarimi999/shahboard/types"
+	"github.com/notnil/chess"
 )
 
 // handleEventUsersMatched handles the event of two players being matched
@@ -65,19 +66,10 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		return
 	}
 
-	game.Lock()
-	if game.Turn().ID != d.PlayerID {
-		game.Unlock()
-		s.l.Debug(fmt.Sprintf("it's not player '%s' turn", d.PlayerID))
-		return
-	}
-
-	if err := game.Move(d.Move, d.Index); err != nil {
-		game.Unlock()
+	if err := game.Move(d.PlayerID, d.Move, d.Index); err != nil {
 		s.l.Debug(fmt.Sprintf("player '%s' made an invalid move '%s' on game '%s'", d.PlayerID, d.Move, d.GameID))
 		return
 	}
-	game.Unlock()
 
 	if game.Outcome() != types.NoOutcome {
 		if !game.EndGame() {
@@ -136,6 +128,130 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 	// TODO: think about how to update the database
 }
 
+func (s *Service) handleEventGamePlayerClaimDraw(d *event.EventGamePlayerClaimDraw) {
+	game := s.getGame(d.GameID)
+	if game == nil || game.Status() == entity.GameStatusDeactive {
+		return
+	}
+
+	t := time.Now().Unix()
+	ea := event.EventGamePlayerClaimDrawApproved{
+		ID:        types.NewObjectId(),
+		ClaimID:   d.ID,
+		GameID:    d.GameID,
+		PlayerID:  d.PlayerID,
+		Method:    d.Method,
+		Timestamp: t,
+	}
+	switch d.Method {
+	case chess.DrawOffer:
+		// if offer draw is approved, the service should send the approve event to the other player
+		// and wait for the other player to accept the offer
+		if !game.OfferDraw(d.PlayerID) {
+			return
+		}
+
+		if err := s.pub.Publish(ea); err != nil {
+			s.l.Error(err.Error())
+			return
+		}
+	case chess.ThreefoldRepetition, chess.FiftyMoveRule:
+
+		// if claim draw for these methods is approved, the service should send the approve event
+		// and end the game with the outcome of the draw
+		if !game.ClaimDraw(d.PlayerID, d.Method) {
+			return
+		}
+
+		if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
+			s.l.Error(err.Error())
+			return
+		}
+
+		if err := s.pub.Publish(ea, event.EventGameEnded{
+			ID:        types.NewObjectId(),
+			GameID:    game.ID(),
+			Player1:   game.Player1(),
+			Player2:   game.Player2(),
+			Outcome:   game.Outcome(),
+			Timestamp: t,
+		}); err != nil {
+			s.l.Error(err.Error())
+			return
+		}
+
+		s.removeGame(game.ID())
+	default:
+		return
+	}
+
+}
+
+func (s *Service) handleEventGamePlayerResponsedDrawOffer(d *event.EventGamePlayerResponsedDrawOffer) {
+	game := s.getGame(d.GameID)
+	if game == nil || game.Status() == entity.GameStatusDeactive {
+		return
+	}
+
+	if !d.Accept {
+		game.RejectDraw(d.PlayerID)
+		return
+	}
+
+	if !game.AcceptDraw(d.PlayerID) {
+		return
+	}
+
+	if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
+		s.l.Error(err.Error())
+		return
+	}
+
+	if err := s.pub.Publish(event.EventGameEnded{
+		ID:        types.NewObjectId(),
+		GameID:    game.ID(),
+		Player1:   game.Player1(),
+		Player2:   game.Player2(),
+		Outcome:   game.Outcome(),
+		Timestamp: time.Now().Unix(),
+	}); err != nil {
+		s.l.Error(err.Error())
+		return
+	}
+
+	s.removeGame(game.ID())
+}
+func (s *Service) handleEventGamePlayerResigned(d *event.EventGamePlayerResigned) {
+	game := s.getGame(d.GameID)
+	if game == nil || game.Status() == entity.GameStatusDeactive {
+		return
+	}
+
+	if !game.Resign(d.PlayerID) {
+		return
+	}
+
+	if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
+		s.l.Error(err.Error())
+		return
+	}
+
+	s.removeGame(d.GameID)
+
+	if err := s.pub.Publish(event.EventGameEnded{
+		ID:        types.NewObjectId(),
+		GameID:    d.GameID,
+		Player1:   game.Player1(),
+		Player2:   game.Player2(),
+		Outcome:   game.Outcome(),
+		Desc:      entity.EndDescriptionPlayerResigned.String(),
+		Timestamp: time.Now().Unix(),
+	}); err != nil {
+		s.l.Error(fmt.Sprintf("failed to publish game ended event: '%s'", d.GameID))
+	}
+
+}
+
 func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 	game := s.getGame(d.GameID)
 	if game == nil || game.Status() == entity.GameStatusDeactive {
@@ -154,9 +270,8 @@ func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 	}
 
 	s.removeGame(d.GameID)
-	s.l.Debug(fmt.Sprintf("removed game: '%s'", d.GameID))
 
-	s.pub.Publish(event.EventGameEnded{
+	if err := s.pub.Publish(event.EventGameEnded{
 		ID:        types.NewObjectId(),
 		GameID:    d.GameID,
 		Player1:   game.Player1(),
@@ -164,9 +279,9 @@ func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 		Outcome:   game.Outcome(),
 		Desc:      entity.EndDescriptionPlayerLeft.String(),
 		Timestamp: time.Now().Unix(),
-	})
-	s.l.Debug(fmt.Sprintf("published game ended event: '%s'", d.GameID))
-
+	}); err != nil {
+		s.l.Error(fmt.Sprintf("failed to publish game ended event: '%s'", d.GameID))
+	}
 }
 
 func (gs *Service) handleEvents(e event.Event) {
@@ -185,6 +300,12 @@ func (gs *Service) handleEvents(e event.Event) {
 		switch e.GetTopic().Action() {
 		case event.ActionGamePlayerMoved:
 			gs.handleEventGamePlayerMoved(e.(*event.EventGamePlayerMoved))
+		case event.ActionGamePlayerClaimDraw:
+			gs.handleEventGamePlayerClaimDraw(e.(*event.EventGamePlayerClaimDraw))
+		case event.ActionGamePlayerResponsedDrawOffer:
+			gs.handleEventGamePlayerResponsedDrawOffer(e.(*event.EventGamePlayerResponsedDrawOffer))
+		case event.ActionGamePlayerResigned:
+			gs.handleEventGamePlayerResigned(e.(*event.EventGamePlayerResigned))
 		case event.ActionGamePlayerLeft:
 			gs.handleEventGamePlayerLeft(e.(*event.EventGamePlayerLeft))
 		}

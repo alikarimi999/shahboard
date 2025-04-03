@@ -2,7 +2,10 @@ package game
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/gameservice/entity"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -18,6 +21,49 @@ func (s *Service) GetLiveGamesData(ctx context.Context) ([]*LiveGameData, error)
 func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (types.ObjectId, error) {
 	return s.cache.getGameIdByUserID(ctx, id)
 
+}
+
+// currently use event for proccessing player resign request.
+//
+// TODO: make this ready for a multi instance setup
+func (s *Service) ResingByPlayer(ctx context.Context, gameId, playerId types.ObjectId) error {
+	game, err := s.getGameByID(ctx, gameId)
+	if err != nil {
+		return err
+	}
+
+	if game == nil || game.Status() == entity.GameStatusDeactive {
+		return fmt.Errorf("game not found")
+	}
+
+	if ok := game.Resign(playerId); !ok {
+		return fmt.Errorf("player is not in the game")
+	}
+
+	s.l.Debug(fmt.Sprintf("player '%s' resigned game '%s'", playerId, gameId))
+
+	if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
+		s.l.Error(err.Error())
+		return err
+	}
+
+	s.removeGame(gameId)
+
+	if err := s.pub.Publish(event.EventGameEnded{
+		ID:        types.NewObjectId(),
+		GameID:    gameId,
+		Player1:   game.Player1(),
+		Player2:   game.Player2(),
+		Outcome:   game.Outcome(),
+		Desc:      entity.EndDescriptionPlayerResigned.String(),
+		Timestamp: time.Now().Unix(),
+	}); err != nil {
+		s.l.Error(err.Error())
+	}
+
+	s.l.Debug(fmt.Sprintf("published game ended event: '%s'", gameId))
+
+	return nil
 }
 
 // GetLiveGamePgnByUserID returns the game ID and PGN for a given user ID.

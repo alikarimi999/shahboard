@@ -25,6 +25,8 @@ const (
 	MsgTypeChatMsgApproved         MsgType = "msg_approved"
 	MsgTypeViewersList             MsgType = "viewers_list"
 
+	MsgTypePlayerResigned MsgType = "player_resigned"
+
 	MsgDataInternalErrorr string = "internal error"
 	MsgDataBadRequest     string = "bad request"
 	MsgDataNotFound       string = "not found"

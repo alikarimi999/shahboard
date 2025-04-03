@@ -230,6 +230,14 @@ func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 			e = &event.EventGamePlayerMoved{}
 		case event.ActionGameMoveApprove:
 			e = &event.EventGameMoveApproved{}
+		case event.ActionGamePlayerClaimDraw:
+			e = &event.EventGamePlayerClaimDraw{}
+		case event.ActionGamePlayerResponsedDrawOffer:
+			e = &event.EventGamePlayerResponsedDrawOffer{}
+		case event.ActionGamePlayerClaimDrawApproved:
+			e = &event.EventGamePlayerClaimDrawApproved{}
+		case event.ActionGamePlayerResigned:
+			e = &event.EventGamePlayerResigned{}
 		case event.ActionGamePlayerLeft:
 			e = &event.EventGamePlayerLeft{}
 		case event.ActionGamePlayerConnectionUpdated:

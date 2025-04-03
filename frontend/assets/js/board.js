@@ -2,7 +2,6 @@ import { currentGame } from './gameState.js';
 import { user } from './user.js';
 import { getUserLiveGameId, parsePGN } from './game_utils.js';
 import { showErrorMessage } from './error.js';
-import { getUserProfile } from './user_info.js';
 
 const whiteSquareYellow = '#DAA520';
 const blackSquareYellow = '#AA7600';
@@ -91,36 +90,16 @@ export function initializeBoard(isPlayer) {
                         currentGame.color = "w";  // Viewer always sees the game as if they are white
                     }
 
+                    // Reset game and set board orientation
+                    currentGame.game.reset();
+                    currentGame.board.orientation(currentGame.color === 'w' ? 'white' : 'black');
+                    currentGame.game.load_pgn(pgn.raw);
+                    updateBoardPosition();
+                    loadingSpinner.classList.remove("active");
 
-                    // Fetch player and opponent profiles
-                    Promise.all([
-                        getUserProfile(currentGame.player.id).then(profile => {
-                            currentGame.player.profile = profile;
-                            currentGame.player.email = profile.email;
-                            currentGame.player.name = profile.name;
-                            currentGame.player.avatar_url = profile.avatar_url
-                        }),
-                        getUserProfile(currentGame.opponent.id).then(profile => {
-                            currentGame.opponent.profile = profile;
-                            currentGame.opponent.email = profile.email;
-                            currentGame.opponent.name = profile.name;
-                            currentGame.opponent.avatar_url = profile.avatar_url
-                        })
-                    ]).then(() => {
-                        // Reset game and set board orientation
-                        currentGame.game.reset();
-                        currentGame.board.orientation(currentGame.color === 'w' ? 'white' : 'black');
-                        currentGame.game.load_pgn(pgn.raw);
-                        updateBoardPosition();
-                        loadingSpinner.classList.remove("active");
-
-                        document.dispatchEvent(new Event("game_created"));
-                        document.dispatchEvent(new Event("pgn_applied"));
-                        resolve();
-                    }).catch(() => {
-                        showErrorMessage("Failed to load player profiles.");
-                        resolve();
-                    });
+                    document.dispatchEvent(new Event("game_created"));
+                    document.dispatchEvent(new Event("pgn_applied"));
+                    resolve();
                 }
 
                 // Attach the event listener

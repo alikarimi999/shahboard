@@ -2,6 +2,7 @@ import { currentGame } from './gameState.js';
 import { updateBoardPosition, ColorWhite, ColorBlack } from './board.js';
 import { user } from './user.js'
 import { showErrorMessage } from './error.js';
+import { initializeBoard } from './board.js';
 
 const GameOutcome = Object.freeze({
     NoOutcome: "*",

@@ -1,3 +1,5 @@
+import { user } from "./user.js";
+
 export async function getUserProfile(userId) {
     if (!userId) {
         console.error("User ID is required.");
@@ -5,7 +7,15 @@ export async function getUserProfile(userId) {
     }
 
     try {
-        const response = await fetch(`http://localhost:8085/users/${userId}`);
+        const response = await fetch(`http://localhost:8085/users/${userId}`,
+            {
+                method: 'GET',
+                headers: {
+                    "Authorization": `Bearer ${user.jwt_token}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
         if (!response.ok) {
             throw new Error('Failed to fetch profile');
         }
@@ -25,7 +35,15 @@ export async function getUserRating(userId) {
     }
 
     try {
-        const response = await fetch(`http://localhost:8085/rating/${userId}`);
+        const response = await fetch(`http://localhost:8085/rating/${userId}`,
+            {
+                method: 'GET',
+                headers: {
+                    "Authorization": `Bearer ${user.jwt_token}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
         if (!response.ok) {
             throw new Error('Failed to fetch profile');
         }
