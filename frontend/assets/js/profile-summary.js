@@ -1,3 +1,5 @@
+import { formatDate } from "./utils.js";
+
 export function showUserProfile(id, profile, element, connected) {
     if (connected) {
         element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">✅ ${profile.name} (${profile.score})</a>`;
@@ -12,19 +14,7 @@ export function showUserProfile(id, profile, element, connected) {
 export function showProfileSummary(id, profile, element) {
     hideProfileSummary(); // Remove any existing tooltip
 
-    const lastActive = profile.last_active_at
-        ? new Date(profile.last_active_at * 1000).toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false, // 24-hour format
-        })
-        : 'Unknown';
 
-    // Create tooltip container
     const tooltip = document.createElement('a');
     tooltip.className = 'custom-tooltip';
     tooltip.href = `/profile.html?userId=${id}`;
@@ -40,7 +30,7 @@ export function showProfileSummary(id, profile, element) {
             <p>UID: <span>${id}</span>
             <p>Score: ${profile.score || 'N/A'}</p>
             <p>Level: ${profile.level || 'N/A'}</p>
-            <p>Last Active: ${lastActive}</p>
+            <p>Joined: ${formatDate(profile.created_at)}</p>
         </div>
     `;
 

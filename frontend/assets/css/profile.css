@@ -59,6 +59,12 @@
     gap: 5px;
 }
 
+.profile-joined {
+    text-align: center;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
 .game-history {
     background-color: var(--card-background);
     padding: 20px;

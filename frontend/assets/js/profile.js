@@ -2,6 +2,7 @@ import { showProfileSummary } from './profile-summary.js';
 import { getUserProfile, getUserRating } from './user_info.js';
 import { showErrorMessage } from './error.js';
 import { user } from './user.js';
+import { formatDate } from './utils.js';
 
 const opponentProfiles = new Map();
 
@@ -49,6 +50,9 @@ async function fetchUserProfile(userId) {
                     <p><strong>Draw:</strong> ${userRating?.games_draw ?? 'N/A'}</p>
                 </div>
             </div>
+                <div class="profile-joined">
+                    <p><strong>Joined:</strong> ${formatDate(userProfile.created_at) || 'N/A'}</p>
+                 </div>
             </div>
         `;
     } catch (error) {
@@ -101,7 +105,7 @@ async function processGameHistory(data) {
             opponentCell.style.cursor = 'pointer';
 
             row.insertCell(1).textContent = game.game_id;
-            row.insertCell(2).textContent = formatDate(game.timestamp);
+            row.insertCell(2).textContent = formatDate(game.timestamp, true);
 
             const resultCell = row.insertCell(3);
             resultCell.textContent = game.result.charAt(0).toUpperCase() + game.result.slice(1);
@@ -134,21 +138,6 @@ async function processGameHistory(data) {
     } else {
         gameHistoryTable.innerHTML = '<tr><td colspan="5">No game history available.</td></tr>';
     }
-}
-
-function formatDate(timestamp) {
-    const date = new Date(timestamp * 1000);
-
-    // Use toLocaleString to format both date and time (hours, minutes, seconds)
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',  // Abbreviated month (Jan, Feb, etc.)
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true  // Optional: Use 12-hour format (AM/PM)
-    });
 }
 
 
