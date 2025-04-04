@@ -48,7 +48,8 @@ func (h *Handler) getUserRatingHistory(c *gin.Context) {
 	}
 
 	p := &paginate.Paginated{
-		Filters: make(map[paginate.FilterParameter]paginate.Filter),
+		Filters:     make(map[paginate.FilterParameter]paginate.Filter),
+		Decscending: true,
 	}
 
 	ls, ok := c.GetQuery("limit")
