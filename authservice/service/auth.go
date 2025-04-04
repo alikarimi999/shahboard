@@ -46,15 +46,15 @@ func NewAuthService(cfg Config, repo Repository, jwtGenerator *jwt.Generator, pu
 }
 
 func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (GoogleAuthResponse, error) {
-	// token, err := s.parseGoogleToken(req.Token)
-	// if err != nil {
-	// 	return GoogleAuthResponse{}, err
-	// }
-
-	token, err := ValidateGoogleJWT(req.Token, s.cfg.GoogleClientID)
+	token, err := s.parseGoogleToken(req.Token)
 	if err != nil {
 		return GoogleAuthResponse{}, err
 	}
+
+	// token, err := validateGoogleJWT(req.Token, s.cfg.GoogleClientID)
+	// if err != nil {
+	// 	return GoogleAuthResponse{}, err
+	// }
 
 	user, err := s.repo.GetByEmail(ctx, token.Email)
 	if err != nil {
@@ -171,8 +171,8 @@ var staticGoogleCerts = GoogleCerts{
 	},
 }
 
-// ValidateGoogleJWT validates a Google OAuth2 ID token using static keys
-func ValidateGoogleJWT(tokenString string, clientID string) (*tokenInfo, error) {
+// validateGoogleJWT validates a Google OAuth2 ID token using static keys
+func validateGoogleJWT(tokenString string, clientID string) (*tokenInfo, error) {
 	// Parse the token to get the "kid" from the header
 	token, err := pjwt.Parse(tokenString, func(token *pjwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*pjwt.SigningMethodRSA); !ok {
