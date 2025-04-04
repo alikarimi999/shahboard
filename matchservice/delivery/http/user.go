@@ -3,16 +3,12 @@ package http
 import (
 	"net/http"
 
-	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/gin-gonic/gin"
 )
 
 func (r *Router) setupUserRoutes() {
-	u := r.gin.Group("/user", middleware.ParsUserHeader(r.v))
-	{
-		u.GET("/match", r.newMatchRequest)
-	}
+	r.gin.GET("/find", r.newMatchRequest)
 }
 
 func (r *Router) newMatchRequest(c *gin.Context) {

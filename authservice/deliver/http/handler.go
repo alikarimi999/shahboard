@@ -25,7 +25,7 @@ func NewHandler(cfg router.Config, s *service.AuthService) (*Handler, error) {
 }
 
 func (h *Handler) setup() error {
-	auth := h.Group("/auth")
+	auth := h.Group("/oauth")
 	{
 		auth.POST("/google", h.googleLogin)
 	}
