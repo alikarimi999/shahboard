@@ -6,13 +6,7 @@ import (
 	"os"
 )
 
-func LoadConfigs(service string, development bool, cfg interface{}) error {
-	var file string
-	if development {
-		file = fmt.Sprintf("deploy/%s/development/config.json", service)
-	} else {
-		file = fmt.Sprintf("deploy/%s/production/config.json", service)
-	}
+func LoadConfigs(file string, cfg interface{}) error {
 	configFile, err := os.Open(file)
 	if err != nil {
 		return fmt.Errorf("failed to open config file: %w", err)

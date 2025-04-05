@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/alikarimi999/shahboard/chatservice"
 	"github.com/alikarimi999/shahboard/pkg/utils"
@@ -9,7 +10,7 @@ import (
 
 func main() {
 	cfg := &chatservice.Config{}
-	if err := utils.LoadConfigs("chat", true, cfg); err != nil {
+	if err := utils.LoadConfigs(os.Getenv("CONFIG_FILE"), cfg); err != nil {
 		panic(err)
 	}
 

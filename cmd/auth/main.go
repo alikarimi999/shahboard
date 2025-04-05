@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/alikarimi999/shahboard/authservice"
 	"github.com/alikarimi999/shahboard/pkg/utils"
 )
@@ -8,7 +10,7 @@ import (
 func main() {
 
 	cfg := &authservice.Config{}
-	if err := utils.LoadConfigs("auth", true, cfg); err != nil {
+	if err := utils.LoadConfigs(os.Getenv("CONFIG_FILE"), cfg); err != nil {
 		panic(err)
 	}
 
