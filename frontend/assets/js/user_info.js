@@ -1,4 +1,5 @@
 import { user } from "./user.js";
+import { config } from "./config.js";
 
 export async function getUserProfile(userId) {
     if (!userId) {
@@ -7,7 +8,7 @@ export async function getUserProfile(userId) {
     }
 
     try {
-        const response = await fetch(`http://localhost:8085/users/${userId}`,
+        const response = await fetch(`${config.baseUrl}/profile/users/${userId}`,
             {
                 method: 'GET',
                 headers: {
@@ -35,7 +36,7 @@ export async function getUserRating(userId) {
     }
 
     try {
-        const response = await fetch(`http://localhost:8085/rating/${userId}`,
+        const response = await fetch(`${config.baseUrl}/rating/${userId}`,
             {
                 method: 'GET',
                 headers: {

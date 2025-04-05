@@ -1,12 +1,13 @@
 import { currentGame } from './gameState.js';
 import { connectWebSocket } from './ws.js';
+import { config } from './config.js';
 import { initializeBoard } from './board.js';
 import {
     handleGameCreated, handleGameChatCreated, handleGameChatMsg, handleMoveApproved,
     handlePlayerConnectionUpdate, handleGameEnded, handleError, handleResumeGame, handleViewersList
 } from './eventHandlers.js';
 
-connectWebSocket('http://localhost:8083/ws').then(connection => {
+connectWebSocket(`${config.baseUrl}/wsgateway/ws`).then(connection => {
     currentGame.ws = connection;
 
     currentGame.ws.registerMessageHandler("game_created", handleGameCreated);

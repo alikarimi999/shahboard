@@ -1,13 +1,14 @@
 import { getUserProfile } from "./user_info.js";
 import { showProfileSummary } from "./profile-summary.js";
 import { user } from "./user.js";
+import { config } from "./config.js";
 
 const profileCache = new Map();
 
 
 async function fetchLiveGamesData() {
     try {
-        const response = await fetch('http://localhost:8081/games/live/data',
+        const response = await fetch(`${config.baseUrl}/game/live/data`,
             {
                 method: 'GET',
                 headers: {

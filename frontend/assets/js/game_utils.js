@@ -1,9 +1,9 @@
 import { user } from './user.js'
-
+import { config } from './config.js'
 
 export async function getUserLiveGameId() {
     try {
-        const apiUrl = `http://localhost:8081/games/live/user/${user.id}`;
+        const apiUrl = `${config.baseUrl}/game/live/user/${user.id}`;
         const response = await fetch(apiUrl, {
             method: 'GET',
             headers: {

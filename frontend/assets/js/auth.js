@@ -1,5 +1,6 @@
 
 import { user } from './user.js';
+import { config } from './config.js';
 
 // Function to dynamically load Google Sign-In SDK
 function loadGoogleSDK() {
@@ -74,7 +75,7 @@ function handleCredentialResponse(response) {
 
 async function sendTokenToBackend(token) {
     try {
-        const response = await fetch("http://localhost:8084/auth/google", {
+        const response = await fetch(`${config.baseUrl}/auth/oauth/google`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

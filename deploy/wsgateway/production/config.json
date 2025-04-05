@@ -1,0 +1,24 @@
+{
+    "kafka": {
+        "brokers": [
+            "kafka:9092"
+        ],
+        "group_id": "wsgateway_0"
+    },
+    "log": {
+        "file": "logs/wsgateway.log",
+        "verbose": true
+    },
+    "http": {
+        "port": 8080
+    },
+    "grpc": {
+        "port": 9090
+    },
+    "jwt_validator": {
+        "public_key_path": "./data/jwt/public_key.pem"
+    },
+    "game_service_grpc": {
+        "target": "game-service:9091"
+    }
+}

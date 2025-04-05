@@ -1,5 +1,27 @@
+version: '3.8'
+
 services:
-  postgres-db:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    restart: always
+    command:
+      - "--api.insecure=true" # Enables the Traefik dashboard (for testing)
+      - "--providers.docker=true" # Enables Docker auto-discovery
+      - "--entrypoints.web.address=:80" # HTTP Entrypoint
+      - "--entrypoints.websecure.address=:443" # HTTPS Entrypoint
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=your@email.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080" # Dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+
+  postgres:
     image: postgres:12.22
     container_name: postgres-db
     environment:
@@ -11,6 +33,12 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
 
   redis:
     image: redis:latest
@@ -19,6 +47,12 @@ services:
       - "6379:6379"
     volumes:
       - ./data/redis:/data
+    restart: always
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   kafka:
     image: bitnami/kafka:latest
@@ -49,3 +83,8 @@ services:
       # Replace CLUSTER_ID with a unique base64 UUID using "bin/kafka-storage.sh random-uuid" 
       # See https://docs.confluent.io/kafka/operations-tools/kafka-tools.html#kafka-storage-sh
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5

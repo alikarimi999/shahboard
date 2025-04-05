@@ -3,6 +3,7 @@ import { getUserProfile, getUserRating } from './user_info.js';
 import { showErrorMessage } from './error.js';
 import { user } from './user.js';
 import { formatDate } from './utils.js';
+import { config } from './config.js';
 
 const opponentProfiles = new Map();
 
@@ -66,7 +67,7 @@ async function fetchGameHistory(userId, page) {
     try {
         if (page < 1) return;
 
-        const response = await fetch(`http://localhost:8085/rating/history/${userId}?page=${page}&limit=${pageSize}`,
+        const response = await fetch(`${config.baseUrl}/profile/rating/history/${userId}?page=${page}&limit=${pageSize}`,
             {
                 method: 'GET',
                 headers: {

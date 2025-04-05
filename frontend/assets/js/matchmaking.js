@@ -1,8 +1,9 @@
 import { currentGame } from './gameState.js';
 import { user } from './user.js'
+import { config } from './config.js';
 
 export async function findMatch() {
-    const response = await fetch("http://localhost:8082/user/match", {
+    const response = await fetch(`${config.baseUrl}/match/find`, {
         method: "GET",
         headers: {
             "Authorization": `Bearer ${user.jwt_token}`,

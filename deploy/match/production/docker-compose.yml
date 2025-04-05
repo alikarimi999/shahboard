@@ -1,0 +1,24 @@
+services:
+  match-service:
+    build:
+      context: .
+      dockerfile: ./deploy/match/production/Dockerfile
+    image: match-service:latest
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: always
+    ports:
+      - "8080:8080"
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.httpserver.rule=PathPrefix(`/match`)"
+      - "traefik.http.routers.httpserver.entrypoints=web"
+      - "traefik.http.services.httpserver.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.httpstrip.stripprefix.prefixes=/match"
+      - "traefik.http.routers.httpserver.middlewares=httpstrip"
