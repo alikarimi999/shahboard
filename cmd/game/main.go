@@ -8,8 +8,13 @@ import (
 )
 
 func main() {
+	file := os.Getenv("CONFIG_FILE")
+	if file == "" {
+		file = "./deploy/game/development/config.json"
+	}
+
 	cfg := &gameservice.Config{}
-	if err := utils.LoadConfigs(os.Getenv("CONFIG_FILE"), cfg); err != nil {
+	if err := utils.LoadConfigs(file, cfg); err != nil {
 		panic(err)
 	}
 
