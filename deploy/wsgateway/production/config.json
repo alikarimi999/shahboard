@@ -20,5 +20,8 @@
     },
     "game_service_grpc": {
         "target": "game-service:9091"
+    },
+    "redis": {
+        "addr": "redis:6379"
     }
 }

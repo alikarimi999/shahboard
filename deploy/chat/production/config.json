@@ -3,8 +3,7 @@
         "instance_id": "chat_service_0"
     },
     "redis": {
-        "host": "redis",
-        "port": 6379
+        "addr": "redis:6379"
     },
     "kafka": {
         "brokers": [
