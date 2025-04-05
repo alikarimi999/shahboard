@@ -29,6 +29,6 @@
         "target": "wsgateway:9090"
     },
     "jwt_validator": {
-        "public_key_path": "./data/jwt/public_key.pem"
+        "public_key_path": "/app/jwt/public_key.pem"
     }
 }

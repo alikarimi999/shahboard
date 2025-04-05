@@ -9,7 +9,7 @@
         "group_id": "auth_service_0"
     },
     "jwt_generator": {
-        "private_key_path": "./data/jwt/private_key.pem",
+        "private_key_path": "/app/jwt/private_key.pem",
         "expiration_in_seconds": 2592000
     },
     "postgres_db": {
@@ -22,7 +22,7 @@
         "max_idle_conns": 15,
         "max_open_conns": 100,
         "conn_max_lifetime": 5,
-        "path_of_migration": "./migrations/auth/"
+        "path_of_migration": "/app/migrations/"
     },
     "http": {
         "port": 8080

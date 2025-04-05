@@ -6,7 +6,7 @@
         "group_id": "profile_service_0"
     },
     "jwt_validator": {
-        "public_key_path": "./data/jwt/public_key.pem"
+        "public_key_path": "/app/jwt/public_key.pem"
     },
     "users_db": {
         "host": "postgres",
@@ -18,7 +18,7 @@
         "max_idle_conns": 15,
         "max_open_conns": 100,
         "conn_max_lifetime": 5,
-        "path_of_migration": "./migrations/user/"
+        "path_of_migration": "/app/migrations/user/"
     },
     "rating_db": {
         "host": "postgres",
@@ -30,7 +30,7 @@
         "max_idle_conns": 15,
         "max_open_conns": 100,
         "conn_max_lifetime": 5,
-        "path_of_migration": "./migrations/rating/"
+        "path_of_migration": "/app/migrations/rating/"
     },
     "redis": {
         "addr": "redis:6379"

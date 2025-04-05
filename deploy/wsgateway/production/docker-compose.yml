@@ -12,17 +12,16 @@ services:
       postgres:
         condition: service_healthy
     restart: always
-    ports:
-      - "8080:8080"
     environment:
       - CONFIG_FILE=/app/config.json
     volumes:
       - ./deploy/wsgateway/production/config.json:/app/config.json
+      - ./data/jwt:/app/jwt/
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.httpserver.rule=PathPrefix(`/wsgateway`)"
-      - "traefik.http.routers.httpserver.entrypoints=web"
-      - "traefik.http.services.httpserver.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.httpstrip.stripprefix.prefixes=/wsgateway"
-      - "traefik.http.routers.httpserver.middlewares=httpstrip"
+      - "traefik.http.routers.wsgateway.rule=PathPrefix(`/wsgateway`)"
+      - "traefik.http.routers.wsgateway.entrypoints=web"
+      - "traefik.http.services.wsgateway.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.wsgateway-httpstrip.stripprefix.prefixes=/wsgateway"
+      - "traefik.http.routers.wsgateway.middlewares=wsgateway-httpstrip"

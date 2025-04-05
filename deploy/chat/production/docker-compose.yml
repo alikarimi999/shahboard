@@ -12,8 +12,6 @@ services:
       postgres:
         condition: service_healthy
     restart: always
-    ports:
-      - "8080:8080"
     environment:
       - CONFIG_FILE=/app/config.json
     volumes:
@@ -21,8 +19,8 @@ services:
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.httpserver.rule=PathPrefix(`/chat`)"
-      - "traefik.http.routers.httpserver.entrypoints=web"
-      - "traefik.http.services.httpserver.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.httpstrip.stripprefix.prefixes=/chat"
-      - "traefik.http.routers.httpserver.middlewares=httpstrip"
+      - "traefik.http.routers.chatservice.rule=PathPrefix(`/chat`)"
+      - "traefik.http.routers.chatservice.entrypoints=web"
+      - "traefik.http.services.chatservice.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.chat-httpstrip.stripprefix.prefixes=/chat"
+      - "traefik.http.routers.chatservice.middlewares=chat-httpstrip"

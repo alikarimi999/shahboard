@@ -36,7 +36,7 @@ export async function getUserRating(userId) {
     }
 
     try {
-        const response = await fetch(`${config.baseUrl}/rating/${userId}`,
+        const response = await fetch(`${config.baseUrl}/profile/rating/${userId}`,
             {
                 method: 'GET',
                 headers: {

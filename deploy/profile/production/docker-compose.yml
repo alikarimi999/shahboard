@@ -12,17 +12,18 @@ services:
       postgres:
         condition: service_healthy
     restart: always
-    ports:
-      - "8080:8080"
     environment:
       - CONFIG_FILE=/app/config.json
     volumes:
       - ./deploy/profile/production/config.json:/app/config.json
+      - ./migrations/user:/app/migrations/user/
+      - ./migrations/rating:/app/migrations/rating/
+      - ./data/jwt:/app/jwt/
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.httpserver.rule=PathPrefix(`/profile`)"
-      - "traefik.http.routers.httpserver.entrypoints=web"
-      - "traefik.http.services.httpserver.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.httpstrip.stripprefix.prefixes=/profile"
-      - "traefik.http.routers.httpserver.middlewares=httpstrip"
+      - "traefik.http.routers.profileservice.rule=PathPrefix(`/profile`)"
+      - "traefik.http.routers.profileservice.entrypoints=web"
+      - "traefik.http.services.profileservice.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.profile-httpstrip.stripprefix.prefixes=/profile"
+      - "traefik.http.routers.profileservice.middlewares=profile-httpstrip"

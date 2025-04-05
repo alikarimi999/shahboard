@@ -12,17 +12,16 @@ services:
       postgres:
         condition: service_healthy
     restart: always
-    ports:
-      - "8080:8080"
     environment:
       - CONFIG_FILE=/app/config.json
     volumes:
       - ./deploy/match/production/config.json:/app/config.json
+      - ./data/jwt:/app/jwt/
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.httpserver.rule=PathPrefix(`/match`)"
-      - "traefik.http.routers.httpserver.entrypoints=web"
-      - "traefik.http.services.httpserver.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.httpstrip.stripprefix.prefixes=/match"
-      - "traefik.http.routers.httpserver.middlewares=httpstrip"
+      - "traefik.http.routers.matchservice.rule=PathPrefix(`/match`)"
+      - "traefik.http.routers.matchservice.entrypoints=web"
+      - "traefik.http.services.matchservice.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.match-httpstrip.stripprefix.prefixes=/match"
+      - "traefik.http.routers.matchservice.middlewares=match-httpstrip"

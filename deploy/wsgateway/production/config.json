@@ -16,7 +16,7 @@
         "port": 9090
     },
     "jwt_validator": {
-        "public_key_path": "./data/jwt/public_key.pem"
+        "public_key_path": "/app/jwt/public_key.pem"
     },
     "game_service_grpc": {
         "target": "game-service:9091"

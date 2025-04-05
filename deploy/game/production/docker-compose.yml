@@ -12,17 +12,17 @@ services:
       postgres:
         condition: service_healthy
     restart: always
-    ports:
-      - "8080:8080"
     environment:
       - CONFIG_FILE=/app/config.json
     volumes:
       - ./deploy/game/production/config.json:/app/config.json
+      - ./data/jwt:/app/jwt/
+
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.routers.httpserver.rule=PathPrefix(`/game`)"
-      - "traefik.http.routers.httpserver.entrypoints=web"
-      - "traefik.http.services.httpserver.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.httpstrip.stripprefix.prefixes=/game"
-      - "traefik.http.routers.httpserver.middlewares=httpstrip"
+      - "traefik.http.routers.gameservice.rule=PathPrefix(`/game`)"
+      - "traefik.http.routers.gameservice.entrypoints=web"
+      - "traefik.http.services.gameservice.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.game-httpstrip.stripprefix.prefixes=/game"
+      - "traefik.http.routers.gameservice.middlewares=game-httpstrip"
