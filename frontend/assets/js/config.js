@@ -1,3 +1,3 @@
 export const config = {
-    baseUrl: 'http://103.75.197.95:80',
+    baseUrl: 'https://103.75.197.95',
 };
