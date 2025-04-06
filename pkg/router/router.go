@@ -37,6 +37,10 @@ func (r *Router) Handle(method, path string, handlers ...gin.HandlerFunc) gin.IR
 	return r.gin.Handle(method, path, handlers...)
 }
 
+func (r *Router) Use(handlers ...gin.HandlerFunc) {
+	r.gin.Use(handlers...)
+}
+
 func (r *Router) Run() error {
 	return r.gin.Run(fmt.Sprintf(":%d", r.cfg.Port))
 }

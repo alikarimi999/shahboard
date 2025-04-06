@@ -15,6 +15,7 @@ import (
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
 	pjwt "github.com/golang-jwt/jwt"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/idtoken"
 )
 
@@ -64,25 +65,12 @@ func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (Go
 
 	exists := user != nil
 	if !exists {
-		user = entity.NewUser(token.Email)
+		user = entity.NewUser(token.Email, "")
 		if err := s.repo.Create(ctx, user); err != nil {
 			s.l.Error(err.Error())
 			return GoogleAuthResponse{}, err
 		}
-	}
-
-	go func() {
-		if exists {
-			if err := s.pub.Publish(event.EventUserLoggedIn{
-				ID:        types.NewObjectId(),
-				UserID:    user.ID,
-				Email:     user.Email,
-				Timestamp: time.Now().Unix(),
-			}); err != nil {
-				s.l.Error(err.Error())
-			}
-			return
-		}
+		s.l.Debug(fmt.Sprintf("user created: %s", user.Email))
 
 		if err := s.pub.Publish(event.EventUserCreated{
 			ID:        types.NewObjectId(),
@@ -94,8 +82,9 @@ func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (Go
 		}); err != nil {
 			s.l.Error(err.Error())
 		}
-
-	}()
+	} else {
+		s.l.Debug(fmt.Sprintf("user logged in: %s", user.Email))
+	}
 
 	return GoogleAuthResponse{
 		Id:       user.ID.String(),
@@ -106,6 +95,68 @@ func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (Go
 		Exists:   exists,
 	}, nil
 
+}
+
+func (s *AuthService) PasswordAuth(ctx context.Context, req PasswordAuthRequest) (PasswordAuthResponse, error) {
+	if req.Email == "" || req.Password == "" {
+		return PasswordAuthResponse{}, errors.New("email and password are required")
+	}
+
+	user, err := s.repo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		s.l.Error(err.Error())
+		return PasswordAuthResponse{}, err
+	}
+
+	hPass, err := hashPassword(req.Password)
+	if err != nil {
+		return PasswordAuthResponse{}, err
+	}
+
+	exists := user != nil
+	if !exists {
+		user = entity.NewUser(req.Email, hPass)
+		if err := s.repo.Create(ctx, user); err != nil {
+			s.l.Error(err.Error())
+			return PasswordAuthResponse{}, err
+		}
+		s.l.Debug(fmt.Sprintf("user created: %s", user.Email))
+
+		if err := s.pub.Publish(event.EventUserCreated{
+			ID:        types.NewObjectId(),
+			UserID:    user.ID,
+			Email:     user.Email,
+			Timestamp: time.Now().Unix(),
+		}); err != nil {
+			s.l.Error(err.Error())
+		}
+	} else {
+		if !checkPassword(user.Password, req.Password) {
+			return PasswordAuthResponse{}, errors.New("invalid password")
+		}
+
+		s.l.Debug(fmt.Sprintf("user logged in: %s", user.Email))
+	}
+
+	return PasswordAuthResponse{
+		Id:       user.ID.String(),
+		Email:    user.Email,
+		JwtToken: s.jwtGenerator.GenerateJWT(types.User{ID: user.ID, Email: user.Email}),
+		Exists:   exists,
+	}, nil
+}
+
+func checkPassword(hashedPassword, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
+}
+
+func hashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost) // DefaultCost is 10
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
 type tokenInfo struct {

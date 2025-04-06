@@ -2,6 +2,7 @@ package profileservice
 
 import (
 	"github.com/alikarimi999/shahboard/event/kafka"
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/pkg/postgres"
 	"github.com/alikarimi999/shahboard/profileservice/delivery/grpc"
@@ -44,7 +45,12 @@ func SetupApplication(cfg Config) (*application, error) {
 	ratingService := rating.NewService(cfg.Rating, ratingRepo, s, l)
 	userService := user.NewService(cfg.User, userRepo, s, ratingService, l)
 
-	h, err := http.NewHandler(cfg.Http, userService, ratingService, l)
+	v, err := jwt.NewValidator(cfg.JwtValidator)
+	if err != nil {
+		return nil, err
+	}
+
+	h, err := http.NewHandler(cfg.Http, userService, ratingService, v, l)
 	if err != nil {
 		return nil, err
 	}

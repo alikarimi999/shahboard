@@ -1,6 +1,8 @@
 package http
 
 import (
+	"net/http"
+
 	"github.com/alikarimi999/shahboard/authservice/service"
 	"github.com/alikarimi999/shahboard/pkg/router"
 	"github.com/gin-gonic/gin"
@@ -25,6 +27,8 @@ func NewHandler(cfg router.Config, s *service.AuthService) (*Handler, error) {
 }
 
 func (h *Handler) setup() error {
+	h.Handle(http.MethodPost, "/", h.passwordLogin)
+
 	auth := h.Group("/oauth")
 	{
 		auth.POST("/google", h.googleLogin)
@@ -41,6 +45,22 @@ func (h *Handler) googleLogin(c *gin.Context) {
 	}
 
 	res, err := h.s.GoogleAuth(c, req)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, res)
+}
+
+func (h *Handler) passwordLogin(c *gin.Context) {
+	var req service.PasswordAuthRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := h.s.PasswordAuth(c, req)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

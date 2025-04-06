@@ -15,7 +15,7 @@ type Repository interface {
 	// return nil,nil if user not found
 	GetByID(ctx context.Context, id types.ObjectId) (*entity.UserInfo, error)
 	Create(ctx context.Context, user *entity.UserInfo) error
-	Update(ctx context.Context, user *entity.UserInfo) error
+	Update(ctx context.Context, userId types.ObjectId, req UpdateUserRequest) error
 	UpdateLastActiveAt(ctx context.Context, id types.ObjectId, lastActiveAt time.Time) error
 }
 
@@ -67,8 +67,8 @@ func (s *Service) GetUserInfo(ctx context.Context, id types.ObjectId) (*entity.U
 	return u, r, nil
 }
 
-func (s *Service) UpdateUser(ctx context.Context, user *entity.UserInfo) error {
-	return s.repo.Update(ctx, user)
+func (s *Service) UpdateUser(ctx context.Context, userId types.ObjectId, req UpdateUserRequest) error {
+	return s.repo.Update(ctx, userId, req)
 }
 
 func (s *Service) handleEvent(e event.Event) {

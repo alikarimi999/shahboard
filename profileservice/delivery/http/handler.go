@@ -1,7 +1,9 @@
 package http
 
 import (
+	"github.com/alikarimi999/shahboard/pkg/jwt"
 	"github.com/alikarimi999/shahboard/pkg/log"
+	"github.com/alikarimi999/shahboard/pkg/middleware"
 	"github.com/alikarimi999/shahboard/pkg/router"
 	"github.com/alikarimi999/shahboard/profileservice/service/rating"
 	"github.com/alikarimi999/shahboard/profileservice/service/user"
@@ -14,12 +16,14 @@ type Handler struct {
 	l      log.Logger
 }
 
-func NewHandler(cfg router.Config, u *user.Service, r *rating.Service, l log.Logger) (*Handler, error) {
+func NewHandler(cfg router.Config, u *user.Service, r *rating.Service,
+	v *jwt.Validator, l log.Logger) (*Handler, error) {
 	router, err := router.NewRouter(cfg)
 	if err != nil {
 		return nil, err
 	}
 
+	router.Use(middleware.ParsUserHeader(v))
 	h := &Handler{
 		Router: router,
 		user:   u,

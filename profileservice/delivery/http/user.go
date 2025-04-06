@@ -2,6 +2,8 @@ package http
 
 import (
 	"github.com/alikarimi999/shahboard/pkg/elo"
+	"github.com/alikarimi999/shahboard/pkg/middleware"
+	"github.com/alikarimi999/shahboard/profileservice/service/user"
 	"github.com/alikarimi999/shahboard/types"
 	"github.com/gin-gonic/gin"
 )
@@ -9,6 +11,7 @@ import (
 func (h *Handler) setupUserRoutes() {
 	u := h.Group("/users")
 	u.GET("/:userId", h.getUserInfo)
+	u.PATCH("/", h.updateUserInfo)
 }
 
 func (h *Handler) getUserInfo(c *gin.Context) {
@@ -48,4 +51,25 @@ func (h *Handler) getUserInfo(c *gin.Context) {
 		CreatedAt:    u.CreatedAt.Unix(),
 		LastActiveAt: u.LastActiveAt.Unix(),
 	})
+}
+
+func (h *Handler) updateUserInfo(c *gin.Context) {
+	usr, ok := middleware.ExtractUser(c)
+	if !ok {
+		c.JSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req user.UpdateUserRequest
+	if err := c.Bind(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.user.UpdateUser(c, usr.ID, req); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "User updated successfully"})
 }

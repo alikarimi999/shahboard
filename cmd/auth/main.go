@@ -11,7 +11,7 @@ func main() {
 
 	file := os.Getenv("CONFIG_FILE")
 	if file == "" {
-		file = "./deploy/profile/development/config.json"
+		file = "./deploy/auth/development/config.json"
 	}
 
 	cfg := &authservice.Config{}

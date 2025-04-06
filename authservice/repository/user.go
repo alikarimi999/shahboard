@@ -18,23 +18,23 @@ func NewUserRepo(db *sql.DB) service.Repository {
 	}
 }
 
-func (r *userRepo) Create(ctx context.Context, user *entity.User) error {
-	query := `INSERT INTO users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $4)`
-	_, err := r.db.ExecContext(ctx, query, user.ID.String(), user.Email, user.CreatedAt, user.UpdatedAt)
+func (r *userRepo) Create(ctx context.Context, u *entity.User) error {
+	query := `INSERT INTO users (id, email, password, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.db.ExecContext(ctx, query, u.ID.String(), u.Email, u.Password, u.CreatedAt, u.UpdatedAt)
 	return err
 }
 
 func (r *userRepo) GetByEmail(ctx context.Context, email string) (*entity.User, error) {
-	query := "SELECT id, email, created_at, updated_at FROM users WHERE email = $1"
+	query := "SELECT id, email, password, created_at, updated_at FROM users WHERE email = $1"
 	row := r.db.QueryRowContext(ctx, query, email)
-	var user entity.User
-	err := row.Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	var u entity.User
+	err := row.Scan(&u.ID, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &user, nil
+	return &u, nil
 
 }

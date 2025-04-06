@@ -3,9 +3,12 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alikarimi999/shahboard/profileservice/entity"
+	"github.com/alikarimi999/shahboard/profileservice/service/user"
 	"github.com/alikarimi999/shahboard/types"
 )
 
@@ -41,9 +44,40 @@ func (r *userRepo) Create(ctx context.Context, user *entity.UserInfo) error {
 	return err
 }
 
-func (r *userRepo) Update(ctx context.Context, user *entity.UserInfo) error {
-	query := `UPDATE users SET name = $1, avatar_url = $2, bio = $3, country = $4, last_active_at = $5 WHERE id = $6`
-	_, err := r.db.ExecContext(ctx, query, user.Name, user.AvatarUrl, user.Bio, user.Country, user.LastActiveAt, user.ID)
+func (r *userRepo) Update(ctx context.Context, userId types.ObjectId, req user.UpdateUserRequest) error {
+	fields := []string{}
+	args := []interface{}{}
+	argID := 1
+
+	if req.Name != "" {
+		fields = append(fields, fmt.Sprintf("name = $%d", argID))
+		args = append(args, req.Name)
+		argID++
+	}
+	if req.AvatarUrl != "" {
+		fields = append(fields, fmt.Sprintf("avatar_url = $%d", argID))
+		args = append(args, req.AvatarUrl)
+		argID++
+	}
+	if req.Bio != "" {
+		fields = append(fields, fmt.Sprintf("bio = $%d", argID))
+		args = append(args, req.Bio)
+		argID++
+	}
+	if req.Country != "" {
+		fields = append(fields, fmt.Sprintf("country = $%d", argID))
+		args = append(args, req.Country)
+		argID++
+	}
+
+	if len(fields) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE users SET %s WHERE id = $%d", strings.Join(fields, ", "), argID)
+	args = append(args, userId.String())
+
+	_, err := r.db.Exec(query, args...)
 	return err
 }
 

@@ -12,3 +12,15 @@ type GoogleAuthResponse struct {
 	JwtToken string `json:"jwt_token"`
 	Exists   bool   `json:"exists"`
 }
+
+type PasswordAuthRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type PasswordAuthResponse struct {
+	Id       string `json:"id"`
+	Email    string `json:"email"`
+	JwtToken string `json:"jwt_token"`
+	Exists   bool   `json:"exists"`
+}
