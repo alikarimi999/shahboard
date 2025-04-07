@@ -215,7 +215,7 @@ func (s *Server) sessionWriter(se *session) {
 func (s *Server) handleMsg(sess *session, msg *Msg) {
 	switch msg.Type {
 	case MsgTypeFindMatch:
-		var d dataFindMatchRequest
+		var d DataFindMatchRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -223,7 +223,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleFindMatchRequest(msg.ID, d)
 	case MsgTypeResumeGame:
-		var d dataResumeGameRequest
+		var d DataResumeGameRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -231,7 +231,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleResumeGameRequest(msg.ID, d)
 	case MsgTypeViewGame:
-		var d dataGameViewRequest
+		var d DataGameViewRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -239,7 +239,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleViewGameRequest(msg.ID, d)
 	case MsgTypePlayerMove:
-		var d dataGamePlayerMoveRequest
+		var d DataGamePlayerMoveRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -247,7 +247,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handleMoveRequest(msg.ID, d)
 	case MsgTypePlayerResigned:
-		var d dataGamePlayerResignRequest
+		var d DataGamePlayerResignRequest
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return
@@ -255,7 +255,7 @@ func (s *Server) handleMsg(sess *session, msg *Msg) {
 
 		sess.handlePlayerResignRequest(msg.ID, d)
 	case MsgTypeChatMsgSend:
-		var d dataGameChatMsgSend
+		var d DataGameChatMsgSend
 		if err := json.Unmarshal(msg.Data, &d); err != nil {
 			sess.sendErr(msg.ID, "invalid data")
 			return

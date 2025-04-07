@@ -7,121 +7,121 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-type dataFindMatchRequest struct {
+type DataFindMatchRequest struct {
 	event.EventUsersMatchCreated
 }
 
-func (d dataFindMatchRequest) Type() MsgType {
+func (d DataFindMatchRequest) Type() MsgType {
 	return MsgTypeFindMatch
 }
 
-func (d dataFindMatchRequest) Encode() []byte {
+func (d DataFindMatchRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type dataGameViewRequest struct {
+type DataGameViewRequest struct {
 	GameId types.ObjectId `json:"game_id"`
 }
 
-func (d dataGameViewRequest) Type() MsgType {
+func (d DataGameViewRequest) Type() MsgType {
 	return MsgTypeViewGame
 }
 
-func (d dataGameViewRequest) Encode() []byte {
+func (d DataGameViewRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type dataGamePlayerMoveRequest struct {
+type DataGamePlayerMoveRequest struct {
 	event.EventGamePlayerMoved
 }
 
-func (d dataGamePlayerMoveRequest) Type() MsgType {
+func (d DataGamePlayerMoveRequest) Type() MsgType {
 	return MsgTypePlayerMove
 }
 
-func (d dataGamePlayerMoveRequest) Encode() []byte {
+func (d DataGamePlayerMoveRequest) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type dataGameChatMsgSend struct {
+type DataGameChatMsgSend struct {
 	event.EventGameChatMsgeSent
 }
 
-func (d dataGameChatMsgSend) Type() MsgType {
+func (d DataGameChatMsgSend) Type() MsgType {
 	return MsgTypeChatMsgSend
 }
 
-func (d dataGameChatMsgSend) Encode() []byte {
+func (d DataGameChatMsgSend) Encode() []byte {
 	b, _ := json.Marshal(d)
 	return b
 }
 
-type dataResumeGameRequest struct {
+type DataResumeGameRequest struct {
 	GameId types.ObjectId `json:"game_id"`
 }
 
-func (m dataResumeGameRequest) Type() MsgType {
+func (m DataResumeGameRequest) Type() MsgType {
 	return MsgTypeResumeGame
 }
 
-func (m dataResumeGameRequest) Encode() []byte {
+func (m DataResumeGameRequest) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
 
-type dataResumeGameResponse struct {
+type DataResumeGameResponse struct {
 	GameId types.ObjectId `json:"game_id"`
 	Pgn    string         `json:"pgn"`
 }
 
-func (m dataResumeGameResponse) Type() MsgType {
+func (m DataResumeGameResponse) Type() MsgType {
 	return MsgTypeResumeGame
 }
 
-func (m dataResumeGameResponse) Encode() []byte {
+func (m DataResumeGameResponse) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
 
-type dataGameViewResponse struct {
+type DataGameViewResponse struct {
 	GameId types.ObjectId `json:"game_id"`
 	Pgn    string         `json:"pgn"`
 }
 
-func (m dataGameViewResponse) Type() MsgType {
+func (m DataGameViewResponse) Type() MsgType {
 	return MsgTypeViewGame
 }
-func (m dataGameViewResponse) Encode() []byte {
+func (m DataGameViewResponse) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
 
-type dataViwersListResponse struct {
+type DataViwersListResponse struct {
 	GameId types.ObjectId   `json:"game_id"`
 	List   []types.ObjectId `json:"list"`
 }
 
-func (m dataViwersListResponse) Type() MsgType {
+func (m DataViwersListResponse) Type() MsgType {
 	return MsgTypeViewersList
 }
 
-func (m dataViwersListResponse) Encode() []byte {
+func (m DataViwersListResponse) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }
 
-type dataGamePlayerResignRequest struct {
+type DataGamePlayerResignRequest struct {
 	event.EventGamePlayerResigned
 }
 
-func (m dataGamePlayerResignRequest) Type() MsgType {
+func (m DataGamePlayerResignRequest) Type() MsgType {
 	return MsgTypePlayerResigned
 }
 
-func (m dataGamePlayerResignRequest) Encode() []byte {
+func (m DataGamePlayerResignRequest) Encode() []byte {
 	b, _ := json.Marshal(m)
 	return b
 }

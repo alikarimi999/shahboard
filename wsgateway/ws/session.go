@@ -206,7 +206,7 @@ func (s *session) handleGameChatEvent(e event.Event) *Msg {
 	return nil
 }
 
-func (s *session) handleFindMatchRequest(msgId types.ObjectId, data dataFindMatchRequest) {
+func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatchRequest) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {
@@ -223,7 +223,7 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data dataFindMatc
 	errMsg = "already subscribed to a game"
 }
 
-func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGameRequest) {
+func (s *session) handleResumeGameRequest(msgId types.ObjectId, req DataResumeGameRequest) {
 	var errMsg string
 	var msg *Msg
 	defer func() {
@@ -273,7 +273,7 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGa
 				Type:      MsgTypeResumeGame,
 				Timestamp: time.Now().Unix(),
 			},
-			Data: dataResumeGameResponse{
+			Data: DataResumeGameResponse{
 				GameId: req.GameId,
 				Pgn:    g.Pgn,
 			}.Encode(),
@@ -286,7 +286,7 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req dataResumeGa
 	errMsg = "already subscribed to a game"
 }
 
-func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRequest) {
+func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRequest) {
 	var errMsg string
 	var msg *Msg
 	defer func() {
@@ -320,7 +320,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 			Type:      MsgTypeViewGame,
 			Timestamp: time.Now().Unix(),
 		},
-		Data: dataGameViewResponse{
+		Data: DataGameViewResponse{
 			GameId: req.GameId,
 			Pgn:    game.Pgn,
 		}.Encode(),
@@ -335,7 +335,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req dataGameViewRe
 	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
 }
 
-func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMoveRequest) {
+func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMoveRequest) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {
@@ -353,7 +353,7 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req dataGamePlayerMove
 	errMsg = "not allowed to move"
 }
 
-func (s *session) handlePlayerResignRequest(msgId types.ObjectId, req dataGamePlayerResignRequest) {
+func (s *session) handlePlayerResignRequest(msgId types.ObjectId, req DataGamePlayerResignRequest) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {
@@ -371,7 +371,7 @@ func (s *session) handlePlayerResignRequest(msgId types.ObjectId, req dataGamePl
 	errMsg = "not allowed to resign"
 }
 
-func (s *session) handleSendMsg(msgId types.ObjectId, req dataGameChatMsgSend) {
+func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
 	var errMsg string
 	defer func() {
 		if errMsg != "" {
@@ -426,7 +426,7 @@ func (s *session) sendViwersList(gameId types.ObjectId, viewers []types.ObjectId
 			Type:      MsgTypeViewersList,
 			Timestamp: time.Now().Unix(),
 		},
-		Data: dataViwersListResponse{
+		Data: DataViwersListResponse{
 			GameId: gameId,
 			List:   viewers,
 		}.Encode(),
