@@ -1,6 +1,7 @@
 import { currentGame } from './gameState.js';
 import { connectWebSocket } from './ws.js';
 import { initializeBoard } from './board.js';
+import { config } from './config.js';
 import {
     handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate,
     handleGameEnded, handleError, handleViewGame, handleViewersList
@@ -21,7 +22,7 @@ if (!gameId) {
     window.location.href = '/'; // Redirect to the home page (adjust the URL as needed)
 } else {
     currentGame.gameId = gameId;
-    connectWebSocket('http://localhost:8083/ws').then(connection => {
+    connectWebSocket(`${config.baseUrl}/wsgateway/ws`).then(connection => {
         currentGame.ws = connection;
 
         currentGame.ws.registerMessageHandler("msg_approved", handleGameChatMsg);
