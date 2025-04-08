@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -66,13 +67,15 @@ func (kc *kafkaSubscriber) Close() error {
 }
 
 type consumerGroupHandler struct {
+	cg     *consumerGroup
 	kc     *kafkaSubscriber
 	topics []string
 	l      log.Logger
 }
 
-func newConsumerGroupHandler(kc *kafkaSubscriber, topics []string, l log.Logger) sarama.ConsumerGroupHandler {
+func newConsumerGroupHandler(cg *consumerGroup, kc *kafkaSubscriber, topics []string, l log.Logger) sarama.ConsumerGroupHandler {
 	return &consumerGroupHandler{
+		cg:     cg,
 		kc:     kc,
 		topics: topics,
 		l:      l,
@@ -84,15 +87,27 @@ func (ch *consumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
 	ch.l.Debug(fmt.Sprintf("consumer group handler setup for topics: %v", ch.topics))
 	return nil
 }
-func (ch *consumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
+func (ch *consumerGroupHandler) Cleanup(s sarama.ConsumerGroupSession) error {
 	ch.l.Debug(fmt.Sprintf("consumer group handler cleanup for topics %v", ch.topics))
+
+	// When not in the process of adding new topics, a disconnection likely indicates
+	// a network issue. Hence, we schedule a reconnection by calling reConsume() in a new goroutine.
+	// During topic addition, reConsume() will be invoked elsewhere to handle the update. (I don't like this approach and need to find a better solution.)
+	if !ch.cg.addingTopic.Load() {
+		go func() {
+			ch.cg.mu.Lock()
+			ch.cg.reConsume(ch.kc)
+			ch.cg.mu.Unlock()
+		}()
+	}
+
 	return nil
 }
 
 // Consumes messages from Kafka, decodes events, and broadcasts them to subscribers.
 func (
 	ch *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	ch.l.Debug(fmt.Sprintf("starting to consume messages for topics %v", ch.topics))
+	ch.l.Debug(fmt.Sprintf("starting to consume messages for topics %v", claim.Topic()))
 	for message := range claim.Messages() {
 		var action string
 		for _, header := range message.Headers {
@@ -309,7 +324,9 @@ type consumerGroup struct {
 
 	g sarama.ConsumerGroup
 
-	td []string
+	td          []string
+	addingTopic atomic.Bool
+
 	wg sync.WaitGroup
 	l  log.Logger
 }
@@ -334,43 +351,18 @@ func newConsumerGroup(brokers []string, groupID string, l log.Logger) (*consumer
 	}, nil
 }
 
-func (cg *consumerGroup) consume(kc *kafkaSubscriber, domain string) {
-	cg.mu.Lock()
-	defer cg.mu.Unlock()
-
-	for _, t := range cg.td {
-		if t == domain {
-			return
-		}
-	}
-
-	if !cg.isRunnig {
-		ctx, cancel := context.WithCancel(context.Background())
-		cg.ctx = ctx
-		cg.cancel = cancel
-		cg.isRunnig = true
-		cg.td = append(cg.td, domain)
-		cg.wg.Add(1)
-		go func() {
-			defer cg.wg.Done()
-			if err := cg.g.Consume(ctx, cg.td, newConsumerGroupHandler(kc, cg.td, cg.l)); err != nil {
-				if err.Error() != context.Canceled.Error() {
-					cg.l.Error(fmt.Sprintf("Error consuming domains %v: %v", cg.td, err))
-				}
-			}
-		}()
-
-		return
-	}
-	cg.cancel()
+func (cg *consumerGroup) reConsume(kc *kafkaSubscriber, newDomains ...string) {
 	cg.wg.Wait()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cg.ctx = ctx
 	cg.cancel = cancel
-	cg.td = append(cg.td, domain)
 
-	cg.l.Info("restarting consumer group")
+	if len(newDomains) > 0 {
+		cg.td = append(cg.td, newDomains...)
+	}
+
+	cg.l.Info("restarting consumer group...")
 	for {
 		newCg, err := sarama.NewConsumerGroup(cg.brokers, cg.groupId, cg.cfg)
 		if err != nil {
@@ -382,15 +374,59 @@ func (cg *consumerGroup) consume(kc *kafkaSubscriber, domain string) {
 		cg.g = newCg
 		break
 	}
-	cg.l.Info("restarted consumer group")
+	cg.l.Info("consumer group restarted")
 
 	cg.wg.Add(1)
 	go func() {
 		defer cg.wg.Done()
-		if err := cg.g.Consume(ctx, cg.td, newConsumerGroupHandler(kc, cg.td, cg.l)); err != nil {
-			cg.l.Error(fmt.Sprintf("Error consuming domains %v: %v", cg.td, err))
+		if err := cg.g.Consume(ctx, cg.td, newConsumerGroupHandler(cg, kc, cg.td, cg.l)); err != nil {
+			cg.isRunnig = false
+			if err.Error() != context.Canceled.Error() {
+				cg.l.Error(fmt.Sprintf("Error consuming domains %v: %v", cg.td, err))
+			}
 		}
 	}()
+}
+
+func (cg *consumerGroup) consume(kc *kafkaSubscriber, domain string) {
+	cg.mu.Lock()
+	defer cg.mu.Unlock()
+
+	for _, t := range cg.td {
+		if t == domain {
+			return
+		}
+	}
+
+	// If this is the first topic to consume, create a new context with a cancel function
+	// and begin consuming the topic.
+	if !cg.isRunnig {
+		ctx, cancel := context.WithCancel(context.Background())
+		cg.ctx = ctx
+		cg.cancel = cancel
+		cg.isRunnig = true
+		cg.td = append(cg.td, domain)
+		cg.wg.Add(1)
+		go func() {
+			defer cg.wg.Done()
+			if err := cg.g.Consume(ctx, cg.td, newConsumerGroupHandler(cg, kc, cg.td, cg.l)); err != nil {
+				cg.isRunnig = false
+				if err.Error() != context.Canceled.Error() {
+					cg.l.Error(fmt.Sprintf("Error consuming domains %v: %v", cg.td, err))
+				}
+			}
+		}()
+
+		return
+	}
+
+	// If a topic is already being consumed, cancel the current context using cancel().
+	// Then, add the new topic to the list and resume consumption from the updated topic.
+	// swap addingTopic to true to prevent re-consuming in Cleanup function
+	cg.addingTopic.Store(true)
+	cg.cancel()
+	cg.reConsume(kc, domain)
+	cg.addingTopic.Store(false)
 
 }
 
