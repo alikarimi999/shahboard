@@ -1,0 +1,14 @@
+{
+    "server": "http://localhost:80",
+    "stockfish_path": "./stockfish_engin",
+    "bots": [
+        {
+            "email": "bot1@test.com",
+            "password": "bot1_password"
+        },
+        {
+            "email": "bot2@test.com",
+            "password": "bot2_password"
+        }
+    ]
+}
