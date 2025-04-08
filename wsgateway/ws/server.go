@@ -33,7 +33,6 @@ type Server struct {
 	h *sessionsEventsHandler
 
 	p     event.Publisher
-	game  GameService
 	cache *redisCache
 
 	stopCh chan struct{}

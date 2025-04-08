@@ -88,6 +88,8 @@ func (s *session) start() {
 
 func (s *session) consume(e event.Event) {
 	if s.isStopped() {
+		s.l.Debug(fmt.Sprintf("attempted to send event to stopped session '%s': %s",
+			s.id, string(e.Encode())))
 		return
 	}
 
@@ -390,6 +392,12 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
 }
 
 func (s *session) send(msg *Msg) {
+	if s.isStopped() {
+		s.l.Debug(fmt.Sprintf("attempted to send msg to stopped session '%s' : %s",
+			s.id, string(msg.Encode())))
+		return
+	}
+
 	select {
 	case s.msgCh <- msg.Encode():
 	default:
