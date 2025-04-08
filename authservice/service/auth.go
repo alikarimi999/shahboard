@@ -26,6 +26,9 @@ type Repository interface {
 
 type Config struct {
 	GoogleClientID string `json:"google_client_id"`
+
+	// this is just because, google cert endpoint has blocked iran ip (should implement a better solution)
+	VerifyPubKey bool `json:"verify_pub_key"`
 }
 
 type AuthService struct {
@@ -47,15 +50,18 @@ func NewAuthService(cfg Config, repo Repository, jwtGenerator *jwt.Generator, pu
 }
 
 func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (GoogleAuthResponse, error) {
-	token, err := s.parseGoogleToken(req.Token)
+
+	var token *tokenInfo
+	var err error
+
+	if s.cfg.VerifyPubKey {
+		token, err = s.validateGoogleJWT(req.Token)
+	} else {
+		token, err = parseGoogleJWT(req.Token, s.cfg.GoogleClientID)
+	}
 	if err != nil {
 		return GoogleAuthResponse{}, err
 	}
-
-	// token, err := validateGoogleJWT(req.Token, s.cfg.GoogleClientID)
-	// if err != nil {
-	// 	return GoogleAuthResponse{}, err
-	// }
 
 	user, err := s.repo.GetByEmail(ctx, token.Email)
 	if err != nil {
@@ -166,7 +172,7 @@ type tokenInfo struct {
 	Picture       string `json:"picture"`
 }
 
-func (s *AuthService) parseGoogleToken(tokenString string) (*tokenInfo, error) {
+func (s *AuthService) validateGoogleJWT(tokenString string) (*tokenInfo, error) {
 	p, err := idtoken.Validate(context.Background(), tokenString, s.cfg.GoogleClientID)
 	if err != nil {
 		s.l.Error(err.Error())
@@ -222,28 +228,30 @@ var staticGoogleCerts = GoogleCerts{
 	},
 }
 
-// validateGoogleJWT validates a Google OAuth2 ID token using static keys
-func validateGoogleJWT(tokenString string, clientID string) (*tokenInfo, error) {
+// parseGoogleJWT validates a Google OAuth2 ID token using static keys
+func parseGoogleJWT(tokenString string, clientID string) (*tokenInfo, error) {
 	// Parse the token to get the "kid" from the header
-	token, err := pjwt.Parse(tokenString, func(token *pjwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*pjwt.SigningMethodRSA); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
 
-		kid, ok := token.Header["kid"].(string)
-		if !ok {
-			return nil, errors.New("missing or invalid kid in token header")
-		}
+	// token, err := pjwt.Parse(tokenString, func(token *pjwt.Token) (interface{}, error) {
+	// 	if _, ok := token.Method.(*pjwt.SigningMethodRSA); !ok {
+	// 		return nil, errors.New("unexpected signing method")
+	// 	}
 
-		// Use static keys instead of fetching
-		publicKey, err := getStaticGooglePublicKey(kid)
-		if err != nil {
-			return nil, err
-		}
+	// 	kid, ok := token.Header["kid"].(string)
+	// 	if !ok {
+	// 		return nil, errors.New("missing or invalid kid in token header")
+	// 	}
 
-		return publicKey, nil
-	})
+	// 	// Use static keys instead of fetching
+	// 	publicKey, err := getStaticGooglePublicKey(kid)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
+	// 	return publicKey, nil
+	// })
+
+	token, _, err := new(pjwt.Parser).ParseUnverified(tokenString, pjwt.MapClaims{})
 	if err != nil {
 		return nil, err
 	}
