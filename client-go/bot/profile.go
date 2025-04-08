@@ -11,38 +11,39 @@ import (
 	"github.com/alikarimi999/shahboard/types"
 )
 
-func (b *Bot) Login() error {
+// return true if user was created account before and logged in
+func (b *Bot) Login() (bool, error) {
 	bReq, err := json.Marshal(auth.PasswordAuthRequest{
 		Email:    b.email,
 		Password: b.password,
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/auth/", b.url), bytes.NewBuffer(bReq))
 	if err != nil {
-		return err
+		return false, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("login failed")
+		return false, fmt.Errorf("login failed")
 	}
 
 	var resBody auth.PasswordAuthResponse
 	if err := json.NewDecoder(res.Body).Decode(&resBody); err != nil {
-		return err
+		return false, err
 	}
 
 	b.id = types.ObjectId(resBody.Id)
 	b.jwtToken = resBody.JwtToken
-	return nil
+	return resBody.Exists, nil
 }
 
 func (b *Bot) UpdateProfile(name, avatar string) error {

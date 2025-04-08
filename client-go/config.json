@@ -1,6 +1,6 @@
 {
-    "server": "http://localhost:80",
-    "stockfish_path": "./stockfish_engin",
+    "server": "http://130.185.77.237",
+    "stockfish_path": "./stockfish_engine",
     "bots": [
         {
             "email": "bot1@test.com",

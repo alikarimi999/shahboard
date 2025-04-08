@@ -16,7 +16,7 @@ import (
 var defaultNotation = chess.AlgebraicNotation{}
 
 type game struct {
-	u          *Bot
+	b          *Bot
 	id         types.ObjectId
 	color      types.Color
 	opponentId types.ObjectId
@@ -29,7 +29,70 @@ type game struct {
 	stopCh chan struct{}
 }
 
-func (b *Bot) Play(ec event.EventUsersMatchCreated) error {
+func (b *Bot) Resume(gameId types.ObjectId) error {
+	if b.g != nil {
+		return fmt.Errorf("game already exists")
+	}
+
+	ms := b.Subscribe(Topic(ws.MsgTypeResumeGame))
+
+	if err := b.SendWsMessage(ws.Msg{
+		MsgBase: ws.MsgBase{
+			Type:      ws.MsgTypeResumeGame,
+			Timestamp: time.Now().Unix(),
+		},
+		Data: ws.DataResumeGameRequest{
+			GameId: gameId,
+		}.Encode(),
+	}); err != nil {
+		return err
+	}
+
+	e := <-ms.Consume()
+	ms.Unsubscribe()
+	fmt.Println("here >>> ", e)
+	msg := ws.DataResumeGameResponse{}
+	if err := json.Unmarshal(e.Data.(ws.Msg).Data, &msg); err != nil {
+		return err
+	}
+
+	f, err := chess.PGN(strings.NewReader(msg.Pgn))
+	if err != nil {
+		return err
+	}
+
+	g := &game{
+		b:  b,
+		id: gameId,
+
+		board:     chess.NewGame(f),
+		subs:      make(map[Topic]*Subscription),
+		moveDelay: 5 * time.Second,
+		stopCh:    make(chan struct{}),
+	}
+
+	g.addBasicSubs(b.Subscribe)
+
+	white := g.board.GetTagPair("w")
+	black := g.board.GetTagPair("b")
+	if white == nil || black == nil {
+		return fmt.Errorf("game pgn is invalid")
+	}
+
+	if white.Value == b.ID().String() {
+		g.color = types.ColorWhite
+		g.opponentId = types.ObjectId(black.Value)
+	} else {
+		g.color = types.ColorBlack
+		g.opponentId = types.ObjectId(white.Value)
+	}
+
+	b.g = g
+
+	return g.run()
+}
+
+func (b *Bot) Create(ec event.EventUsersMatchCreated) error {
 	if b.g != nil {
 		return fmt.Errorf("game already exists")
 	}
@@ -55,7 +118,7 @@ func (b *Bot) Play(ec event.EventUsersMatchCreated) error {
 	}
 
 	g := &game{
-		u:         b,
+		b:         b,
 		id:        msg.GameID,
 		board:     chess.NewGame(),
 		subs:      make(map[Topic]*Subscription),
@@ -63,16 +126,7 @@ func (b *Bot) Play(ec event.EventUsersMatchCreated) error {
 		stopCh:    make(chan struct{}),
 	}
 
-	t := Topic(ws.MsgTypeMoveApproved)
-	g.subs[t] = b.Subscribe(t)
-	t = Topic(ws.MsgTypeGameEnd)
-	g.subs[t] = b.Subscribe(t)
-	t = Topic(ws.MsgTypeChatCreated)
-	g.subs[t] = b.Subscribe(t)
-	t = Topic(ws.MsgTypeChatMsgApproved)
-	g.subs[t] = b.Subscribe(t)
-	t = Topic(ws.MsgTypePlayerConnectionUpdated)
-	g.subs[t] = b.Subscribe(t)
+	g.addBasicSubs(b.Subscribe)
 
 	if b.id == msg.Player1.ID {
 		g.color = msg.Player1.Color
@@ -87,7 +141,22 @@ func (b *Bot) Play(ec event.EventUsersMatchCreated) error {
 	return g.run()
 }
 
+func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
+	t := Topic(ws.MsgTypeMoveApproved)
+	g.subs[t] = subscribe(t)
+	t = Topic(ws.MsgTypeGameEnd)
+	g.subs[t] = subscribe(t)
+	t = Topic(ws.MsgTypeChatCreated)
+	g.subs[t] = subscribe(t)
+	t = Topic(ws.MsgTypeChatMsgApproved)
+	g.subs[t] = subscribe(t)
+	t = Topic(ws.MsgTypePlayerConnectionUpdated)
+	g.subs[t] = subscribe(t)
+}
+
 func (g *game) run() error {
+
+	fmt.Printf("game started between %s and %s\n", g.b.ID(), g.opponentId)
 
 	// first move if use is white
 	if g.color == types.ColorWhite {
@@ -121,7 +190,7 @@ func (g *game) stop() {
 			s.Unsubscribe()
 		}
 		close(g.stopCh)
-		g.u.g = nil
+		g.b.g = nil
 	})
 }
 
@@ -173,7 +242,7 @@ func (g *game) handleMoveApproved(data []byte) {
 
 func (g *game) bestMove() *chess.Move {
 	for {
-		m, err := g.u.sp.BestMove(g.board.FEN(), g.u.skill)
+		m, err := g.b.sp.BestMove(g.board.FEN(), g.b.skill)
 		if err != nil {
 			fmt.Printf("stockfish error: %v\n", err)
 			time.Sleep(1 * time.Second)
@@ -194,7 +263,7 @@ func (g *game) bestMove() *chess.Move {
 func (g *game) sendMove(m *chess.Move) {
 	time.Sleep(g.moveDelay)
 	for {
-		if err := g.u.SendWsMessage(ws.Msg{
+		if err := g.b.SendWsMessage(ws.Msg{
 			MsgBase: ws.MsgBase{
 				Type:      ws.MsgTypePlayerMove,
 				Timestamp: time.Now().Unix(),
@@ -202,7 +271,7 @@ func (g *game) sendMove(m *chess.Move) {
 			Data: ws.DataGamePlayerMoveRequest{
 				EventGamePlayerMoved: event.EventGamePlayerMoved{
 					GameID:   g.id,
-					PlayerID: g.u.id,
+					PlayerID: g.b.id,
 					Move:     defaultNotation.Encode(g.board.Position(), m),
 					Index:    len(g.board.Moves()),
 				},

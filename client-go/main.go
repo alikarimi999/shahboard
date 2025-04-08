@@ -10,7 +10,24 @@ import (
 	"github.com/alikarimi999/shahboard/pkg/utils"
 )
 
+type Config struct {
+	Server        string `json:"server"`
+	StockfishPath string `json:"stockfish_path"`
+	Bots          []Bot  `json:"bots"`
+}
+
+type Bot struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 func main() {
+	// http.DefaultClient.Transport = &http.Transport{
+	// 	TLSClientConfig: &tls.Config{
+	// 		InsecureSkipVerify: true,
+	// 	},
+	// }
+
 	cfg := &Config{}
 	if err := utils.LoadConfigs("./config.json", cfg); err != nil {
 		panic(err)
@@ -34,39 +51,68 @@ func main() {
 	}
 
 	for _, bc := range cfg.Bots {
-		b, err := bot.NewBot(cfg.Server, bc.Email, bc.Password, randSkill(), sp)
+		b, err := bot.NewBot(bc.Email, bc.Password, cfg.Server, randSkill(), sp)
 		if err != nil {
-			fmt.Printf("bot %s error: %v\n", bc.Email, err)
+			fmt.Printf("bot '%s' error: %v\n", bc.Email, err)
 			continue
 		}
 		handleBot(b)
 	}
+
+	select {}
 }
 
 func handleBot(b *bot.Bot) {
 	go func() {
 		for {
-			randSleep()
-			if err := b.Login(); err != nil {
-				fmt.Printf("bot %s login error: %v\n", b.Email(), err)
+			// randSleep()
+			ok, err := b.Login()
+			if err != nil {
+				fmt.Printf("bot '%s' login error: %v\n", b.Email(), err)
 				continue
 			}
 
+			fmt.Printf("bot '%s' login success\n", b.Email())
+
+			if !ok {
+				if err := b.UpdateProfile(b.Email(), "avatar"); err != nil {
+					fmt.Printf("bot '%s' update profile error: %v\n", b.Email(), err)
+					continue
+				}
+			}
+
 			if err := b.SetupWS(); err != nil {
-				fmt.Printf("bot %s ws error: %v\n", b.Email(), err)
+				fmt.Printf("bot '%s' ws error: %v\n", b.Email(), err)
+				continue
+			}
+
+			fmt.Printf("bot '%s' ws connected\n", b.Email())
+
+			gameId, err := b.GetUserLiveGame(b.ID())
+			if err != nil {
+				fmt.Printf("bot '%s' get live game error: %v\n", b.Email(), err)
+				continue
+			}
+
+			if !gameId.IsZero() {
+				if err := b.Resume(gameId); err != nil {
+					fmt.Printf("bot '%s' resume error: %v\n", b.Email(), err)
+					continue
+				}
 				continue
 			}
 
 			e, err := b.FindMatch()
 			if err != nil {
-				fmt.Printf("bot %s find match error: %v\n", b.Email(), err)
+				fmt.Printf("bot '%s' find match error: %v\n", b.Email(), err)
 				continue
 			}
 
-			if err := b.Play(e); err != nil {
-				fmt.Printf("bot %s play error: %v\n", b.Email(), err)
+			if err := b.Create(e); err != nil {
+				fmt.Printf("bot '%s' play error: %v\n", b.Email(), err)
 				continue
 			}
+
 		}
 	}()
 }
@@ -76,5 +122,5 @@ func randSkill() int {
 }
 
 func randSleep() {
-	time.Sleep(time.Duration(rand.Intn(15)) * time.Second)
+	time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
 }

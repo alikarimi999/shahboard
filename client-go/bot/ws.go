@@ -3,6 +3,7 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
 	"time"
 
@@ -11,24 +12,36 @@ import (
 )
 
 type webSocket struct {
-	b      *Bot
-	conn   *websocket.Conn
-	once   sync.Once
+	b    *Bot
+	conn *websocket.Conn
+	once sync.Once
+
+	writeCh chan ws.Msg
+
 	stopCh chan struct{}
 }
 
 func (b *Bot) SetupWS() error {
-	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("%s/wsgateway/ws?token=%s", b.url, b.jwtToken), nil)
+	u, err := url.Parse(b.url)
+	if err != nil {
+		return err
+	}
+
+	wsURL := fmt.Sprintf("%s://%s", "ws", u.Host)
+	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("%s/wsgateway/ws?token=%s", wsURL, b.jwtToken), nil)
 	if err != nil {
 		return err
 	}
 	b.ws = &webSocket{
-		b:      b,
-		conn:   conn,
-		stopCh: make(chan struct{})}
+		b:       b,
+		conn:    conn,
+		writeCh: make(chan ws.Msg, 100),
+		stopCh:  make(chan struct{})}
 
 	b.ws.waitFor(ws.MsgTypeWelcome)
-	go b.ws.handlePingPong()
+	fmt.Printf("bot %s received welcome message\n", b.Email())
+
+	go b.ws.runWriter()
 	go b.ws.runReader()
 
 	return nil
@@ -57,19 +70,33 @@ func (s *webSocket) stop() {
 }
 
 func (s *webSocket) sendMessage(msg ws.Msg) error {
-	return s.conn.WriteJSON(msg)
+	select {
+	case s.writeCh <- msg:
+		return nil
+	default:
+		return fmt.Errorf("failed to send message")
+	}
 }
 
-func (s *webSocket) handlePingPong() {
+func (s *webSocket) runWriter() {
+	t := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case <-s.stopCh:
 			return
-		default:
-			if err := s.conn.WriteMessage(websocket.BinaryMessage, []byte{0x0}); err != nil {
+
+		case msg := <-s.writeCh:
+			if err := s.conn.WriteJSON(msg); err != nil {
+				fmt.Printf("bot '%s' error sending ping message: %v\n", s.b.Email(), err)
+				s.stop()
 				return
 			}
-			time.Sleep(1 * time.Second)
+		case <-t.C:
+			if err := s.conn.WriteMessage(websocket.BinaryMessage, []byte{0x0}); err != nil {
+				fmt.Printf("bot '%s' error sending ping message: %v\n", s.b.Email(), err)
+				s.stop()
+				return
+			}
 		}
 	}
 }
@@ -82,9 +109,14 @@ func (s *webSocket) runReader() {
 		default:
 			mt, b, err := s.conn.ReadMessage()
 			if err != nil {
+				fmt.Printf("bot '%s' error reading message: %v\n", s.b.Email(), err)
 				s.stop()
 				return
 			}
+			if mt == websocket.BinaryMessage {
+				fmt.Printf("bot '%s' received binary message: %v\n", s.b.Email(), b)
+			}
+
 			if mt == websocket.TextMessage {
 				msg := &ws.Msg{}
 				if err := json.Unmarshal(b, msg); err != nil {
