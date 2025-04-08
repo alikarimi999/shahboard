@@ -258,7 +258,7 @@ func parseGoogleJWT(tokenString string, clientID string) (*tokenInfo, error) {
 
 	// Validate token and extract claims
 	claims, ok := token.Claims.(pjwt.MapClaims)
-	if !ok || !token.Valid {
+	if !ok {
 		return nil, errors.New("invalid token")
 	}
 
