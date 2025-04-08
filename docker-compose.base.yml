@@ -6,7 +6,7 @@ services:
     container_name: traefik
     restart: always
     command:
-      - "--api.insecure=true" # Enables the Traefik dashboard (for testing)
+      # - "--api.insecure=true" 
       - "--providers.docker=true" # Enables Docker auto-discovery
       - "--entrypoints.web.address=:80" # HTTP Entrypoint
       - "--entrypoints.websecure.address=:443" # HTTPS Entrypoint
@@ -16,7 +16,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8081:8080" # Dashboard
+      # - "8080:8080" # Dashboard
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./letsencrypt:/letsencrypt"
@@ -29,7 +29,7 @@ services:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     restart: always
@@ -44,7 +44,7 @@ services:
     image: redis:latest
     container_name: redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - ./data/redis:/data
     restart: always
@@ -61,8 +61,8 @@ services:
     volumes:
       - ./data/kafka:/bitnami/kafka
     ports:
-      - "9092:9092"
-      - "9101:9101"
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:9101:9101"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
