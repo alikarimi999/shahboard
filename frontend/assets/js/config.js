@@ -1,3 +1,3 @@
 export const config = {
-    baseUrl: 'http://api.shahboard.ir',
+    baseUrl: 'https://api.shahboard.ir',
 };
