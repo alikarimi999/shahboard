@@ -19,7 +19,7 @@
         "public_key_path": "/app/jwt/public_key.pem"
     },
     "game_service_grpc": {
-        "target": "game-service:9091"
+        "target": "game-service:9090"
     },
     "redis": {
         "addr": "redis:6379"
