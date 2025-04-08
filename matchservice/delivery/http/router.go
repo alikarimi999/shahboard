@@ -23,7 +23,7 @@ type Router struct {
 func NewRouter(cfg Config, s *match.Service, v *jwt.Validator) (*Router, error) {
 	// gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
-	engine.Use(middleware.Cors())
+	engine.Use(middleware.Cors(), middleware.ParsUserHeader(v))
 
 	r := &Router{
 		cfg: cfg,
