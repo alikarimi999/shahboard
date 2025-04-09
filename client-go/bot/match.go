@@ -25,7 +25,7 @@ func (b *Bot) FindMatch() (event.EventUsersMatchCreated, error) {
 		return e, err
 	}
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusCreated {
 		return e, fmt.Errorf("find match failed")
 	}
 

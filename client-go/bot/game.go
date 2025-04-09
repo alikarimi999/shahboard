@@ -3,8 +3,10 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
@@ -14,6 +16,8 @@ import (
 )
 
 var defaultNotation = chess.AlgebraicNotation{}
+var defaultDelay int = 5
+var defaultMsgLen int = 5
 
 type game struct {
 	b          *Bot
@@ -23,13 +27,14 @@ type game struct {
 	board      *chess.Game
 	subs       map[Topic]*Subscription
 
-	moveDelay time.Duration
+	moveDelay int
 
-	once   sync.Once
-	stopCh chan struct{}
+	gamesCount *atomic.Int32
+	once       sync.Once
+	stopCh     chan struct{}
 }
 
-func (b *Bot) Resume(gameId types.ObjectId) error {
+func (b *Bot) Resume(gameId types.ObjectId, counter *atomic.Int32) error {
 	if b.g != nil {
 		return fmt.Errorf("game already exists")
 	}
@@ -50,9 +55,13 @@ func (b *Bot) Resume(gameId types.ObjectId) error {
 
 	e := <-ms.Consume()
 	ms.Unsubscribe()
-	fmt.Println("here >>> ", e)
+
 	msg := ws.DataResumeGameResponse{}
-	if err := json.Unmarshal(e.Data.(ws.Msg).Data, &msg); err != nil {
+	msgData, ok := e.Data.(*ws.Msg)
+	if !ok {
+		return fmt.Errorf("unexpected message type: %T", e.Data)
+	}
+	if err := json.Unmarshal(msgData.Data, &msg); err != nil {
 		return err
 	}
 
@@ -65,10 +74,15 @@ func (b *Bot) Resume(gameId types.ObjectId) error {
 		b:  b,
 		id: gameId,
 
-		board:     chess.NewGame(f),
-		subs:      make(map[Topic]*Subscription),
-		moveDelay: 5 * time.Second,
-		stopCh:    make(chan struct{}),
+		board:      chess.NewGame(f),
+		subs:       make(map[Topic]*Subscription),
+		gamesCount: counter,
+		moveDelay:  defaultDelay,
+		stopCh:     make(chan struct{}),
+	}
+
+	if g.board.Outcome() != chess.NoOutcome {
+		return fmt.Errorf("game is already finished")
 	}
 
 	g.addBasicSubs(b.Subscribe)
@@ -89,10 +103,10 @@ func (b *Bot) Resume(gameId types.ObjectId) error {
 
 	b.g = g
 
-	return g.run()
+	return g.run(counter)
 }
 
-func (b *Bot) Create(ec event.EventUsersMatchCreated) error {
+func (b *Bot) Create(ec event.EventUsersMatchCreated, counter *atomic.Int32) error {
 	if b.g != nil {
 		return fmt.Errorf("game already exists")
 	}
@@ -113,7 +127,11 @@ func (b *Bot) Create(ec event.EventUsersMatchCreated) error {
 	ms.Unsubscribe()
 
 	msg := event.EventGameCreated{}
-	if err := json.Unmarshal(e.Data.(ws.Msg).Data, &msg); err != nil {
+	msgData, ok := e.Data.(*ws.Msg)
+	if !ok {
+		return fmt.Errorf("unexpected message type: %T", e.Data)
+	}
+	if err := json.Unmarshal(msgData.Data, &msg); err != nil {
 		return err
 	}
 
@@ -122,7 +140,7 @@ func (b *Bot) Create(ec event.EventUsersMatchCreated) error {
 		id:        msg.GameID,
 		board:     chess.NewGame(),
 		subs:      make(map[Topic]*Subscription),
-		moveDelay: 5 * time.Second,
+		moveDelay: defaultDelay,
 		stopCh:    make(chan struct{}),
 	}
 
@@ -138,7 +156,7 @@ func (b *Bot) Create(ec event.EventUsersMatchCreated) error {
 
 	b.g = g
 
-	return g.run()
+	return g.run(counter)
 }
 
 func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
@@ -154,19 +172,32 @@ func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
 	g.subs[t] = subscribe(t)
 }
 
-func (g *game) run() error {
+func (g *game) run(counter *atomic.Int32) error {
 
-	fmt.Printf("game started between %s and %s\n", g.b.ID(), g.opponentId)
+	g.chatGenerator()
 
-	// first move if use is white
-	if g.color == types.ColorWhite {
-		m := g.bestMove()
-		if err := g.board.Move(m); err != nil {
+	// first move
+	if types.Color(g.board.Position().Turn()) == g.color {
+		counter.Add(1)
+		fmt.Printf("%d: game started between %s and %s\n", counter.Load(), g.b.ID(), g.opponentId)
+
+		randSleep(g.moveDelay)
+		fmt.Println(g.b.Email(), g.board.Position().Turn(), g.color)
+		m, err := g.randMove()
+		if err != nil {
+			g.stop()
+			return err
+		}
+
+		if err := g.board.MoveStr(m); err != nil {
 			g.stop()
 			return fmt.Errorf("move error: %v", err)
 		}
 
-		g.sendMove(m)
+		if err := g.sendMove(m); err != nil {
+			g.stop()
+			return err
+		}
 	}
 
 	wg := sync.WaitGroup{}
@@ -186,6 +217,7 @@ func (g *game) run() error {
 
 func (g *game) stop() {
 	g.once.Do(func() {
+		g.gamesCount.Add(-1)
 		for _, s := range g.subs {
 			s.Unsubscribe()
 		}
@@ -197,12 +229,101 @@ func (g *game) stop() {
 func (g *game) handleEvent(e Event) {
 	switch e.Topic {
 	case Topic(ws.MsgTypeMoveApproved):
-		g.handleMoveApproved(e.Data.(ws.Msg).Data)
-
+		g.handleMoveApproved(e.Data.(*ws.Msg).Data)
+	case Topic(ws.MsgTypeChatCreated):
+		// g.handleChatCreated(e.Data.(*ws.Msg).Data)
 	case Topic(ws.MsgTypeGameEnd):
-		g.handleGameEnd(e.Data.(ws.Msg).Data)
+		g.handleGameEnd(e.Data.(*ws.Msg).Data)
 
 	}
+}
+
+func (g *game) handleChatCreated(data []byte) {
+	fmt.Println("received chat created event")
+	var e event.EventGameChatCreated
+	if err := json.Unmarshal(data, &e); err != nil {
+		fmt.Printf("unmarshal chat created error: %v\n", err)
+		return
+	}
+
+	if g.id != e.GameID {
+		return
+	}
+
+	fmt.Printf("chat enabled: %v\n", e)
+	s, ok := g.subs[Topic(ws.MsgTypeChatCreated)]
+	if ok {
+		s.Unsubscribe()
+	}
+
+	g.chatGenerator()
+}
+
+func (g *game) chatGenerator() {
+	if g.color == types.ColorWhite {
+		go func() {
+			for {
+				select {
+				case <-g.stopCh:
+					return
+				case <-time.After(time.Second):
+					if err := g.sendChat(fmt.Sprintf("random msg by white:\n '%s'\n",
+						randString(defaultMsgLen))); err != nil {
+						fmt.Printf("send chat error: %v\n", err)
+						continue
+					}
+				}
+			}
+		}()
+	} else {
+		s, ok := g.subs[Topic(ws.MsgTypeChatMsgApproved)]
+		if !ok {
+			return
+		}
+		go func() {
+			for {
+				select {
+				case <-g.stopCh:
+					return
+				case e := <-s.Consume():
+					msgData, ok := e.Data.(*ws.Msg)
+					if !ok {
+						continue
+					}
+					msg := event.EventGameChatMsgApproved{}
+					if err := json.Unmarshal(msgData.Data, &msg); err != nil {
+						continue
+					}
+					if msg.GameID != g.id || msg.SenderId != g.opponentId {
+						continue
+					}
+
+					extracted := strings.Split(msg.Content, "\n")
+					if len(extracted) < 2 {
+						continue
+					}
+					if extracted[1] == "" {
+						continue
+					}
+
+					if err := g.sendChat(fmt.Sprintf("random reply to %s by black is:\n '%s'\n",
+						extracted[1], randString(defaultMsgLen))); err != nil {
+						fmt.Printf("send chat error: %v\n", err)
+						continue
+					}
+				}
+			}
+		}()
+	}
+}
+
+func randString(n int) string {
+	var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }
 
 func (g *game) handleGameEnd(data []byte) {
@@ -222,29 +343,48 @@ func (g *game) handleMoveApproved(data []byte) {
 		return
 	}
 
-	if e.GameID != g.id || e.PlayerID != g.opponentId || e.Index != (len(g.board.Moves())-1) {
+	if e.GameID != g.id || e.PlayerID != g.opponentId || e.Index-1 != len(g.board.Moves()) {
 		return
 	}
+	// fmt.Printf("bot %s received move %s with index %d, current index %d\n",
+	// g.b.ID(), e.Move, e.Index, len(g.board.Moves()))
 
 	if err := g.board.MoveStr(e.Move); err != nil {
 		fmt.Printf("move error: %v\n", err)
 		return
 	}
 
-	m := g.bestMove()
-	if err := g.board.Move(m); err != nil {
+	if g.board.Outcome() != chess.NoOutcome {
+		fmt.Printf("game %s ended\n", g.id)
+		return
+	}
+
+	m, err := g.randMove()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := g.board.MoveStr(m); err != nil {
 		fmt.Printf("move error: %v\n", err)
 		return
 	}
 
-	g.sendMove(m)
+	if err := g.sendMove(m); err != nil {
+		fmt.Println(err)
+		return
+	}
 }
 
-func (g *game) bestMove() *chess.Move {
+func (g *game) bestMove() (*chess.Move, error) {
+	count := 0
 	for {
+		count++
 		m, err := g.b.sp.BestMove(g.board.FEN(), g.b.skill)
 		if err != nil {
 			fmt.Printf("stockfish error: %v\n", err)
+			if count == 3 {
+				return nil, fmt.Errorf("stockfish error: %v", err)
+			}
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -252,17 +392,36 @@ func (g *game) bestMove() *chess.Move {
 		move, err := chess.UCINotation{}.Decode(g.board.Position(), strings.TrimSpace(m))
 		if err != nil {
 			fmt.Printf("decode move error: %v\n", err)
+			if count == 3 {
+				return nil, fmt.Errorf("decode move error: %v", err)
+			}
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		return move
+		return move, nil
 	}
 }
 
-func (g *game) sendMove(m *chess.Move) {
-	time.Sleep(g.moveDelay)
+func (g *game) randMove() (string, error) {
+
+	vm := g.board.ValidMoves()
+	for _, m := range vm {
+		ms := defaultNotation.Encode(g.board.Position(), m)
+		if strings.Contains(ms, "x") {
+			return ms, nil
+		}
+	}
+	return defaultNotation.Encode(g.board.Position(), vm[rand.Intn(len(vm))]), nil
+}
+
+func (g *game) sendMove(m string) error {
+	count := 0
 	for {
+		randSleep(g.moveDelay)
+		count++
+		index := len(g.board.Moves())
+		// fmt.Printf("bot %s send move %s index %d\n", g.b.ID(), m, index)
 		if err := g.b.SendWsMessage(ws.Msg{
 			MsgBase: ws.MsgBase{
 				Type:      ws.MsgTypePlayerMove,
@@ -272,14 +431,51 @@ func (g *game) sendMove(m *chess.Move) {
 				EventGamePlayerMoved: event.EventGamePlayerMoved{
 					GameID:   g.id,
 					PlayerID: g.b.id,
-					Move:     defaultNotation.Encode(g.board.Position(), m),
-					Index:    len(g.board.Moves()),
+					Move:     m,
+					Index:    index,
 				},
 			}.Encode(),
 		}); err != nil {
 			fmt.Printf("send move error: %v\n", err)
-			time.Sleep(1 * time.Second)
+			if count == 3 {
+				return fmt.Errorf("send move error: %v", err)
+			}
 			continue
 		}
+		return nil
 	}
+}
+
+func (g *game) sendChat(msg string) error {
+	count := 0
+	for {
+		randSleep(g.moveDelay)
+		count++
+		t := time.Now().Unix()
+		if err := g.b.SendWsMessage(ws.Msg{
+			MsgBase: ws.MsgBase{
+				Type:      ws.MsgTypeChatMsgSend,
+				Timestamp: t,
+			},
+			Data: ws.DataGameChatMsgSend{
+				EventGameChatMsgeSent: event.EventGameChatMsgeSent{
+					SenderID:  g.b.ID(),
+					GameID:    g.id,
+					Content:   msg,
+					Timestamp: t,
+				},
+			}.Encode(),
+		}); err != nil {
+			fmt.Printf("send chat error: %v\n", err)
+			if count == 3 {
+				return fmt.Errorf("send chat error: %v", err)
+			}
+			continue
+		}
+		return nil
+	}
+}
+
+func randSleep(max int) {
+	time.Sleep(time.Duration((rand.Intn(max))+5) * time.Second)
 }

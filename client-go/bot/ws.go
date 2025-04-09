@@ -38,28 +38,26 @@ func (b *Bot) SetupWS() error {
 		writeCh: make(chan ws.Msg, 100),
 		stopCh:  make(chan struct{})}
 
-	b.ws.waitFor(ws.MsgTypeWelcome)
-	fmt.Printf("bot %s received welcome message\n", b.Email())
+	// b.ws.waitFor(ws.MsgTypeWelcome)
 
 	go b.ws.runWriter()
 	go b.ws.runReader()
 
-	return nil
+	s := b.Subscribe(Topic(ws.MsgTypeWelcome))
+	defer s.Unsubscribe()
+	for {
+		select {
+		case <-s.Consume():
+			// fmt.Printf("bot %s received welcome message\n", b.Email())
+			return nil
+		case <-time.After(60 * time.Second):
+			return fmt.Errorf("bot %s didn't receiv welcome message", b.Email())
+		}
+	}
 }
 
 func (b *Bot) SendWsMessage(msg ws.Msg) error {
 	return b.ws.sendMessage(msg)
-}
-
-func (s *webSocket) waitFor(t ws.MsgType) ws.Msg {
-	msg := ws.Msg{}
-	for {
-		if err := s.conn.ReadJSON(&msg); err != nil {
-			if msg.Type == t {
-				return msg
-			}
-		}
-	}
 }
 
 func (s *webSocket) stop() {
@@ -112,9 +110,6 @@ func (s *webSocket) runReader() {
 				fmt.Printf("bot '%s' error reading message: %v\n", s.b.Email(), err)
 				s.stop()
 				return
-			}
-			if mt == websocket.BinaryMessage {
-				fmt.Printf("bot '%s' received binary message: %v\n", s.b.Email(), b)
 			}
 
 			if mt == websocket.TextMessage {

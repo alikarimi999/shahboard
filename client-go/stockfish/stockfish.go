@@ -81,7 +81,6 @@ func (sf *Stockfish) BestMove(fen string, depth int) (string, error) {
 
 		if strings.HasPrefix(line, "bestmove") {
 			parts := strings.Split(line, " ")
-			fmt.Println("parts: ", parts)
 			if len(parts) >= 2 {
 				return parts[1], nil
 			}
