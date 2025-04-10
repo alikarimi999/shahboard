@@ -50,7 +50,7 @@ func (v *viewManager) exists(id types.ObjectId) bool {
 }
 
 func (b *Bot) RandomView() {
-	t := time.NewTicker(time.Second * time.Duration(rand.Intn(60)+30))
+	t := time.NewTicker(time.Second * time.Duration(rand.Intn(10)+30))
 
 	for {
 		select {

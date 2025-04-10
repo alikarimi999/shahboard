@@ -42,7 +42,7 @@ func (ps *PubSub) subscribe(t Topic) *Subscription {
 		cs = make(map[int]*Subscription)
 		ps.subscribers[t] = cs
 	}
-	s := &Subscription{id: id, ps: ps, t: t, ch: make(chan Event, 10)}
+	s := &Subscription{id: id, ps: ps, t: t, ch: make(chan Event, 100)}
 	cs[id] = s
 
 	return s
