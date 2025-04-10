@@ -2,12 +2,13 @@ package game
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -23,15 +24,15 @@ type WsGateway interface {
 // for game suggestions based on various filters and user preferences.
 //
 // Right now, each instance of the game service is responsible for
-// separately building a list of 1000 live games by fetching the data
-// from the Redis cache and ordering them based on players' scores
-// and the number of viewers.
+// separately building a list of 1000 live games by consuming game created event,
+// and clean its cache by ended game event.
 type liveGamesService struct {
 	cache *redisGameCache
 	ws    WsGateway
 
-	mu   sync.RWMutex
-	list []*LiveGameData
+	mu         sync.RWMutex
+	list       map[types.ObjectId]*LiveGameData // map by game ID
+	sortedList []*LiveGameData
 
 	l       log.Logger
 	listCap int
@@ -42,7 +43,7 @@ func newLiveGamesService(cache *redisGameCache, ws WsGateway, l log.Logger) *liv
 	ls := &liveGamesService{
 		cache:   cache,
 		ws:      ws,
-		list:    make([]*LiveGameData, 0, 1000),
+		list:    make(map[types.ObjectId]*LiveGameData),
 		listCap: 1000,
 		l:       l,
 		stopCh:  make(chan struct{}),
@@ -52,11 +53,32 @@ func newLiveGamesService(cache *redisGameCache, ws WsGateway, l log.Logger) *liv
 	return ls
 }
 
-func (s *liveGamesService) stop() {
-	close(s.stopCh)
+// func (s *liveGamesService) stop() {
+// 	close(s.stopCh)
+// }
+
+func (s *liveGamesService) add(g *LiveGameData) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.list[g.GameID] = g
+	if len(s.sortedList) < s.listCap {
+		s.sortedList = append(s.sortedList, g)
+	}
 }
+
+func (s *liveGamesService) remove(gameID types.ObjectId) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.list, gameID)
+	s.sortedList = slices.DeleteFunc(s.sortedList, func(g *LiveGameData) bool {
+		return g.GameID == gameID
+	})
+}
+
 func (s *liveGamesService) run() {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 
 		for {
@@ -74,41 +96,49 @@ func (s *liveGamesService) run() {
 	}()
 }
 
-func (s *liveGamesService) updateLiveGames(ctx context.Context) error {
+func (s *liveGamesService) getAll() []*LiveGameData {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	newList := make([]*LiveGameData, 0, len(s.list))
 
-	games, err := s.cache.getLiveGamesData(ctx)
-	if err != nil {
-		return err
+	for _, g := range s.list {
+		newList = append(newList, g)
 	}
+	return newList
+}
 
+func (s *liveGamesService) updateLiveGames(ctx context.Context) error {
 	viwersNumber, err := s.ws.GetLiveGamesViewersNumber(ctx)
 	if err != nil {
 		return err
 	}
 
-	for _, g := range games {
-		g.ViewersNumber = viwersNumber[g.GameID]
-	}
-
-	sortByPriorityScore(games)
-	if len(games) > s.listCap {
-		games = games[:s.listCap]
-	}
+	list := s.getAll()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.list = games
+
+	for _, g := range list {
+		g.ViewersNumber = viwersNumber[g.GameID]
+	}
+
+	sortByPriorityScore(list)
+	if len(list) > s.listCap {
+		list = list[:s.listCap]
+	}
+
+	s.sortedList = list
 
 	return nil
 }
 
-func (s *liveGamesService) getLiveGames() []*LiveGameData {
+func (s *liveGamesService) getLiveGamesSorted() (list []*LiveGameData, total int64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	newList := make([]*LiveGameData, len(s.list))
-	copy(newList, s.list)
-	return newList
+	newList := make([]*LiveGameData, len(s.sortedList))
+	copy(newList, s.sortedList)
+	return newList, int64(len(s.list))
 }
 
 func sortByPriorityScore(list []*LiveGameData) {
@@ -127,12 +157,20 @@ type LiveGameData struct {
 	GameID        types.ObjectId `json:"game_id"`
 	Player1       types.Player   `json:"player1"`
 	Player2       types.Player   `json:"player2"`
-	StartedAt     time.Time      `json:"started_at"`
+	StartedAt     int64          `json:"started_at"`
 	ViewersNumber int64          `json:"viewers_number"`
 	PriorityScore int64          `json:"priority_score"`
 }
 
-func (g LiveGameData) encode() []byte {
-	d, _ := json.Marshal(g)
-	return d
+func (gs *Service) handleEventGameCreated(e *event.EventGameCreated) {
+	gs.live.add(&LiveGameData{
+		GameID:    e.GameID,
+		Player1:   e.Player1,
+		Player2:   e.Player2,
+		StartedAt: e.Timestamp,
+	})
+}
+
+func (gs *Service) handleEventGameEnded(e *event.EventGameEnded) {
+	gs.live.remove(e.GameID)
 }

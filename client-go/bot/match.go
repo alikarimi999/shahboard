@@ -14,7 +14,14 @@ import (
 func (b *Bot) FindMatch() (event.EventUsersMatchCreated, error) {
 	e := event.EventUsersMatchCreated{}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/match/find", b.url), nil)
+	var url string
+	if b.cfg.Local {
+		url = b.cfg.MatchService
+	} else {
+		url = fmt.Sprintf("%s/match", b.cfg.Server)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/find", url), nil)
 	if err != nil {
 		return e, err
 	}
@@ -37,7 +44,15 @@ func (b *Bot) FindMatch() (event.EventUsersMatchCreated, error) {
 }
 
 func (b *Bot) GetUserLiveGame(userId types.ObjectId) (types.ObjectId, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/game/live/user/%s", b.url, userId), nil)
+
+	var url string
+	if b.cfg.Local {
+		url = b.cfg.GameService
+	} else {
+		url = fmt.Sprintf("%s/game", b.cfg.Server)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/live/user/%s", url, userId), nil)
 	if err != nil {
 		return "", err
 	}
@@ -61,7 +76,14 @@ func (b *Bot) GetUserLiveGame(userId types.ObjectId) (types.ObjectId, error) {
 }
 
 func (b *Bot) GetLivePgnByUserId(id types.ObjectId) (gs.GetGamePGNResponse, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/game/live?user_id=%s", b.url, id), nil)
+	var url string
+	if b.cfg.Local {
+		url = b.cfg.GameService
+	} else {
+		url = fmt.Sprintf("%s/game", b.cfg.Server)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/live?user_id=%s", url, id), nil)
 	if err != nil {
 		return gs.GetGamePGNResponse{}, err
 	}

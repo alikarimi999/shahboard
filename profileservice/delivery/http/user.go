@@ -66,7 +66,7 @@ func (h *Handler) updateUserInfo(c *gin.Context) {
 		return
 	}
 
-	if err := h.user.UpdateUser(c, usr.ID, req); err != nil {
+	if err := h.user.UpdateUser(c, usr, req); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}

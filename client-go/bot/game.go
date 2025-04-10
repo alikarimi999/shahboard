@@ -103,7 +103,7 @@ func (b *Bot) Resume(gameId types.ObjectId, counter *atomic.Int32) error {
 
 	b.g = g
 
-	return g.run(counter)
+	return g.run()
 }
 
 func (b *Bot) Create(ec event.EventUsersMatchCreated, counter *atomic.Int32) error {
@@ -136,12 +136,13 @@ func (b *Bot) Create(ec event.EventUsersMatchCreated, counter *atomic.Int32) err
 	}
 
 	g := &game{
-		b:         b,
-		id:        msg.GameID,
-		board:     chess.NewGame(),
-		subs:      make(map[Topic]*Subscription),
-		moveDelay: defaultDelay,
-		stopCh:    make(chan struct{}),
+		b:          b,
+		id:         msg.GameID,
+		board:      chess.NewGame(),
+		subs:       make(map[Topic]*Subscription),
+		gamesCount: counter,
+		moveDelay:  defaultDelay,
+		stopCh:     make(chan struct{}),
 	}
 
 	g.addBasicSubs(b.Subscribe)
@@ -156,7 +157,7 @@ func (b *Bot) Create(ec event.EventUsersMatchCreated, counter *atomic.Int32) err
 
 	b.g = g
 
-	return g.run(counter)
+	return g.run()
 }
 
 func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
@@ -172,14 +173,14 @@ func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
 	g.subs[t] = subscribe(t)
 }
 
-func (g *game) run(counter *atomic.Int32) error {
+func (g *game) run() error {
 
 	g.chatGenerator()
 
 	// first move
 	if types.Color(g.board.Position().Turn()) == g.color {
-		counter.Add(1)
-		fmt.Printf("%d: game started between %s and %s\n", counter.Load(), g.b.ID(), g.opponentId)
+		g.gamesCount.Add(1)
+		fmt.Printf("%d: game started between %s and %s\n", g.gamesCount.Load(), g.b.ID(), g.opponentId)
 
 		randSleep(g.moveDelay)
 		fmt.Println(g.b.Email(), g.board.Position().Turn(), g.color)
@@ -332,8 +333,11 @@ func (g *game) handleGameEnd(data []byte) {
 		fmt.Printf("unmarshal game end error: %v\n", err)
 		return
 	}
-	g.stop()
-	fmt.Printf("game ended: %v\n", e)
+
+	if e.GameID == g.id {
+		g.stop()
+		return
+	}
 }
 
 func (g *game) handleMoveApproved(data []byte) {

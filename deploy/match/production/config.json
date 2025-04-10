@@ -23,6 +23,6 @@
         "target": "game-service:9090"
     },
     "rating_service_grpc": {
-        "target": "rating-service:9090"
+        "target": "profile-service:9090"
     }
 }

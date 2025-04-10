@@ -238,6 +238,8 @@ func (s *Service) handleEventGamePlayerResigned(d *event.EventGamePlayerResigned
 
 	s.removeGame(d.GameID)
 
+	s.l.Debug(fmt.Sprintf("player '%s' resigned from game '%s'", d.PlayerID, d.GameID))
+
 	if err := s.pub.Publish(event.EventGameEnded{
 		ID:        types.NewObjectId(),
 		GameID:    d.GameID,
@@ -287,17 +289,10 @@ func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
 func (gs *Service) handleEvents(e event.Event) {
 	switch e.GetTopic().Domain() {
 	case event.DomainGame:
-		res := e.GetTopic().Resource()
-		gameId, err := types.ParseObjectId(res)
-		if err != nil {
-			return
-		}
-
-		if !gs.gameExists(gameId) {
-			return
-		}
 
 		switch e.GetTopic().Action() {
+		case event.ActionCreated:
+			gs.handleEventGameCreated(e.(*event.EventGameCreated))
 		case event.ActionGamePlayerMoved:
 			gs.handleEventGamePlayerMoved(e.(*event.EventGamePlayerMoved))
 		case event.ActionGamePlayerClaimDraw:
@@ -308,6 +303,8 @@ func (gs *Service) handleEvents(e event.Event) {
 			gs.handleEventGamePlayerResigned(e.(*event.EventGamePlayerResigned))
 		case event.ActionGamePlayerLeft:
 			gs.handleEventGamePlayerLeft(e.(*event.EventGamePlayerLeft))
+		case event.ActionEnded:
+			gs.handleEventGameEnded(e.(*event.EventGameEnded))
 		}
 
 	case event.DomainMatch:

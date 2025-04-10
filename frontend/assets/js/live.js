@@ -19,8 +19,12 @@ async function fetchLiveGamesData() {
         ); // Replace with actual API endpoint
         const data = await response.json();
 
-        if (Array.isArray(data.list) && Array.isArray(data.list[0])) {
-            displayGames(data.list[0]);
+        if (data.total > 0) {
+            document.querySelector('.page-header h2').textContent = `Live Games: ${data.total}`;
+        }
+
+        if (Array.isArray(data.list)) {
+            displayGames(data.list);
         } else {
             console.error('Unexpected data format:', data);
         }

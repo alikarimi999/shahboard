@@ -8,15 +8,10 @@ import (
 	"time"
 
 	"github.com/alikarimi999/shahboard/client-go/bot"
+	"github.com/alikarimi999/shahboard/client-go/config"
 	"github.com/alikarimi999/shahboard/client-go/stockfish"
 	"github.com/alikarimi999/shahboard/pkg/utils"
 )
-
-type Config struct {
-	Server        string `json:"server"`
-	StockfishPath string `json:"stockfish_path"`
-	BotsNum       int    `json:"bots_num"`
-}
 
 type Bot struct {
 	Email    string `json:"email"`
@@ -33,7 +28,7 @@ func main() {
 	// 	},
 	// }
 
-	cfg := &Config{}
+	cfg := &config.Config{}
 	if err := utils.LoadConfigs("./config.json", cfg); err != nil {
 		panic(err)
 	}
@@ -46,7 +41,7 @@ func main() {
 		panic("stockfish path is required")
 	}
 
-	bots := generateBots(cfg.BotsNum)
+	bots := generateBots(900, 900+cfg.BotsNum)
 
 	sp, err := stockfish.NewStockfish(cfg.StockfishPath)
 	if err != nil {
@@ -56,7 +51,7 @@ func main() {
 	for _, bc := range bots {
 		go func() {
 			for {
-				startBot(bc, cfg.Server, sp)
+				startBot(cfg, bc, sp)
 			}
 		}()
 	}
@@ -64,9 +59,9 @@ func main() {
 	select {}
 }
 
-func startBot(bc Bot, url string, sp *stockfish.Stockfish) {
+func startBot(cfg *config.Config, bc Bot, sp *stockfish.Stockfish) {
 	randSleep(10)
-	b, err := bot.NewBot(bc.Email, bc.Password, url, randSkill(), sp)
+	b, err := bot.NewBot(cfg, bc.Email, bc.Password, randSkill(), sp)
 	if err != nil {
 		fmt.Printf("bot '%s' error: %v\n", bc.Email, err)
 		return
@@ -77,7 +72,7 @@ func startBot(bc Bot, url string, sp *stockfish.Stockfish) {
 		fmt.Printf("bot '%s' stopped\n", b.Email())
 	}()
 
-	ok, err := b.Login()
+	_, err = b.Login()
 	if err != nil {
 		fmt.Printf("bot '%s' login error: %v\n", b.Email(), err)
 		return
@@ -85,20 +80,28 @@ func startBot(bc Bot, url string, sp *stockfish.Stockfish) {
 
 	fmt.Printf("bot '%s' login success\n", b.Email())
 
-	if !ok {
+	// if !ok {
+	go func() {
+		randSleep(20)
 		if err := b.UpdateProfile(strings.Split(b.Email(), "@")[0],
 			fmt.Sprintf("https://robohash.org/%s.png", b.Email())); err != nil {
 			fmt.Printf("bot '%s' update profile error: %v\n", b.Email(), err)
 			return
 		}
-	}
+	}()
+	// }
 
 	if err := b.SetupWS(); err != nil {
 		fmt.Printf("bot '%s' ws error: %v\n", b.Email(), err)
 		return
 	}
+
 	wsCounter.Add(1)
 	fmt.Printf("%d: bot '%s' ws connected\n", wsCounter.Load(), b.Email())
+
+	go func() {
+		b.RandomView()
+	}()
 
 	gameId, err := b.GetUserLiveGame(b.ID())
 	if err != nil {
@@ -130,9 +133,9 @@ func randSkill() int {
 	return rand.Intn(15)
 }
 
-func generateBots(n int) []Bot {
+func generateBots(start, end int) []Bot {
 	var bots []Bot
-	for i := 0; i < n; i++ {
+	for i := start; i < end; i++ {
 		bots = append(bots, Bot{
 			Email:    fmt.Sprintf("bot%d@gmail.com", i),
 			Password: fmt.Sprintf("bot%d_password", i),

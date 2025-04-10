@@ -16,6 +16,10 @@ type Repository interface {
 	GetByID(ctx context.Context, id types.ObjectId) (*entity.UserInfo, error)
 	Create(ctx context.Context, user *entity.UserInfo) error
 	Update(ctx context.Context, userId types.ObjectId, req UpdateUserRequest) error
+
+	// UpdateNX inserts a new user if they don't exist; otherwise, it updates their profile fields.
+	// It ensures atomicity using a transaction, committing only after a successful operation.
+	UpdateNX(ctx context.Context, user types.ObjectId, email string, req UpdateUserRequest) error
 	UpdateLastActiveAt(ctx context.Context, id types.ObjectId, lastActiveAt time.Time) error
 }
 
@@ -67,8 +71,14 @@ func (s *Service) GetUserInfo(ctx context.Context, id types.ObjectId) (*entity.U
 	return u, r, nil
 }
 
-func (s *Service) UpdateUser(ctx context.Context, userId types.ObjectId, req UpdateUserRequest) error {
-	return s.repo.Update(ctx, userId, req)
+func (s *Service) UpdateUser(ctx context.Context, u types.User, req UpdateUserRequest) error {
+	if err := s.repo.UpdateNX(ctx, u.ID, u.Email, req); err != nil {
+		s.l.Error(fmt.Sprintf("failed to update user '%s' profile: %v", u.Email, err))
+		return err
+	}
+	s.l.Debug(fmt.Sprintf("user updated profile with UID '%s' Email: '%s'", u.ID, u.Email))
+
+	return nil
 }
 
 func (s *Service) handleEvent(e event.Event) {

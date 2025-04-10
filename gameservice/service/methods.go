@@ -14,8 +14,9 @@ func (s *Service) GetLiveGamesIDs(ctx context.Context) ([]types.ObjectId, error)
 	return s.cache.getGamesIDs(ctx)
 }
 
-func (s *Service) GetLiveGamesData(ctx context.Context) ([]*LiveGameData, error) {
-	return s.live.getLiveGames(), nil
+func (s *Service) GetLiveGamesData(ctx context.Context) ([]*LiveGameData, int64, error) {
+	l, t := s.live.getLiveGamesSorted()
+	return l, t, nil
 }
 
 func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (types.ObjectId, error) {

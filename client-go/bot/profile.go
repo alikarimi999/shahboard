@@ -21,7 +21,14 @@ func (b *Bot) Login() (bool, error) {
 		return false, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/auth/", b.url), bytes.NewBuffer(bReq))
+	var url string
+	if b.cfg.Local {
+		url = b.cfg.AuthService
+	} else {
+		url = fmt.Sprintf("%s/auth", b.cfg.Server)
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/", url), bytes.NewBuffer(bReq))
 	if err != nil {
 		return false, err
 	}
@@ -55,7 +62,14 @@ func (b *Bot) UpdateProfile(name, avatar string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/profile/users/", b.url), bytes.NewBuffer(bReq))
+	var url string
+	if b.cfg.Local {
+		url = b.cfg.ProfileService
+	} else {
+		url = fmt.Sprintf("%s/profile", b.cfg.Server)
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/users/", url), bytes.NewBuffer(bReq))
 	if err != nil {
 		return err
 	}

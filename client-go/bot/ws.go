@@ -22,13 +22,25 @@ type webSocket struct {
 }
 
 func (b *Bot) SetupWS() error {
-	u, err := url.Parse(b.url)
-	if err != nil {
-		return err
+
+	var u string
+	if b.cfg.Local {
+		p, err := url.Parse(b.cfg.WsService)
+		if err != nil {
+			return err
+		}
+
+		u = fmt.Sprintf("%s://%s", "ws", p.Host)
+	} else {
+		p, err := url.Parse(b.cfg.Server)
+		if err != nil {
+			return err
+		}
+
+		u = fmt.Sprintf("%s://%s/wsgateway", "ws", p.Host)
 	}
 
-	wsURL := fmt.Sprintf("%s://%s", "ws", u.Host)
-	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("%s/wsgateway/ws?token=%s", wsURL, b.jwtToken), nil)
+	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("%s/ws?token=%s", u, b.jwtToken), nil)
 	if err != nil {
 		return err
 	}
@@ -107,7 +119,6 @@ func (s *webSocket) runReader() {
 		default:
 			mt, b, err := s.conn.ReadMessage()
 			if err != nil {
-				fmt.Printf("bot '%s' error reading message: %v\n", s.b.Email(), err)
 				s.stop()
 				return
 			}
