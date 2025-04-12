@@ -31,8 +31,8 @@ type liveGamesService struct {
 	ws    WsGateway
 
 	mu         sync.RWMutex
-	list       map[types.ObjectId]*LiveGameData // map by game ID
-	sortedList []*LiveGameData
+	list       map[types.ObjectId]*liveGameData // map by game ID
+	sortedList []*liveGameData
 
 	l       log.Logger
 	listCap int
@@ -43,7 +43,7 @@ func newLiveGamesService(cache *redisGameCache, ws WsGateway, l log.Logger) *liv
 	ls := &liveGamesService{
 		cache:   cache,
 		ws:      ws,
-		list:    make(map[types.ObjectId]*LiveGameData),
+		list:    make(map[types.ObjectId]*liveGameData),
 		listCap: 1000,
 		l:       l,
 		stopCh:  make(chan struct{}),
@@ -57,7 +57,7 @@ func newLiveGamesService(cache *redisGameCache, ws WsGateway, l log.Logger) *liv
 // 	close(s.stopCh)
 // }
 
-func (s *liveGamesService) add(g *LiveGameData) {
+func (s *liveGamesService) add(g *liveGameData) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -72,7 +72,7 @@ func (s *liveGamesService) remove(gameID types.ObjectId) {
 	defer s.mu.Unlock()
 
 	delete(s.list, gameID)
-	s.sortedList = slices.DeleteFunc(s.sortedList, func(g *LiveGameData) bool {
+	s.sortedList = slices.DeleteFunc(s.sortedList, func(g *liveGameData) bool {
 		return g.GameID == gameID
 	})
 }
@@ -96,10 +96,10 @@ func (s *liveGamesService) run() {
 	}()
 }
 
-func (s *liveGamesService) getAll() []*LiveGameData {
+func (s *liveGamesService) getAll() []*liveGameData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	newList := make([]*LiveGameData, 0, len(s.list))
+	newList := make([]*liveGameData, 0, len(s.list))
 
 	for _, g := range s.list {
 		newList = append(newList, g)
@@ -132,16 +132,16 @@ func (s *liveGamesService) updateLiveGames(ctx context.Context) error {
 	return nil
 }
 
-func (s *liveGamesService) getLiveGamesSorted() (list []*LiveGameData, total int64) {
+func (s *liveGamesService) getLiveGamesSorted() (list []*liveGameData, total int64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	newList := make([]*LiveGameData, len(s.sortedList))
+	newList := make([]*liveGameData, len(s.sortedList))
 	copy(newList, s.sortedList)
 	return newList, int64(len(s.list))
 }
 
-func sortByPriorityScore(list []*LiveGameData) {
+func sortByPriorityScore(list []*liveGameData) {
 	sort.Slice(list, func(i, j int) bool {
 		list[i].PriorityScore = calcPriorityScore(list[i])
 		list[j].PriorityScore = calcPriorityScore(list[j])
@@ -149,21 +149,21 @@ func sortByPriorityScore(list []*LiveGameData) {
 	})
 }
 
-func calcPriorityScore(g *LiveGameData) int64 {
+func calcPriorityScore(g *liveGameData) int64 {
 	return g.Player1.Score + g.Player2.Score + g.ViewersNumber
 }
 
-type LiveGameData struct {
-	GameID        types.ObjectId `json:"game_id"`
-	Player1       types.Player   `json:"player1"`
-	Player2       types.Player   `json:"player2"`
-	StartedAt     int64          `json:"started_at"`
-	ViewersNumber int64          `json:"viewers_number"`
-	PriorityScore int64          `json:"priority_score"`
+type liveGameData struct {
+	GameID        types.ObjectId
+	Player1       types.Player
+	Player2       types.Player
+	StartedAt     int64
+	ViewersNumber int64
+	PriorityScore int64
 }
 
 func (gs *Service) handleEventGameCreated(e *event.EventGameCreated) {
-	gs.live.add(&LiveGameData{
+	gs.live.add(&liveGameData{
 		GameID:    e.GameID,
 		Player1:   e.Player1,
 		Player2:   e.Player2,
@@ -173,4 +173,5 @@ func (gs *Service) handleEventGameCreated(e *event.EventGameCreated) {
 
 func (gs *Service) handleEventGameEnded(e *event.EventGameEnded) {
 	gs.live.remove(e.GameID)
+	gs.ct.removeGame(e.GameID)
 }

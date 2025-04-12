@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/alikarimi999/shahboard/event"
-	gh "github.com/alikarimi999/shahboard/gameservice/delivery/http"
 	gs "github.com/alikarimi999/shahboard/gameservice/service"
 	"github.com/alikarimi999/shahboard/types"
 )
@@ -67,7 +66,7 @@ func (b *Bot) GetUserLiveGame(userId types.ObjectId) (types.ObjectId, error) {
 		return "", fmt.Errorf("get live game failed")
 	}
 
-	g := gh.GetLiveGameIdByUserIdRequest{}
+	g := gs.GetLiveGameIdByUserIdRequest{}
 	if err := json.NewDecoder(res.Body).Decode(&g); err != nil {
 		return "", err
 	}

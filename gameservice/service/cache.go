@@ -123,23 +123,27 @@ func (c *redisGameCache) updateGameMove(ctx context.Context, g *entity.Game) err
 	return c.rc.Set(ctx, fmt.Sprintf("%s%s", keyGamePrefix, g.ID()), bGame, 0).Err()
 }
 
-func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, g *entity.Game) error {
+func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, games ...*entity.Game) error {
 	tx := c.rc.TxPipeline()
 
-	// delete the players game so they can join a new game
-	tx.Del(ctx, fmt.Sprintf("%s%s", keyPlayerGamePrefix, g.Player1().ID),
-		fmt.Sprintf("%s%s", keyPlayerGamePrefix, g.Player2().ID))
+	for _, g := range games {
+		// Delete the players' game keys so they can join new games
+		tx.Del(ctx,
+			fmt.Sprintf("%s%s", keyPlayerGamePrefix, g.Player1().ID),
+			fmt.Sprintf("%s%s", keyPlayerGamePrefix, g.Player2().ID),
+		)
 
-	// remove the game from the service's game list
-	tx.LRem(ctx, fmt.Sprintf("%s:games", c.serviceID), 0, g.ID().String())
+		// Remove the game from the service's game list
+		tx.LRem(ctx, fmt.Sprintf("%s:games", c.serviceID), 0, g.ID().String())
 
-	// set the game data with a deactivation TTL
-	cGame := &inCacheGame{
-		Status: g.Status(),
-		Game:   g.Encode(),
+		// Set the game data with a deactivation TTL
+		cGame := &inCacheGame{
+			Status: g.Status(),
+			Game:   g.Encode(),
+		}
+		bGame := cGame.encode()
+		tx.Set(ctx, fmt.Sprintf("%s%s", keyGamePrefix, g.ID()), bGame, c.deactivedTTL)
 	}
-	bGame := cGame.encode()
-	tx.Set(ctx, fmt.Sprintf("%s%s", keyGamePrefix, g.ID()), bGame, c.deactivedTTL)
 
 	_, err := tx.Exec(ctx)
 	return err

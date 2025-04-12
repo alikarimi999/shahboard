@@ -14,14 +14,44 @@ func (s *Service) GetLiveGamesIDs(ctx context.Context) ([]types.ObjectId, error)
 	return s.cache.getGamesIDs(ctx)
 }
 
-func (s *Service) GetLiveGamesData(ctx context.Context) ([]*LiveGameData, int64, error) {
-	l, t := s.live.getLiveGamesSorted()
-	return l, t, nil
+func (s *Service) GetLiveGamesData(ctx context.Context) (GetLiveGamesDataResponse, error) {
+	list, total := s.live.getLiveGamesSorted()
+	connections := s.ct.getAll()
+	res := GetLiveGamesDataResponse{
+		List:  make([]LiveGameDataResponse, 0, len(list)),
+		Total: total,
+	}
+
+	for _, g := range list {
+		l := LiveGameDataResponse{
+			GameID:        g.GameID,
+			Player1:       g.Player1,
+			Player2:       g.Player2,
+			StartedAt:     g.StartedAt,
+			ViewersNumber: g.ViewersNumber,
+			PriorityScore: g.PriorityScore,
+		}
+		if conn, ok := connections[g.GameID]; ok {
+			for p, t := range conn {
+				l.PlayersDisconnection = append(l.PlayersDisconnection, PlayerDisconnection{
+					PlayerId:       p,
+					DisconnectedAt: t.Unix(),
+				})
+			}
+		}
+		res.List = append(res.List, l)
+	}
+
+	return res, nil
 }
 
-func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (types.ObjectId, error) {
-	return s.cache.getGameIdByUserID(ctx, id)
+func (s *Service) GetLiveGameIdByUserId(ctx context.Context, id types.ObjectId) (GetLiveGameIdByUserIdRequest, error) {
+	gameId, err := s.cache.getGameIdByUserID(ctx, id)
+	if err != nil {
+		return GetLiveGameIdByUserIdRequest{}, err
+	}
 
+	return GetLiveGameIdByUserIdRequest{GameId: gameId}, nil
 }
 
 // currently use event for proccessing player resign request.
@@ -48,7 +78,7 @@ func (s *Service) ResingByPlayer(ctx context.Context, gameId, playerId types.Obj
 		return err
 	}
 
-	s.removeGame(gameId)
+	s.gm.removeGame(gameId)
 
 	if err := s.pub.Publish(event.EventGameEnded{
 		ID:        types.NewObjectId(),
@@ -81,33 +111,15 @@ func (s *Service) GetLiveGamePgnByUserID(ctx context.Context, id types.ObjectId)
 		return GetGamePGNResponse{ID: types.ObjectZero}, nil
 	}
 
-	game, err := s.cache.getGameByID(ctx, gameId)
-	if err != nil {
-		return GetGamePGNResponse{}, err
-	}
-
-	if game == nil || game.Status() == entity.GameStatusDeactive {
-		return GetGamePGNResponse{ID: types.ObjectZero}, nil
-	}
-
-	return GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}, nil
+	return s.getGamePGN(ctx, gameId)
 }
 
 // GetLiveGamePGN returns the game ID and PGN for a given game ID.
 func (s *Service) GetLiveGamePGN(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
-	game, err := s.cache.getGameByID(ctx, id)
-	if err != nil {
-		return GetGamePGNResponse{}, err
-	}
-
-	if game == nil || game.Status() == entity.GameStatusDeactive {
-		return GetGamePGNResponse{ID: types.ObjectZero}, nil
-	}
-
-	return GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}, nil
+	return s.getGamePGN(ctx, id)
 }
 
-func (s *Service) GetLiveGameByID(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
+func (s *Service) getGamePGN(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
 	game, err := s.cache.getGameByID(ctx, id)
 	if err != nil {
 		return GetGamePGNResponse{}, err
@@ -117,7 +129,15 @@ func (s *Service) GetLiveGameByID(ctx context.Context, id types.ObjectId) (GetGa
 		return GetGamePGNResponse{ID: types.ObjectZero}, nil
 	}
 
-	return GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}, nil
+	res := GetGamePGNResponse{ID: game.ID(), PGN: game.PGN()}
+	for p, t := range s.ct.get(game.ID()) {
+		res.PlayersDisconnection = append(res.PlayersDisconnection, PlayerDisconnection{
+			PlayerId:       p,
+			DisconnectedAt: t.Unix(),
+		})
+	}
+
+	return res, nil
 }
 
 func (s *Service) GetGamesFEN(ctx context.Context, ids []types.ObjectId) (map[types.ObjectId]string, error) {
@@ -134,16 +154,8 @@ func (s *Service) GetGamesFEN(ctx context.Context, ids []types.ObjectId) (map[ty
 	return res, nil
 }
 
-func (s *Service) GetGamePGN(ctx context.Context, id types.ObjectId) (GetGamePGNResponse, error) {
-	g, err := s.getGameByID(ctx, id)
-	if err != nil {
-		return GetGamePGNResponse{}, err
-	}
-	return GetGamePGNResponse{ID: g.ID(), PGN: g.PGN()}, nil
-}
-
 func (s *Service) getGameByID(ctx context.Context, id types.ObjectId) (*entity.Game, error) {
-	if g := s.getGame(id); g != nil {
+	if g := s.gm.getGame(id); g != nil {
 		return g, nil
 	}
 

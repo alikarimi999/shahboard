@@ -8,11 +8,6 @@ message GetUserLiveGamePgnRequest {
   string user_id = 1;
 }
 
-message GetUserLiveGamePgnResponse {
-  string game_id = 1;
-  string pgn = 2;
-}
-
 message GetUserLiveGameIdRequest {
   string user_id = 1;
 }
@@ -28,11 +23,16 @@ message GetLiveGamePGNRequest {
 message GetLiveGamePGNResponse {
   string game_id = 1;
   string pgn = 2;
+    repeated PlayerDisconnection players_disconnection = 3;
 }
 
+message PlayerDisconnection {
+  string player_id = 1;
+  int64 disconnected_at = 2; // Unix timestamp
+}
 
 service GameService {
     rpc GetUserLiveGameID(GetUserLiveGameIdRequest) returns (GetUserLiveGameIdResponse);
-    rpc GetUserLiveGamePGN(GetUserLiveGamePgnRequest) returns (GetUserLiveGamePgnResponse);
+    rpc GetUserLiveGamePGN(GetUserLiveGamePgnRequest) returns (GetLiveGamePGNResponse);
     rpc GetLiveGamePGN(GetLiveGamePGNRequest) returns (GetLiveGamePGNResponse);
 }

@@ -34,9 +34,18 @@ func (s *Service) GetUserLiveGamePGN(ctx context.Context, userId types.ObjectId)
 		return nil, nil
 	}
 
+	ds := make([]ws.PlayerDisconnection, 0, len(resp.PlayersDisconnection))
+	for _, v := range resp.PlayersDisconnection {
+		ds = append(ds, ws.PlayerDisconnection{
+			PlayerId:       types.ObjectId(v.PlayerId),
+			DisconnectedAt: v.DisconnectedAt,
+		})
+	}
+
 	return &ws.GamePgn{
-		GameId: gameId,
-		Pgn:    resp.Pgn,
+		GameId:                gameId,
+		Pgn:                   resp.Pgn,
+		PlayersDisconnections: ds,
 	}, nil
 }
 
@@ -52,8 +61,17 @@ func (s *Service) GetLiveGamePGN(ctx context.Context, gameId types.ObjectId) (*w
 		return nil, nil
 	}
 
+	ds := make([]ws.PlayerDisconnection, 0, len(resp.PlayersDisconnection))
+	for _, v := range resp.PlayersDisconnection {
+		ds = append(ds, ws.PlayerDisconnection{
+			PlayerId:       types.ObjectId(v.PlayerId),
+			DisconnectedAt: v.DisconnectedAt,
+		})
+	}
+
 	return &ws.GamePgn{
-		GameId: gameId,
-		Pgn:    resp.Pgn,
+		GameId:                gameId,
+		Pgn:                   resp.Pgn,
+		PlayersDisconnections: ds,
 	}, nil
 }

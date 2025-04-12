@@ -110,35 +110,22 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 func (s *Server) stopSessions(ss ...*session) {
 	s.sm.remove(ss...)
 	events := []event.Event{}
-	usersId := make(map[types.ObjectId]struct{})
+	usersGameId := make(map[types.ObjectId]types.ObjectId)
 
 	for _, se := range ss {
-		if !se.playGameId.IsZero() {
-			usersId[se.userId] = struct{}{}
-		}
 		se.stop()
-	}
 
-	ids := make([]types.ObjectId, 0, len(usersId))
-	for id := range usersId {
-		ids = append(ids, id)
-	}
-	res, err := s.cache.countUsersGameSessions(context.Background(), ids...)
-	if err != nil {
-		s.l.Error(err.Error())
-	}
+		if !se.playGameId.Load().IsZero() {
+			counter, err := s.cache.removeGameIdFromUserSessions(context.Background(), se.userId, se.id)
+			if err != nil {
+				// TODO: need to handle this error
+				s.l.Error(err.Error())
 
-	// only send these two events if user doesn't have any other active game session
-	t := time.Now().Unix()
-	for _, se := range ss {
-		if count := res[se.userId]; count < 2 {
-			events = append(events, event.EventGamePlayerConnectionUpdated{
-				ID:        types.NewObjectId(),
-				GameID:    se.playGameId,
-				PlayerID:  se.userId,
-				Connected: false,
-				Timestamp: t,
-			})
+			} else if counter == 0 {
+				// this is the last session for this user that is playing the game
+				// so we need to notify other parts of system
+				usersGameId[se.userId] = se.playGameId.Load()
+			}
 		}
 	}
 
@@ -146,8 +133,17 @@ func (s *Server) stopSessions(ss ...*session) {
 		s.l.Error(err.Error())
 	}
 
-	if err := s.p.Publish(events...); err != nil {
-		s.l.Error(err.Error())
+	for u, g := range usersGameId {
+		events = append(events, event.EventGamePlayerLeft{
+			GameID:    g,
+			PlayerID:  u,
+			Timestamp: time.Now().Unix(),
+		})
+	}
+	if len(events) > 0 {
+		if err := s.p.Publish(events...); err != nil {
+			s.l.Error(err.Error())
+		}
 	}
 }
 

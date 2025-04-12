@@ -73,8 +73,9 @@ func (m DataResumeGameRequest) Encode() []byte {
 }
 
 type DataResumeGameResponse struct {
-	GameId types.ObjectId `json:"game_id"`
-	Pgn    string         `json:"pgn"`
+	GameId               types.ObjectId        `json:"game_id"`
+	Pgn                  string                `json:"pgn"`
+	PlayersDisconnection []PlayerDisconnection `json:"players_disconnection"`
 }
 
 func (m DataResumeGameResponse) Type() MsgType {
@@ -87,8 +88,9 @@ func (m DataResumeGameResponse) Encode() []byte {
 }
 
 type DataGameViewResponse struct {
-	GameId types.ObjectId `json:"game_id"`
-	Pgn    string         `json:"pgn"`
+	GameId               types.ObjectId        `json:"game_id"`
+	Pgn                  string                `json:"pgn"`
+	PlayersDisconnection []PlayerDisconnection `json:"players_disconnection"`
 }
 
 func (m DataGameViewResponse) Type() MsgType {

@@ -18,7 +18,7 @@ import (
 func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
 	s.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
 	// check if player is already in a game
-	if s.checkByPlayer(d.User1.ID) || s.checkByPlayer(d.User2.ID) {
+	if s.gm.checkByPlayer(d.User1.ID) || s.gm.checkByPlayer(d.User2.ID) {
 		s.l.Debug("player is already in a game")
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
 	}
 	s.l.Debug(fmt.Sprintf("added game to cache: '%s'", game.ID()))
 
-	if !s.addGame(game) {
+	if !s.gm.addGame(game) {
 		s.l.Error(fmt.Sprintf("game '%s' created before", game.ID()))
 		return
 	}
@@ -60,7 +60,7 @@ func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
 }
 
 func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
-	game := s.getGame(d.GameID)
+	game := s.gm.getGame(d.GameID)
 	// if game is not manging by this instance, do nothing
 	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return
@@ -104,7 +104,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
 		s.l.Debug(fmt.Sprintf("published game ended event: '%s'", game.ID()))
 
-		s.removeGame(game.ID())
+		s.gm.removeGame(game.ID())
 
 	} else {
 		if err := s.cache.updateGameMove(context.Background(), game); err != nil {
@@ -129,7 +129,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 }
 
 func (s *Service) handleEventGamePlayerClaimDraw(d *event.EventGamePlayerClaimDraw) {
-	game := s.getGame(d.GameID)
+	game := s.gm.getGame(d.GameID)
 	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return
 	}
@@ -180,7 +180,7 @@ func (s *Service) handleEventGamePlayerClaimDraw(d *event.EventGamePlayerClaimDr
 			return
 		}
 
-		s.removeGame(game.ID())
+		s.gm.removeGame(game.ID())
 	default:
 		return
 	}
@@ -188,7 +188,7 @@ func (s *Service) handleEventGamePlayerClaimDraw(d *event.EventGamePlayerClaimDr
 }
 
 func (s *Service) handleEventGamePlayerResponsedDrawOffer(d *event.EventGamePlayerResponsedDrawOffer) {
-	game := s.getGame(d.GameID)
+	game := s.gm.getGame(d.GameID)
 	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return
 	}
@@ -219,10 +219,10 @@ func (s *Service) handleEventGamePlayerResponsedDrawOffer(d *event.EventGamePlay
 		return
 	}
 
-	s.removeGame(game.ID())
+	s.gm.removeGame(game.ID())
 }
 func (s *Service) handleEventGamePlayerResigned(d *event.EventGamePlayerResigned) {
-	game := s.getGame(d.GameID)
+	game := s.gm.getGame(d.GameID)
 	if game == nil || game.Status() == entity.GameStatusDeactive {
 		return
 	}
@@ -236,7 +236,7 @@ func (s *Service) handleEventGamePlayerResigned(d *event.EventGamePlayerResigned
 		return
 	}
 
-	s.removeGame(d.GameID)
+	s.gm.removeGame(d.GameID)
 
 	s.l.Debug(fmt.Sprintf("player '%s' resigned from game '%s'", d.PlayerID, d.GameID))
 
@@ -255,35 +255,11 @@ func (s *Service) handleEventGamePlayerResigned(d *event.EventGamePlayerResigned
 }
 
 func (s *Service) handleEventGamePlayerLeft(d *event.EventGamePlayerLeft) {
-	game := s.getGame(d.GameID)
-	if game == nil || game.Status() == entity.GameStatusDeactive {
-		return
-	}
+	s.ct.add(d.GameID, d.PlayerID)
+}
 
-	if !game.PlayerLeft(d.PlayerID) {
-		return
-	}
-
-	s.l.Debug(fmt.Sprintf("player '%s' left game '%s'", d.PlayerID, d.GameID))
-
-	if err := s.cache.updateAndDeactivateGame(context.Background(), game); err != nil {
-		s.l.Error(err.Error())
-		return
-	}
-
-	s.removeGame(d.GameID)
-
-	if err := s.pub.Publish(event.EventGameEnded{
-		ID:        types.NewObjectId(),
-		GameID:    d.GameID,
-		Player1:   game.Player1(),
-		Player2:   game.Player2(),
-		Outcome:   game.Outcome(),
-		Desc:      entity.EndDescriptionPlayerLeft.String(),
-		Timestamp: time.Now().Unix(),
-	}); err != nil {
-		s.l.Error(fmt.Sprintf("failed to publish game ended event: '%s'", d.GameID))
-	}
+func (s *Service) handleEventGamePlayerJoined(d *event.EventGamePlayerJoined) {
+	s.ct.remove(d.GameID, d.PlayerID)
 }
 
 func (gs *Service) handleEvents(e event.Event) {
@@ -303,6 +279,8 @@ func (gs *Service) handleEvents(e event.Event) {
 			gs.handleEventGamePlayerResigned(e.(*event.EventGamePlayerResigned))
 		case event.ActionGamePlayerLeft:
 			gs.handleEventGamePlayerLeft(e.(*event.EventGamePlayerLeft))
+		case event.ActionGamePlayerJoined:
+			gs.handleEventGamePlayerJoined(e.(*event.EventGamePlayerJoined))
 		case event.ActionEnded:
 			gs.handleEventGameEnded(e.(*event.EventGameEnded))
 		}

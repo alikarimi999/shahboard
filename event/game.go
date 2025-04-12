@@ -15,7 +15,7 @@ const (
 	ActionGamePlayerClaimDrawApproved  Action = "claimDrawApproved"
 	ActionGamePlayerResigned           Action = "playerResigned"
 	ActionGamePlayerLeft               Action = "playerLeft"
-	ActionGamePlayerConnectionUpdated  Action = "playerConnectionUpdated"
+	ActionGamePlayerJoined             Action = "playerJoined"
 	ActionGamePlayerSelectSquare       Action = "selectSquare"
 )
 
@@ -24,7 +24,7 @@ var (
 	TopicGameCreated                  = NewTopic(DomainGame, ActionCreated)
 	TopicGamePlayerMoved              = NewTopic(DomainGame, ActionGamePlayerMoved)
 	TopicGameMoveApproved             = NewTopic(DomainGame, ActionGameMoveApprove)
-	TopicGamePlayerConnectionUpdated  = NewTopic(DomainGame, ActionGamePlayerConnectionUpdated)
+	TopicGamePlayerJoined             = NewTopic(DomainGame, ActionGamePlayerJoined)
 	TopicGameEnded                    = NewTopic(DomainGame, ActionEnded)
 	TopicGamePlayerClaimDraw          = NewTopic(DomainGame, ActionGamePlayerClaimDraw)
 	TopicGamePlayerResponsedDrawOffer = NewTopic(DomainGame, ActionGamePlayerResponsedDrawOffer)
@@ -124,31 +124,30 @@ func (e EventGameMoveApproved) Encode() []byte {
 	return b
 }
 
-type EventGamePlayerConnectionUpdated struct {
+type EventGamePlayerJoined struct {
 	ID        types.ObjectId `json:"id"`
 	GameID    types.ObjectId `json:"game_id"`
 	PlayerID  types.ObjectId `json:"player_id"`
-	Connected bool           `json:"connected"`
 	Timestamp int64          `json:"timestamp"`
 }
 
-func (e EventGamePlayerConnectionUpdated) GetResource() string {
+func (e EventGamePlayerJoined) GetResource() string {
 	return e.GameID.String()
 }
 
-func (e EventGamePlayerConnectionUpdated) GetTopic() Topic {
-	return TopicGamePlayerConnectionUpdated.SetResource(e.GetResource())
+func (e EventGamePlayerJoined) GetTopic() Topic {
+	return TopicGamePlayerJoined.SetResource(e.GetResource())
 }
 
-func (e EventGamePlayerConnectionUpdated) GetAction() Action {
-	return ActionGamePlayerConnectionUpdated
+func (e EventGamePlayerJoined) GetAction() Action {
+	return ActionGamePlayerJoined
 }
 
-func (e EventGamePlayerConnectionUpdated) TimeStamp() int64 {
+func (e EventGamePlayerJoined) TimeStamp() int64 {
 	return e.Timestamp
 }
 
-func (e EventGamePlayerConnectionUpdated) Encode() []byte {
+func (e EventGamePlayerJoined) Encode() []byte {
 	b, _ := json.Marshal(e)
 	return b
 }
@@ -288,7 +287,7 @@ func (e EventGamePlayerResigned) GetTopic() Topic {
 }
 
 func (e EventGamePlayerResigned) GetAction() Action {
-	return ActionGamePlayerLeft
+	return ActionGamePlayerResigned
 }
 
 func (e EventGamePlayerResigned) TimeStamp() int64 {

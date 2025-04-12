@@ -29,7 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GameServiceClient interface {
 	GetUserLiveGameID(ctx context.Context, in *GetUserLiveGameIdRequest, opts ...grpc.CallOption) (*GetUserLiveGameIdResponse, error)
-	GetUserLiveGamePGN(ctx context.Context, in *GetUserLiveGamePgnRequest, opts ...grpc.CallOption) (*GetUserLiveGamePgnResponse, error)
+	GetUserLiveGamePGN(ctx context.Context, in *GetUserLiveGamePgnRequest, opts ...grpc.CallOption) (*GetLiveGamePGNResponse, error)
 	GetLiveGamePGN(ctx context.Context, in *GetLiveGamePGNRequest, opts ...grpc.CallOption) (*GetLiveGamePGNResponse, error)
 }
 
@@ -51,9 +51,9 @@ func (c *gameServiceClient) GetUserLiveGameID(ctx context.Context, in *GetUserLi
 	return out, nil
 }
 
-func (c *gameServiceClient) GetUserLiveGamePGN(ctx context.Context, in *GetUserLiveGamePgnRequest, opts ...grpc.CallOption) (*GetUserLiveGamePgnResponse, error) {
+func (c *gameServiceClient) GetUserLiveGamePGN(ctx context.Context, in *GetUserLiveGamePgnRequest, opts ...grpc.CallOption) (*GetLiveGamePGNResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUserLiveGamePgnResponse)
+	out := new(GetLiveGamePGNResponse)
 	err := c.cc.Invoke(ctx, GameService_GetUserLiveGamePGN_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (c *gameServiceClient) GetLiveGamePGN(ctx context.Context, in *GetLiveGameP
 // for forward compatibility.
 type GameServiceServer interface {
 	GetUserLiveGameID(context.Context, *GetUserLiveGameIdRequest) (*GetUserLiveGameIdResponse, error)
-	GetUserLiveGamePGN(context.Context, *GetUserLiveGamePgnRequest) (*GetUserLiveGamePgnResponse, error)
+	GetUserLiveGamePGN(context.Context, *GetUserLiveGamePgnRequest) (*GetLiveGamePGNResponse, error)
 	GetLiveGamePGN(context.Context, *GetLiveGamePGNRequest) (*GetLiveGamePGNResponse, error)
 	mustEmbedUnimplementedGameServiceServer()
 }
@@ -91,7 +91,7 @@ type UnimplementedGameServiceServer struct{}
 func (UnimplementedGameServiceServer) GetUserLiveGameID(context.Context, *GetUserLiveGameIdRequest) (*GetUserLiveGameIdResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserLiveGameID not implemented")
 }
-func (UnimplementedGameServiceServer) GetUserLiveGamePGN(context.Context, *GetUserLiveGamePgnRequest) (*GetUserLiveGamePgnResponse, error) {
+func (UnimplementedGameServiceServer) GetUserLiveGamePGN(context.Context, *GetUserLiveGamePgnRequest) (*GetLiveGamePGNResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserLiveGamePGN not implemented")
 }
 func (UnimplementedGameServiceServer) GetLiveGamePGN(context.Context, *GetLiveGamePGNRequest) (*GetLiveGamePGNResponse, error) {

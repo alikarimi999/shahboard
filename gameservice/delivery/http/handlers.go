@@ -8,22 +8,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (r *Router) getGamePGN(ctx *gin.Context) {
-	sid := ctx.Param("id")
+// func (r *Router) getGamePGN(ctx *gin.Context) {
+// 	sid := ctx.Param("id")
 
-	oid, err := types.ParseObjectId(sid)
-	if err != nil {
-		ctx.JSON(400, err)
-		return
-	}
-	res, err := r.s.GetGamePGN(ctx, oid)
-	if err != nil {
-		ctx.JSON(500, err)
-		return
-	}
+// 	oid, err := types.ParseObjectId(sid)
+// 	if err != nil {
+// 		ctx.JSON(400, err)
+// 		return
+// 	}
+// 	res, err := r.s.GetGamePGN(ctx, oid)
+// 	if err != nil {
+// 		ctx.JSON(500, err)
+// 		return
+// 	}
 
-	ctx.JSON(200, res)
-}
+// 	ctx.JSON(200, res)
+// }
 
 func (r *Router) getLiveGames(ctx *gin.Context) {
 	// check userId query
@@ -52,7 +52,7 @@ func (r *Router) getLiveGames(ctx *gin.Context) {
 			ctx.JSON(400, err)
 			return
 		}
-		res, err := r.s.GetLiveGameByID(ctx, gid)
+		res, err := r.s.GetLiveGamePGN(ctx, gid)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, err)
 			return
@@ -62,30 +62,17 @@ func (r *Router) getLiveGames(ctx *gin.Context) {
 		return
 	}
 
-	games, err := r.s.GetLiveGamesIDs(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, list{
-		List: []interface{}{
-			games,
-		},
-	})
+	ctx.JSON(http.StatusBadRequest, "invalid request")
 }
 
 func (r *Router) getLiveGamesData(ctx *gin.Context) {
-	games, total, err := r.s.GetLiveGamesData(ctx)
+	res, err := r.s.GetLiveGamesData(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, GetLiveGameDataResponse{
-		List:  games,
-		Total: total,
-	})
+	ctx.JSON(http.StatusOK, res)
 }
 
 func (r *Router) getLiveGameByUserId(ctx *gin.Context) {
@@ -102,7 +89,7 @@ func (r *Router) getLiveGameByUserId(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(200, GetLiveGameIdByUserIdRequest{GameId: res})
+	ctx.JSON(200, res)
 }
 
 func (r *Router) resignByPlayer(ctx *gin.Context) {

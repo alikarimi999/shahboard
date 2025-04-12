@@ -26,9 +26,10 @@ type session struct {
 	msgCh   chan []byte
 	pongCh  chan struct{}
 
-	matchId types.ObjectId
-
-	playGameId types.ObjectId
+	// These variables may be updated multiple times during the session's lifetime.
+	// Access must be concurrency-safe to prevent race conditions.
+	matchId    *types.AtomicObjectId
+	playGameId *types.AtomicObjectId
 
 	vmu         sync.RWMutex
 	viewGamesId map[types.ObjectId]struct{}
@@ -53,10 +54,12 @@ type session struct {
 func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandler, rc *redisCache,
 	userId types.ObjectId, gameId types.ObjectId, p event.Publisher, game GameService, l log.Logger) *session {
 	s := &session{
-		Conn:       conn,
-		id:         id,
-		userId:     userId,
-		playGameId: gameId,
+		Conn:   conn,
+		id:     id,
+		userId: userId,
+
+		matchId:    types.NewAtomicObjectId(types.ObjectZero),
+		playGameId: types.NewAtomicObjectId(gameId),
 
 		eventCh: make(chan event.Event, 1000),
 		msgCh:   make(chan []byte, 1000),
@@ -124,10 +127,10 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 	case event.ActionCreated:
 		eve := e.(*event.EventGameCreated)
 
-		s.playGameId = eve.GameID
-		if err := s.rc.updateUserGameSession(context.Background(), s); err != nil {
+		s.playGameId.Store(eve.GameID)
+		if err := s.rc.addGameIdToUserSessions(context.Background(), s.userId, s.id, eve.GameID); err != nil {
 			s.l.Error(err.Error())
-			s.playGameId = types.ObjectZero
+			s.playGameId.SetZero()
 
 			return &Msg{
 				MsgBase: MsgBase{
@@ -156,12 +159,15 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 			},
 			Data: e.Encode(),
 		}
-		if eve.GameID == s.playGameId {
-			s.playGameId = types.ObjectZero
+		if eve.GameID == s.playGameId.Load() {
+			s.playGameId.SetZero()
 		}
 
+		if _, err := s.rc.removeGameIdFromUserSessions(context.Background(), s.userId, s.id); err != nil {
+			// TODO: handle error
+			s.l.Error(err.Error())
+		}
 		s.removeViewGames(eve.GameID)
-
 		s.h.unsubscribeFromGameWithChat(s, eve.GameID)
 
 	default:
@@ -169,8 +175,10 @@ func (s *session) handleGameEvent(e event.Event) *Msg {
 		switch e.GetTopic().Action() {
 		case event.ActionGameMoveApprove:
 			mt = MsgTypeMoveApproved
-		case event.ActionGamePlayerConnectionUpdated:
-			mt = MsgTypePlayerConnectionUpdated
+		case event.ActionGamePlayerJoined:
+			mt = MsgTypePlayerJoined
+		case event.ActionGamePlayerLeft:
+			mt = MsgTypePlayerLeft
 		default:
 			return nil
 		}
@@ -216,8 +224,9 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatc
 		}
 	}()
 
-	if s.playGameId.IsZero() && s.matchId.IsZero() && (s.userId == data.User1.ID || s.userId == data.User2.ID) {
-		s.matchId = data.ID
+	if s.playGameId.Load().IsZero() && s.matchId.Load().IsZero() &&
+		(s.userId == data.User1.ID || s.userId == data.User2.ID) {
+		s.matchId.Store(data.ID)
 		s.h.subscribeToMatch(s)
 		return
 	}
@@ -238,7 +247,7 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req DataResumeGa
 		}
 	}()
 
-	if s.matchId.IsZero() && s.playGameId.IsZero() {
+	if s.matchId.Load().IsZero() && s.playGameId.Load().IsZero() {
 		g, err := s.game.GetUserLiveGamePGN(context.Background(), s.userId)
 		if err != nil {
 			s.l.Error(err.Error())
@@ -251,19 +260,18 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req DataResumeGa
 			return
 		}
 
-		s.playGameId = req.GameId
-		if err := s.rc.updateUserGameSession(context.Background(), s); err != nil {
+		s.playGameId.Store(req.GameId)
+		if err := s.rc.addGameIdToUserSessions(context.Background(), s.userId, s.id, req.GameId); err != nil {
 			s.l.Error(err.Error())
-			s.playGameId = types.ObjectZero
+			s.playGameId.SetZero()
 			errMsg = MsgDataInternalErrorr
 			return
 		}
 
 		s.h.subscribeToGameWithChat(s, req.GameId)
-		if err := s.p.Publish(event.EventGamePlayerConnectionUpdated{
+		if err := s.p.Publish(event.EventGamePlayerJoined{
 			GameID:    req.GameId,
 			PlayerID:  s.userId,
-			Connected: true,
 			Timestamp: time.Now().Unix(),
 		}); err != nil {
 			s.l.Error(err.Error())
@@ -276,8 +284,9 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req DataResumeGa
 				Timestamp: time.Now().Unix(),
 			},
 			Data: DataResumeGameResponse{
-				GameId: req.GameId,
-				Pgn:    g.Pgn,
+				GameId:               req.GameId,
+				Pgn:                  g.Pgn,
+				PlayersDisconnection: g.PlayersDisconnections,
 			}.Encode(),
 		}
 
@@ -323,8 +332,9 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 			Timestamp: time.Now().Unix(),
 		},
 		Data: DataGameViewResponse{
-			GameId: req.GameId,
-			Pgn:    game.Pgn,
+			GameId:               req.GameId,
+			Pgn:                  game.Pgn,
+			PlayersDisconnection: game.PlayersDisconnections,
 		}.Encode(),
 	}
 
@@ -345,7 +355,7 @@ func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMove
 		}
 	}()
 
-	if s.userId == req.PlayerID && s.playGameId == req.GameID {
+	if s.userId == req.PlayerID && s.playGameId.Load() == req.GameID {
 		if err := s.p.Publish(req.EventGamePlayerMoved); err != nil {
 			s.l.Error(fmt.Sprintf("failed to publish move event: %v", err))
 		}
@@ -363,7 +373,7 @@ func (s *session) handlePlayerResignRequest(msgId types.ObjectId, req DataGamePl
 		}
 	}()
 
-	if s.userId == req.PlayerID && s.playGameId == req.GameID {
+	if s.userId == req.PlayerID && s.playGameId.Load() == req.GameID {
 		if err := s.p.Publish(req.EventGamePlayerResigned); err != nil {
 			s.l.Error(fmt.Sprintf("failed to publish resign event: %v", err))
 		}
@@ -381,7 +391,7 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
 		}
 	}()
 
-	if s.userId == req.SenderID && s.playGameId == req.GameID {
+	if s.userId == req.SenderID && s.playGameId.Load() == req.GameID {
 		if err := s.p.Publish(req.EventGameChatMsgeSent); err != nil {
 			s.l.Error(fmt.Sprintf("failed to publish chat message event: %v", err))
 		}
@@ -457,8 +467,8 @@ func (s *session) stop() {
 		close(s.stopCh)
 
 		var gamesId []types.ObjectId
-		if !s.playGameId.IsZero() {
-			gamesId = append(gamesId, s.playGameId)
+		if !s.playGameId.Load().IsZero() {
+			gamesId = append(gamesId, s.playGameId.Load())
 		}
 
 		ids := s.removeAllViewGames()
@@ -472,7 +482,7 @@ func (s *session) stop() {
 		s.h.unsubscribeFromBasicEvents(s)
 		s.h.unsubscribeFromGameWithChat(s, gamesId...)
 
-		if !s.matchId.IsZero() {
+		if !s.matchId.Load().IsZero() {
 			s.h.unsubscribeFromMatch(s)
 		}
 	})

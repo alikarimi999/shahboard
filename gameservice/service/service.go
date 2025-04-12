@@ -3,24 +3,20 @@ package game
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/gameservice/entity"
 	"github.com/alikarimi999/shahboard/pkg/log"
-	"github.com/alikarimi999/shahboard/types"
 	"github.com/redis/go-redis/v9"
 )
 
 type Service struct {
 	cfg Config
 
-	sm *event.SubscriptionManager
-
-	gMu   sync.RWMutex
-	games map[types.ObjectId]*entity.Game
-
+	sm    *event.SubscriptionManager
+	gm    *gameManager
+	ct    *playersConnectionTracker
 	cache *redisGameCache
 
 	live *liveGamesService
@@ -35,14 +31,15 @@ type Service struct {
 
 func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub event.Subscriber,
 	ws WsGateway, l log.Logger) (*Service, error) {
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
 
-	s := &Service{
-		cfg: cfg,
+	ct := newPlayersConnectionTracker(l, time.Duration(cfg.PlayerDisconnectTreshold)*time.Second)
 
-		games: make(map[types.ObjectId]*entity.Game),
+	s := &Service{
+		cfg:   cfg,
+		ct:    ct,
 		cache: newRedisGameCache(cfg.InstanceID, redis, 15*time.Minute, l),
 
 		pub: pub,
@@ -51,6 +48,7 @@ func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub ev
 
 		closeCh: make(chan struct{}),
 	}
+	s.gm = newGameManager(s.cache, pub, ct, l)
 	s.live = newLiveGamesService(s.cache, ws, l)
 
 	s.sm = event.NewManager(l, s.handleEvents)
@@ -74,7 +72,7 @@ func (s *Service) init() error {
 
 	for _, g := range games {
 		if g.Status() == entity.GameStatusActive {
-			if s.addGame(g) {
+			if s.gm.addGame(g) {
 				sub := s.sub.Subscribe(event.TopicGame.SetResource(g.ID().String()))
 				s.sm.AddSubscription(sub)
 				s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
@@ -84,44 +82,4 @@ func (s *Service) init() error {
 	}
 
 	return nil
-}
-
-func (gs *Service) addGame(g *entity.Game) bool {
-	gs.gMu.Lock()
-	defer gs.gMu.Unlock()
-	if _, ok := gs.games[g.ID()]; ok {
-		return false
-	}
-	gs.games[g.ID()] = g
-	return true
-}
-
-func (gs *Service) getGame(id types.ObjectId) *entity.Game {
-	gs.gMu.RLock()
-	defer gs.gMu.RUnlock()
-	return gs.games[id]
-}
-
-func (gs *Service) gameExists(id types.ObjectId) bool {
-	gs.gMu.RLock()
-	defer gs.gMu.RUnlock()
-	_, ok := gs.games[id]
-	return ok
-}
-
-func (gs *Service) removeGame(id types.ObjectId) {
-	gs.gMu.Lock()
-	defer gs.gMu.Unlock()
-	delete(gs.games, id)
-}
-
-func (gs *Service) checkByPlayer(p types.ObjectId) bool {
-	gs.gMu.RLock()
-	defer gs.gMu.RUnlock()
-	for _, g := range gs.games {
-		if g.Player1().ID == p || g.Player2().ID == p {
-			return true
-		}
-	}
-	return false
 }

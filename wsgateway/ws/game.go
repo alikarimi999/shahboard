@@ -17,6 +17,12 @@ type GameService interface {
 }
 
 type GamePgn struct {
-	GameId types.ObjectId
-	Pgn    string
+	GameId                types.ObjectId
+	Pgn                   string
+	PlayersDisconnections []PlayerDisconnection
+}
+
+type PlayerDisconnection struct {
+	PlayerId       types.ObjectId `json:"player_id"`
+	DisconnectedAt int64          `json:"disconnected_at"`
 }

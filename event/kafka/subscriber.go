@@ -255,8 +255,8 @@ func decodeEvent(domain, action string, data []byte) (event.Event, error) {
 			e = &event.EventGamePlayerResigned{}
 		case event.ActionGamePlayerLeft:
 			e = &event.EventGamePlayerLeft{}
-		case event.ActionGamePlayerConnectionUpdated:
-			e = &event.EventGamePlayerConnectionUpdated{}
+		case event.ActionGamePlayerJoined:
+			e = &event.EventGamePlayerJoined{}
 		case event.ActionGamePlayerSelectSquare:
 			e = &event.EventGamePlayerSelectSquare{}
 		case event.ActionEnded:

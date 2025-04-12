@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	gh "github.com/alikarimi999/shahboard/gameservice/delivery/http"
+	gs "github.com/alikarimi999/shahboard/gameservice/service"
 )
 
-func (b *Bot) getLiveList() (*gh.GetLiveGameDataResponse, error) {
+func (b *Bot) getLiveList() (*gs.GetLiveGamesDataResponse, error) {
 	var url string
 	if b.cfg.Local {
 		url = b.cfg.GameService
@@ -31,7 +31,7 @@ func (b *Bot) getLiveList() (*gh.GetLiveGameDataResponse, error) {
 		return nil, fmt.Errorf("get live game failed")
 	}
 
-	var data gh.GetLiveGameDataResponse
+	var data gs.GetLiveGamesDataResponse
 	if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
 		return nil, err
 	}

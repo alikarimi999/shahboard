@@ -229,7 +229,7 @@ func (h *sessionsEventsHandler) subscribeToBasicEvents(s *session) {
 func (h *sessionsEventsHandler) subscribeToMatch(s *session) {
 	h.mmu.Lock()
 	defer h.mmu.Unlock()
-	h.matchSubSessions[s.matchId] = append(h.matchSubSessions[s.matchId],
+	h.matchSubSessions[s.matchId.Load()] = append(h.matchSubSessions[s.matchId.Load()],
 		struct {
 			*session
 			addedAt time.Time
@@ -261,7 +261,7 @@ func (m *sessionsEventsHandler) unsubscribeFromMatch(s *session) {
 	m.mmu.Lock()
 	defer m.mmu.Unlock()
 
-	sessions := m.matchSubSessions[s.matchId]
+	sessions := m.matchSubSessions[s.matchId.Load()]
 	newSessions := make([]struct {
 		*session
 		addedAt time.Time
@@ -274,9 +274,9 @@ func (m *sessionsEventsHandler) unsubscribeFromMatch(s *session) {
 	}
 
 	if len(newSessions) == 0 {
-		delete(m.matchSubSessions, s.matchId)
+		delete(m.matchSubSessions, s.matchId.Load())
 	} else {
-		m.matchSubSessions[s.matchId] = newSessions
+		m.matchSubSessions[s.matchId.Load()] = newSessions
 	}
 }
 

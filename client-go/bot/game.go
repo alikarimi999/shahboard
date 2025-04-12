@@ -169,7 +169,9 @@ func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
 	g.subs[t] = subscribe(t)
 	t = Topic(ws.MsgTypeChatMsgApproved)
 	g.subs[t] = subscribe(t)
-	t = Topic(ws.MsgTypePlayerConnectionUpdated)
+	t = Topic(ws.MsgTypePlayerJoined)
+	g.subs[t] = subscribe(t)
+	t = Topic(ws.MsgTypePlayerLeft)
 	g.subs[t] = subscribe(t)
 }
 

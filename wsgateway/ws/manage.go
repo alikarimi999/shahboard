@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/types"
 )
 
@@ -17,7 +16,6 @@ import (
 // for better modularity and maintainability.
 func (s *Server) manageSessionsState() {
 	sessionCacheTTL := time.Minute * 3
-	gameSessionTTL := time.Minute * 2
 	cleanCachTicker := time.NewTicker(time.Minute * 1)
 	pingTicker := time.NewTicker(time.Second * 5)
 	pingIntervalDisconnectedSession := time.Second * 10
@@ -59,6 +57,8 @@ func (s *Server) manageSessionsState() {
 				continue
 			}
 
+			// get the updated list of viewers of games from the cache again,
+			// to get data that saved in the cache by other instances of wsGateway
 			viewersList, err := s.cache.getAllGamesViewersList(context.Background())
 			if err != nil {
 				s.l.Error(err.Error())
@@ -66,9 +66,9 @@ func (s *Server) manageSessionsState() {
 			}
 
 			for _, se := range ss {
-				viewers := viewersList[se.playGameId]
+				viewers := viewersList[se.playGameId.Load()]
 				if len(viewers) > 0 {
-					se.sendViwersList(se.playGameId, viewers)
+					se.sendViwersList(se.playGameId.Load(), viewers)
 				}
 
 				gamesId := se.getAllViewGames()
@@ -111,51 +111,12 @@ func (s *Server) manageSessionsState() {
 
 			// remove sessions that have not updated their timestamp in the last 3 minutes
 			// it's better to be done in only one instance of wsGateway with a master/slave mechanism!
+			//
+			// this is a simple approach to clean cache from expired sessions
+			// that failed to remove after disconnection of client by any reason.
 			if err := s.cache.deleteExpiredSessions(context.Background(), sessionCacheTTL); err != nil {
 				s.l.Error(err.Error())
 				continue
-			}
-
-			liveGameSessions := make(map[types.ObjectId]types.ObjectId)
-			for _, se := range ss {
-				if se.playGameId != types.ObjectZero {
-					liveGameSessions[se.userId] = se.playGameId
-				}
-			}
-
-			// update game_sessions_heartbeat cache, every 1 minute
-			// this should be done in every wsGateway instances
-			// this is used to detect games that have been left by one of the players for a while
-			if len(liveGameSessions) > 0 {
-				if err := s.cache.updateUserGameSessionsHeartbeat(context.Background(), liveGameSessions); err != nil {
-					s.l.Error(err.Error())
-					continue
-				}
-			}
-
-			// remove expired game_sessions_heartbeat cache, that have not been updated in the last 2 minutes
-			// it's better to be done in only one instance of wsGateway with a master/slave mechanism!
-			deletedSessions, err := s.cache.deleteExpiredUserGameSessionsHeartbeat(context.Background(), gameSessionTTL)
-			if err != nil {
-				s.l.Error(err.Error())
-				continue
-			}
-
-			// publish event to game service to notify that the game has been left by one of the players
-			t := time.Now().Unix()
-			events := make([]event.Event, 0, len(deletedSessions))
-			for userId, gameId := range deletedSessions {
-				events = append(events, event.EventGamePlayerLeft{
-					GameID:    gameId,
-					PlayerID:  userId,
-					Timestamp: t,
-				})
-			}
-
-			if len(events) > 0 {
-				if err := s.p.Publish(events...); err != nil {
-					s.l.Error(err.Error())
-				}
 			}
 
 		}
