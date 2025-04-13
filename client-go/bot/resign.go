@@ -27,7 +27,7 @@ func (g *game) resign() error {
 }
 
 func (g *game) resigner() {
-	if resignChance() {
+	if chance(g.b.cfg.ResignChance) {
 		go func() {
 			randSleep(60)
 			if err := g.resign(); err != nil {
@@ -39,6 +39,6 @@ func (g *game) resigner() {
 	}
 }
 
-func resignChance() bool {
-	return rand.Intn(100) < 10
+func chance(c int) bool {
+	return rand.Intn(100) < c
 }

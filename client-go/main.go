@@ -33,7 +33,7 @@ func main() {
 		panic(err)
 	}
 
-	if cfg.Server == "" {
+	if !cfg.Local && cfg.Server == "" {
 		panic("server is required")
 	}
 

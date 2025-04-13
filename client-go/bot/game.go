@@ -176,9 +176,24 @@ func (g *game) addBasicSubs(subscribe func(Topic) *Subscription) {
 }
 
 func (g *game) run() error {
+	endSleep := time.Duration(0)
+	defer func() {
+		time.Sleep(endSleep)
+	}()
+
+	// this is a stopChance function to test system reaction to player's disconnection
+	go func() {
+		if chance(g.b.cfg.StopChance) {
+			endSleep = time.Duration(rand.Intn(120)+30) * time.Second
+			randSleep(120)
+			g.b.Stop()
+			fmt.Printf("bot '%s' disconnected from game '%s' randomly\n", g.b.Email(), g.id)
+		}
+	}()
 
 	g.chatGenerator()
 	g.resigner()
+
 	// first move
 	if types.Color(g.board.Position().Turn()) == g.color {
 		g.gamesCount.Add(1)
