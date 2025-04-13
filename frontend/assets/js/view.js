@@ -3,7 +3,7 @@ import { connectWebSocket } from './ws.js';
 import { initializeBoard } from './board.js';
 import { config } from './config.js';
 import {
-    handleGameChatMsg, handleMoveApproved, handlePlayerConnectionUpdate,
+    handleGameChatMsg, handleMoveApproved, handlePlayerJoined, handlePlayerLeft,
     handleGameEnded, handleError, handleViewGame, handleViewersList
 } from './eventHandlers.js';
 import { showErrorMessage } from './error.js';
@@ -28,7 +28,8 @@ if (!gameId) {
         currentGame.ws.registerMessageHandler("msg_approved", handleGameChatMsg);
         currentGame.ws.registerMessageHandler("move_approved", handleMoveApproved);
         currentGame.ws.registerMessageHandler("game_ended", handleGameEnded);
-        currentGame.ws.registerMessageHandler("player_connection_updated", handlePlayerConnectionUpdate);
+        currentGame.ws.registerMessageHandler("player_joined", handlePlayerJoined);
+        currentGame.ws.registerMessageHandler("player_left", handlePlayerLeft);
         currentGame.ws.registerMessageHandler("view_game", handleViewGame);
         currentGame.ws.registerMessageHandler("viewers_list", handleViewersList);
         currentGame.ws.registerMessageHandler("err", handleError);

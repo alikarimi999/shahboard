@@ -63,7 +63,7 @@
 
             <div class="viewer-container">
                 <div class="game-info hidden">
-                    <span id="gameId">Game: 7487656522617630031</span>
+                    <span id="gameId">Game: </span>
                     <span class="viewer-count" id="viewerCount">
                         <span id="viewerNumber">0</span> Viewers
                     </span>
@@ -86,61 +86,122 @@
 
     <script type="module">
         import { currentGame } from "./assets/js/gameState.js";
+        import { sendGameChatMsg } from './assets/js/chat.js';
         import { showUserProfile } from "./assets/js/profile-summary.js";
+        import { getUserProfile } from './assets/js/user_info.js';
 
         const moveSound = new Audio('./assets/sounds/move2.mp3');
         const playerNameBoard = document.querySelector("#player-name");
         const opponentNameBoard = document.querySelector("#opponent-name");
 
         document.addEventListener("game_created", function () {
-            moveSound.play();
+            Promise.all([
+                getUserProfile(currentGame.player.id).then(profile => {
+                    currentGame.player.profile = profile;
+                    currentGame.player.email = profile.email;
+                    currentGame.player.name = profile.name;
+                    currentGame.player.avatar_url = profile.avatar_url
+                }),
+                getUserProfile(currentGame.opponent.id).then(profile => {
+                    currentGame.opponent.profile = profile;
+                    currentGame.opponent.email = profile.email;
+                    currentGame.opponent.name = profile.name;
+                    currentGame.opponent.avatar_url = profile.avatar_url
+                })
+            ]).then(() => {
 
-            document.querySelector(".player-info").classList.remove("hidden");
-            document.querySelector(".opponent-info").classList.remove("hidden");
-            document.querySelector(".game-info").classList.remove("hidden");
+                moveSound.play();
 
-            const playerAvatarUrl = currentGame.player.avatar_url || "./assets/img/player1.webp";
-            const opponentAvatarUrl = currentGame.opponent.avatar_url || "./assets/img/player2.webp";
+                document.querySelector(".player-info").classList.remove("hidden");
+                document.querySelector(".opponent-info").classList.remove("hidden");
+                document.querySelector(".game-info").classList.remove("hidden");
 
-            document.getElementById("player-name-animation").textContent = currentGame.player.profile.name;
-            document.getElementById("opponent-name-animation").textContent = currentGame.opponent.profile.name;
+                // Update player names and avatars
+                document.getElementById("player-name-animation").textContent = `${currentGame.player.profile.name} (${currentGame.player.profile.score})`;
+                document.getElementById("opponent-name-animation").textContent = `${currentGame.opponent.profile.name} (${currentGame.opponent.profile.score})`;
+
+                const playerAvatarUrl = currentGame.player.avatar_url || "./assets/img/player1.webp";
+                const opponentAvatarUrl = currentGame.opponent.avatar_url || "./assets/img/player2.webp";
+
+                document.getElementById("player-avatar-animation").src = playerAvatarUrl;
+                document.getElementById("opponent-avatar-animation").src = opponentAvatarUrl;
+
+                // Set player avatars
+                document.getElementById("player-avatar-board").src = playerAvatarUrl;
+                document.getElementById("opponent-avatar-board").src = opponentAvatarUrl;
 
 
-            document.getElementById("player-avatar-animation").src = playerAvatarUrl;
-            document.getElementById("opponent-avatar-animation").src = opponentAvatarUrl;
+                let playerDisconnected = false;
+                let playerDisconnected_at = null;
+                if (Array.isArray(currentGame.players_disconnection)) {
+                    const disconnection = currentGame.players_disconnection.find(d => d.player_id === currentGame.player.id);
+                    if (disconnection) {
+                        playerDisconnected = true;
+                        playerDisconnected_at = disconnection.disconnected_at;
+                    }
+                }
 
-            document.getElementById("player-avatar-board").src = playerAvatarUrl;
-            document.getElementById("opponent-avatar-board").src = opponentAvatarUrl;
+                currentGame.player.connected = !playerDisconnected;
+                showUserProfile(
+                    currentGame.player.id,
+                    currentGame.player.profile,
+                    playerNameBoard,
+                    !playerDisconnected,
+                    playerDisconnected_at
+                );
 
-            showUserProfile(currentGame.player.id, currentGame.player.profile, playerNameBoard, true);
-            showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, true);
 
-            // Show animation
-            const animationOverlay = document.getElementById("game-start-animation");
-            animationOverlay.style.opacity = "1";
-            animationOverlay.style.pointerEvents = "auto";
+                let opponentDisconnected = false;
+                let opponentDisconnected_at = null;
+                if (Array.isArray(currentGame.players_disconnection)) {
+                    const disconnection = currentGame.players_disconnection.find(d => d.player_id === currentGame.opponent.id);
+                    if (disconnection) {
+                        opponentDisconnected = true;
+                        opponentDisconnected_at = disconnection.disconnected_at;
+                    }
+                }
 
-            document.getElementById("gameId").textContent = `Game: ${currentGame.gameId}`;
+                currentGame.opponent.connected = !opponentDisconnected;
+                showUserProfile(
+                    currentGame.opponent.id,
+                    currentGame.opponent.profile,
+                    opponentNameBoard,
+                    !opponentDisconnected,
+                    opponentDisconnected_at
+                );
+                // Show animation
+                const animationOverlay = document.getElementById("game-start-animation");
+                animationOverlay.style.opacity = "1";
+                animationOverlay.style.pointerEvents = "auto";
 
-            // After 3 seconds, fade out animation and proceed with UI updates
-            setTimeout(() => {
-                animationOverlay.style.animation = "fadeOut 1s forwards";
+                // add game id 
+                document.getElementById("gameId").textContent = `Game: ${currentGame.gameId}`;
 
-                // Hide elements and clear move/chat after fade-out
+                // After 3 seconds, fade out animation and proceed with UI updates
                 setTimeout(() => {
-                    animationOverlay.style.opacity = "0";
-                    animationOverlay.style.pointerEvents = "none";
-                    animationOverlay.style.animation = ""; // Reset animation
+                    animationOverlay.style.animation = "fadeOut 1s forwards";
 
-                }, 1000); // Delay after fade out
-            }, 3000); // Display animation for 3 seconds
+                    // Hide elements and clear move/chat after fade-out
+                    setTimeout(() => {
+                        animationOverlay.style.opacity = "0";
+                        animationOverlay.style.pointerEvents = "none";
+                        animationOverlay.style.animation = ""; // Reset animation
+                        document.querySelector(".messages").innerHTML = "";
+
+                    }, 100);
+                }, 3000);
+            }).catch(() => {
+                showErrorMessage("Failed to load player profiles.");
+                resolve();
+            });
+
         });
 
         document.addEventListener("player_disconnected", (event) => {
             if (event.detail.id === currentGame.player.id) {
-                showUserProfile(currentGame.player.id, currentGame.player.profile, playerNameBoard, false);
+                showUserProfile(currentGame.player.id, currentGame.player.profile, playerNameBoard, false, event.detail.timestamp);
             } else if (event.detail.id === currentGame.opponent.id) {
-                showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, false);
+                showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, false, event.detail.timestamp);
             }
         });
 

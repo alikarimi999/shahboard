@@ -2,7 +2,6 @@ import { currentGame } from './gameState.js';
 import { updateBoardPosition, ColorWhite, ColorBlack } from './board.js';
 import { user } from './user.js'
 import { showErrorMessage } from './error.js';
-import { initializeBoard } from './board.js';
 
 const GameOutcome = Object.freeze({
     NoOutcome: "*",
@@ -86,22 +85,31 @@ export function handleGameChatMsg(base64Data) {
     }
 }
 
-export function handlePlayerConnectionUpdate(base64Data) {
+export function handlePlayerJoined(base64Data) {
     const playerData = JSON.parse(atob(base64Data));
     if (currentGame.isPlayer && playerData.player_id === currentGame.opponent.id) {
-        if (playerData.connected) {
-            document.dispatchEvent(new Event("opponent_connected"));
-        } else {
-            document.dispatchEvent(new Event("opponent_disconnected"));
-        }
+        document.dispatchEvent(new Event("opponent_connected"));
     } else {
-        // Dispatch player_disconnected event with player id 
-        if (playerData.connected) {
-            document.dispatchEvent(new CustomEvent("player_connected", { detail: { id: playerData.player_id } }));
+        document.dispatchEvent(new CustomEvent("player_connected", { detail: { id: playerData.player_id } }));
+    }
+}
 
-        } else {
-            document.dispatchEvent(new CustomEvent("player_disconnected", { detail: { id: playerData.player_id } }));
-        }
+export function handlePlayerLeft(base64Data) {
+    const playerData = JSON.parse(atob(base64Data));
+    if (currentGame.isPlayer && playerData.player_id === currentGame.opponent.id) {
+        document.dispatchEvent(new CustomEvent("opponent_disconnected", {
+            detail: {
+                id: playerData.player_id,
+                timestamp: playerData.timestamp
+            }
+        }));
+    } else {
+        document.dispatchEvent(new CustomEvent("player_disconnected", {
+            detail: {
+                id: playerData.player_id,
+                timestamp: playerData.timestamp
+            }
+        }));
     }
 }
 
@@ -142,7 +150,8 @@ export function handleResumeGame(base64Data) {
     const event = new CustomEvent("pgn_received", {
         detail: {
             gameId: gameData.game_id,
-            pgn: gameData.pgn
+            pgn: gameData.pgn,
+            players_disconnection: gameData.players_disconnection,
         }
     })
 
@@ -155,7 +164,8 @@ export function handleViewGame(base64Data) {
     const event = new CustomEvent("pgn_received", {
         detail: {
             gameId: gameData.game_id,
-            pgn: gameData.pgn
+            pgn: gameData.pgn,
+            players_disconnection: gameData.players_disconnection,
         }
     })
     document.dispatchEvent(event);

@@ -5,12 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ShahBoard - Live Games</title>
-
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"
         integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2"
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <link rel="stylesheet" href="./assets/css/style.css">
     <link rel="stylesheet" href="./assets/css/profile.css">
     <link rel="stylesheet" href="./assets/css/live.css">
@@ -18,20 +16,26 @@
 </head>
 
 <body>
-
     <div id="sidebar-container"></div>
     <div id="container">
         <div class="live-games-wrapper">
             <header class="page-header">
                 <h2>Live Games: 0</h2>
+                <div class="refresh-info">
+                    <span id="last-updated">Last Updated: Never</span>
+                    <span id="refresh-spinner" class="spinner hidden">⟳</span>
+                </div>
+                <div class="sort-filter">
+                    <select id="sort-games">
+                        <option value="viewers-desc">Sort by Viewers (High to Low)</option>
+                        <option value="viewers-asc">Sort by Viewers (Low to High)</option>
+                        <option value="id-desc">Sort by Game ID (Newest)</option>
+                    </select>
+                </div>
             </header>
-
-            <div id="games-container" class="games-grid">
-                <!-- Games will be injected here dynamically -->
-            </div>
+            <div id="games-container" class="games-grid"></div>
         </div>
     </div>
-
     <script type="module" src="./assets/js/live.js"></script>
     <script type="module" src="/assets/js/sidebar.js"></script>
 </body>

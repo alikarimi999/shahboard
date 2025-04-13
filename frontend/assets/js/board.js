@@ -3,8 +3,15 @@ import { user } from './user.js';
 import { getUserLiveGameId, parsePGN } from './game_utils.js';
 import { showErrorMessage } from './error.js';
 
+const moveSound = new Audio('../assets/sounds/move2.mp3');
+
+
 const whiteSquareYellow = '#DAA520';
 const blackSquareYellow = '#AA7600';
+
+const moveHighlightWhite = '#BACA44';
+const moveHighlightBlack = '#A2A33C';
+
 
 export const ColorWhite = 'w';
 export const ColorBlack = 'b';
@@ -73,6 +80,7 @@ export function initializeBoard(isPlayer) {
                     }
 
                     const pgn = parsePGN(responseData.pgn);
+                    currentGame.players_disconnection = responseData.players_disconnection;
 
                     if (isPlayer) {
                         currentGame.player.id = user.id;
@@ -116,8 +124,25 @@ function highlightCurrentSquare(square) {
 }
 
 function removeDotSquares() {
-    $('#board .square-55d63').css('background', '').find('.dot').remove();
+    $('#board .square-55d63').each(function () {
+        const $square = $(this);
+
+        // Remove .dot elements always
+        $square.find('.dot').remove();
+
+        // If not a last-move square, clear background
+        if (!$square.hasClass('last-move')) {
+            $square.css('background', '');
+        } else {
+            // If it is a last-move square, reapply its background
+            const isBlack = $square.hasClass('black-3c85d');
+            const color = isBlack ? moveHighlightBlack : moveHighlightWhite;
+            $square.css('background', color);
+        }
+    });
 }
+
+
 
 function dotSquare(square, isThreatened) {
     const $square = $('#board .square-' + square);
@@ -138,7 +163,35 @@ function dotSquare(square, isThreatened) {
     }
 }
 
+function highlightLastMove() {
+    const history = currentGame.game.history({ verbose: true });
+
+    if (history.length === 0) return;
+
+    const lastMove = history[history.length - 1];
+    const from = lastMove.from;
+    const to = lastMove.to;
+
+    [from, to].forEach(square => {
+        const $square = $('#board .square-' + square);
+        const isBlack = $square.hasClass('black-3c85d');
+        const color = isBlack ? moveHighlightBlack : moveHighlightWhite;
+
+        $square.addClass('last-move'); // Tag the square to protect it
+        $square.css('background', color);
+    });
+}
+
+function removeLastMoveHighlights() {
+    $('#board .square-55d63.last-move').removeClass('last-move').css('background', '');
+}
+
+
 export function updateBoardPosition() {
+    moveSound.play();
+
+    removeLastMoveHighlights();
+    highlightLastMove();
     currentGame.board.position(currentGame.game.fen());
 }
 
@@ -178,7 +231,6 @@ function onDrop(source, target) {
     if (!move) return 'snapback';
 
     if (currentGame.gameId) sendMove(move.san);
-    // moveSound.play();
 
     updateBoardPosition();
 }
@@ -360,16 +412,12 @@ function attemptMove(destinationSquare) {
     const moveEvent = new CustomEvent('move', { detail: { index: moveIndex, san: move.san } });
     document.dispatchEvent(moveEvent);
 
-    // moveSound.play();
-
-    // Update the board position
-    currentGame.board.position(currentGame.game.fen());
-
     // Clear the selection
     selectedSquare = null;
 
     // Remove all highlights and dots
     removeDotSquares();
+    updateBoardPosition();
 }
 
 // Add click-based event handlers using event delegation

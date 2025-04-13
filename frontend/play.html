@@ -49,13 +49,11 @@
             <div class="hidden opponent-info">
                 <img id="opponent-avatar-board" class="avatar" src="./assets/img/player2.webp" alt="Opponent Avatar">
                 <span id="opponent-name"></span>
-                <!-- <span class="timer">10:00</span> -->
             </div>
             <div id="board"></div>
             <div class="hidden player-info">
                 <img id="player-avatar-board" class="avatar" src="./assets/img/player1.webp" alt="Player Avatar">
                 <span id="player-name"></span>
-                <!-- <span class="timer">10:00</span> -->
             </div>
             <button id="find-match-btn">Find Match</button>
         </div>
@@ -95,7 +93,6 @@
         import { showUserProfile } from "./assets/js/profile-summary.js";
         import { getUserProfile } from './assets/js/user_info.js';
 
-        const moveSound = new Audio('./assets/sounds/move2.mp3');
         const playerNameBoard = document.querySelector("#player-name");
         const opponentNameBoard = document.querySelector("#opponent-name");
 
@@ -153,7 +150,6 @@
         });
 
         document.addEventListener("game_created", function () {
-            // Fetch player and opponent profiles
             Promise.all([
                 getUserProfile(currentGame.player.id).then(profile => {
                     currentGame.player.profile = profile;
@@ -169,10 +165,7 @@
                 })
             ]).then(() => {
 
-                moveSound.play();
-
                 currentGame.player.connected = true;
-                currentGame.opponent.connected = true;
 
                 document.getElementById("find-match-btn").classList.add("hidden");
                 document.querySelector(".player-info").classList.remove("hidden");
@@ -183,8 +176,7 @@
                 // Update player names and avatars
                 document.getElementById("player-name-animation").textContent = `${currentGame.player.profile.name} (${currentGame.player.profile.score})`;
                 document.getElementById("opponent-name-animation").textContent = `${currentGame.opponent.profile.name} (${currentGame.opponent.profile.score})`;
-                console.log(currentGame.player.profile.name);
-                console.log(currentGame.opponent.profile.name);
+
                 const playerAvatarUrl = currentGame.player.avatar_url || "./assets/img/player1.webp";
                 const opponentAvatarUrl = currentGame.opponent.avatar_url || "./assets/img/player2.webp";
 
@@ -196,7 +188,25 @@
                 document.getElementById("opponent-avatar-board").src = opponentAvatarUrl;
 
                 showUserProfile(currentGame.player.id, currentGame.player.profile, playerNameBoard, true);
-                showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, true);
+
+                let opponentDisconnected = false;
+                let opponentDisconnected_at = null;
+                if (Array.isArray(currentGame.players_disconnection)) {
+                    const disconnection = currentGame.players_disconnection.find(d => d.player_id === currentGame.opponent.id);
+                    if (disconnection) {
+                        opponentDisconnected = true;
+                        opponentDisconnected_at = disconnection.disconnected_at;
+                    }
+                }
+
+                currentGame.opponent.connected = !opponentDisconnected;
+                showUserProfile(
+                    currentGame.opponent.id,
+                    currentGame.opponent.profile,
+                    opponentNameBoard,
+                    !opponentDisconnected,
+                    opponentDisconnected_at
+                );
 
                 // Show animation
                 const animationOverlay = document.getElementById("game-start-animation");
@@ -226,10 +236,9 @@
 
         });
 
-        document.addEventListener("opponent_disconnected", function () {
+        document.addEventListener("opponent_disconnected", function (event) {
             currentGame.opponent.connected = false;
-            showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, false);
-
+            showUserProfile(currentGame.opponent.id, currentGame.opponent.profile, opponentNameBoard, false, event.detail.timestamp);
         });
 
         document.addEventListener("opponent_connected", function () {
@@ -317,7 +326,6 @@
 
 
         document.addEventListener("move", (event) => {
-            moveSound.play();
 
             const { index, san } = event.detail;
             const movesContainer = document.querySelector(".moves");
@@ -533,6 +541,11 @@
 
             // Clear move list
             document.querySelector(".moves").innerHTML = "";
+
+            // reload page
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
         });
 
 

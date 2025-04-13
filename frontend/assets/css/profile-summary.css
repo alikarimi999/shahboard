@@ -31,3 +31,43 @@
 .game-history table td {
     position: relative;
 }
+
+
+.timer-container {
+    background-color: #333;
+    border: 1px solid #ffd700;
+    border-radius: 4px;
+    padding: 2px 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 4px;
+}
+
+.timer-icon {
+    color: #ffd700;
+    font-size: 14px;
+}
+
+.timer {
+    color: #ffffff;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+.timer-label {
+    color: #ff4444;
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.timer-urgent {
+    color: #ff4444;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0.5;
+    }
+}

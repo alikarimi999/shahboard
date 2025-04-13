@@ -1,11 +1,72 @@
 import { formatDate } from "./utils.js";
 
-export function showUserProfile(id, profile, element, connected) {
+export function showUserProfile(id, profile, element, connected, disconnected_at) {
+    const gameEndDuration = 120;
+
+    if (element && element.timerInterval) {
+        clearInterval(element.timerInterval);
+        element.timerInterval = null;
+    }
+
+    if (!element || !(element instanceof HTMLElement)) {
+        console.error('Invalid element passed to showUserProfile:', element);
+        return;
+    }
+
     if (connected) {
         element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">✅ ${profile.name} (${profile.score})</a>`;
     } else {
-        element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">❌ ${profile.name} (${profile.score})</a>`;
+        const validDisconnectedAt = (typeof disconnected_at === 'number' && !isNaN(disconnected_at))
+            ? disconnected_at
+            : Math.floor(Date.now() / 1000);
+
+        if (validDisconnectedAt !== disconnected_at) {
+            console.warn(`Invalid disconnected_at (${disconnected_at}), using current time: ${validDisconnectedAt}`);
+        }
+
+        const gameEndTime = validDisconnectedAt + gameEndDuration;
+
+        // Use a container for the timer with an icon and the time
+        element.innerHTML = `
+            <span class="timer-container" title="Opponent must reconnect by this time">
+            <span class="timer-label">END IN</span>
+            <span class="timer-icon">⏳</span>
+                <span class="timer"></span>
+            </span>
+            <a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer"> ${profile.name} (${profile.score})</a>
+        `;
+        const timerSpan = element.querySelector('.timer');
+        const timerContainer = element.querySelector('.timer-container');
+
+        if (!timerSpan || !timerContainer) {
+            console.error('Timer elements not found in element:', element);
+            return;
+        }
+
+        const updateTimer = () => {
+            const nowSeconds = Math.floor(Date.now() / 1000);
+            const timeLeftSeconds = gameEndTime - nowSeconds;
+
+            if (timeLeftSeconds <= 0) {
+                timerSpan.textContent = '00:00';
+                if (element.timerInterval) {
+                    clearInterval(element.timerInterval);
+                    element.timerInterval = null;
+                }
+            } else {
+                const minutes = Math.floor(timeLeftSeconds / 60);
+                const seconds = timeLeftSeconds % 60;
+                timerSpan.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                timerContainer.classList.add('timer-urgent');
+            }
+        };
+
+        updateTimer();
+        if (gameEndTime - Math.floor(Date.now() / 1000) > 0) {
+            element.timerInterval = setInterval(updateTimer, 1000);
+        }
     }
+
     element.onmouseenter = () => {
         showProfileSummary(id, profile, element);
     };

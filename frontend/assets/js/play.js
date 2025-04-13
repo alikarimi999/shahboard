@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { initializeBoard } from './board.js';
 import {
     handleGameCreated, handleGameChatCreated, handleGameChatMsg, handleMoveApproved,
-    handlePlayerConnectionUpdate, handleGameEnded, handleError, handleResumeGame, handleViewersList
+    handlePlayerJoined, handlePlayerLeft, handleGameEnded, handleError, handleResumeGame, handleViewersList
 } from './eventHandlers.js';
 
 connectWebSocket(`${config.baseUrl}/wsgateway/ws`).then(connection => {
@@ -15,7 +15,8 @@ connectWebSocket(`${config.baseUrl}/wsgateway/ws`).then(connection => {
     currentGame.ws.registerMessageHandler("msg_approved", handleGameChatMsg);
     currentGame.ws.registerMessageHandler("move_approved", handleMoveApproved);
     currentGame.ws.registerMessageHandler("game_ended", handleGameEnded);
-    currentGame.ws.registerMessageHandler("player_connection_updated", handlePlayerConnectionUpdate);
+    currentGame.ws.registerMessageHandler("player_joined", handlePlayerJoined);
+    currentGame.ws.registerMessageHandler("player_left", handlePlayerLeft);
     currentGame.ws.registerMessageHandler("resume_game", handleResumeGame);
     currentGame.ws.registerMessageHandler("viewers_list", handleViewersList);
     currentGame.ws.registerMessageHandler("err", handleError);
