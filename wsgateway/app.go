@@ -56,7 +56,7 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	server, err := ws.NewServer(e, s, p, game.NewService(client), nil, c, v, l)
+	server, err := ws.NewServer(e, s, p, game.NewService(client), &cfg.Ws, c, v, l)
 	if err != nil {
 		return nil, err
 	}

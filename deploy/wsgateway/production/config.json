@@ -1,4 +1,7 @@
 {
+    "ws": {
+        "user_sessions_cap": 5
+    },
     "kafka": {
         "brokers": [
             "broker:9092"

@@ -6,8 +6,8 @@ var (
 )
 
 type WsConfigs struct {
-	MaxConnections  int
-	UserSessionsCap int
+	MaxConnections  int `json:"max_connections"`
+	UserSessionsCap int `json:"user_sessions_cap"`
 }
 
 var defaultConfigs = &WsConfigs{
