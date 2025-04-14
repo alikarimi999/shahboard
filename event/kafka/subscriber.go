@@ -105,10 +105,13 @@ func (ch *consumerGroupHandler) Cleanup(s sarama.ConsumerGroupSession) error {
 }
 
 // Consumes messages from Kafka, decodes events, and broadcasts them to subscribers.
-func (
-	ch *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (ch *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	ch.l.Debug(fmt.Sprintf("starting to consume messages for topics %v", claim.Topic()))
 	for message := range claim.Messages() {
+
+		// needs to handle better
+		sess.MarkMessage(message, "")
+
 		var action string
 		for _, header := range message.Headers {
 			if string(header.Key) == headerAction {
@@ -176,23 +179,10 @@ func (sm *subscriptionManager) send(events ...event.Event) {
 					default:
 						fmt.Println("event dropped: ", e.GetTopic().String())
 					}
-
-					// subscribers = append(subscribers, sub.ch)
 				}
 			}
 		}
 	}
-
-	// for _, ch := range subscribers {
-	// 	for _, e := range events {
-	// 		select {
-	// 		case ch <- e:
-	// 		default:
-	// 			fmt.Println("event dropped: ", e.GetTopic().String())
-	// 		}
-
-	// 	}
-	// }
 }
 
 // feedSub Implements the event.Subscription interface.
@@ -334,6 +324,7 @@ type consumerGroup struct {
 func newConsumerGroup(brokers []string, groupID string, l log.Logger) (*consumerGroup, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 
 	cg, err := sarama.NewConsumerGroup(brokers, groupID, config)
 	if err != nil {
