@@ -52,14 +52,12 @@ func newRedisGameCache(sercviceID string, rc *redis.Client, deactivedTTL time.Du
 func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, error) {
 
 	script := `
-	local serviceID = KEYS[1]
 	local gameID = ARGV[1]
-	local keyGamePrefix = KEYS[2]
-	local keyPlayerGamePrefix = KEYS[3]
+	local keyGamePrefix = KEYS[1]
+	local keyPlayerGamePrefix = KEYS[2]
 	local gameKey = keyGamePrefix .. gameID
 	local playerGameKey1 = keyPlayerGamePrefix .. ARGV[2]
 	local playerGameKey2 = keyPlayerGamePrefix .. ARGV[3]
-	local gameListKey = serviceID .. ":games"
 	local expirationTime = tonumber(ARGV[4])
 
 	-- MSetNX to store game data
@@ -71,9 +69,6 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 	if expirationTime > 0 then
 	    redis.call('EXPIRE', gameKey, expirationTime)
 	end
-
-	-- Add game ID to the service's game list
-	redis.call('LPUSH', gameListKey, gameID)
 
 	-- Add player game mapping (Player1 -> GameID and Player2 -> GameID)
 	redis.call('SET', playerGameKey1, gameID)
@@ -89,7 +84,6 @@ func (c *redisGameCache) addGame(ctx context.Context, g *entity.Game) (bool, err
 
 	// Execute the Lua script with expiration time as an argument
 	return c.rc.Eval(ctx, script, []string{
-		c.serviceID,
 		keyGamePrefix,
 		keyPlayerGamePrefix,
 	}, []interface{}{
@@ -134,7 +128,7 @@ func (c *redisGameCache) updateAndDeactivateGame(ctx context.Context, games ...*
 		)
 
 		// Remove the game from the service's game list
-		tx.LRem(ctx, fmt.Sprintf("%s:games", c.serviceID), 0, g.ID().String())
+		// tx.LRem(ctx, fmt.Sprintf("%s:games", c.serviceID), 0, g.ID().String())
 
 		// Set the game data with a deactivation TTL
 		cGame := &inCacheGame{
@@ -276,53 +270,53 @@ func (c *redisGameCache) getGamesByID(ctx context.Context, ids []types.ObjectId)
 
 }
 
-func (c *redisGameCache) getGamesByServiceID(ctx context.Context, id string) ([]*entity.Game, error) {
-	if id == "" {
-		id = c.serviceID
-	}
+// func (c *redisGameCache) getGamesByServiceID(ctx context.Context, id string) ([]*entity.Game, error) {
+// 	if id == "" {
+// 		id = c.serviceID
+// 	}
 
-	gamesId, err := c.rc.LRange(ctx, fmt.Sprintf("%s:games", id), 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
+// 	gamesId, err := c.rc.LRange(ctx, fmt.Sprintf("%s:games", id), 0, -1).Result()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	if len(gamesId) == 0 {
-		return nil, nil
-	}
+// 	if len(gamesId) == 0 {
+// 		return nil, nil
+// 	}
 
-	keys := make([]string, len(gamesId))
-	for i, gId := range gamesId {
-		keys[i] = fmt.Sprintf("%s%s", keyGamePrefix, gId)
-	}
+// 	keys := make([]string, len(gamesId))
+// 	for i, gId := range gamesId {
+// 		keys[i] = fmt.Sprintf("%s%s", keyGamePrefix, gId)
+// 	}
 
-	gameData, err := c.rc.MGet(ctx, keys...).Result()
-	if err != nil {
-		return nil, err
-	}
+// 	gameData, err := c.rc.MGet(ctx, keys...).Result()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	gs := []*entity.Game{}
-	for _, i := range gameData {
-		if i == nil {
-			continue
-		}
+// 	gs := []*entity.Game{}
+// 	for _, i := range gameData {
+// 		if i == nil {
+// 			continue
+// 		}
 
-		g := &inCacheGame{}
-		if err := g.decode([]byte(i.(string))); err != nil {
-			continue
-		}
+// 		g := &inCacheGame{}
+// 		if err := g.decode([]byte(i.(string))); err != nil {
+// 			continue
+// 		}
 
-		game := &entity.Game{}
-		if err := game.Decode(g.Game); err != nil {
-			c.l.Debug(fmt.Sprintf("failed to decode game: %v", err))
-			continue
-		}
+// 		game := &entity.Game{}
+// 		if err := game.Decode(g.Game); err != nil {
+// 			c.l.Debug(fmt.Sprintf("failed to decode game: %v", err))
+// 			continue
+// 		}
 
-		gs = append(gs, game)
+// 		gs = append(gs, game)
 
-	}
+// 	}
 
-	return gs, nil
-}
+// 	return gs, nil
+// }
 
 func (c *redisGameCache) getGameByID(ctx context.Context, id types.ObjectId) (*entity.Game, error) {
 	gameData, err := c.rc.Get(ctx, fmt.Sprintf("%s%s", keyGamePrefix, id.String())).Result()

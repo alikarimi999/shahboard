@@ -78,7 +78,7 @@ func (s *liveGamesService) remove(gameID types.ObjectId) {
 }
 
 func (s *liveGamesService) run() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	go func() {
 
 		for {

@@ -68,7 +68,7 @@ func (gm *gameManager) checkPlayersConnection() {
 				continue
 			}
 
-			gm.l.Debug(fmt.Sprintf("game '%s' ended because player '%s' left", game.ID(), playerId))
+			gm.l.Debug(fmt.Sprintf("game %s ended, player %s left", game.ID(), playerId))
 
 			endedGames = append(endedGames, game)
 

@@ -148,7 +148,7 @@ func (c *redisCache) updateSessionsTimestamp(ctx context.Context, ss ...*session
 	if len(ss) == 0 {
 		return nil
 	}
-
+	count := 0
 	pipe := c.c.Pipeline()
 
 	t := time.Now()
@@ -167,12 +167,15 @@ func (c *redisCache) updateSessionsTimestamp(ctx context.Context, ss ...*session
 
 		key := fmt.Sprintf("%s:%s", c.userSessions, s.userId.String())
 		pipe.HSet(ctx, key, s.id.String(), value)
+		count++
 	}
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to execute Redis pipeline for updating sessions: %v", err)
 	}
+
+	c.l.Debug(fmt.Sprintf("update timestamp for %d sessions at: '%s'", count, t.Format("2006-01-02 15:04:05")))
 
 	return nil
 }
@@ -205,6 +208,7 @@ func (c *redisCache) deleteExpiredSessions(ctx context.Context, ttl time.Duratio
 	if err != nil {
 		return fmt.Errorf("failed to get keys: %v", err)
 	}
+	count := 0
 
 	pipe := c.c.Pipeline()
 	expirationThreshold := time.Now().Add(-ttl)
@@ -225,8 +229,14 @@ func (c *redisCache) deleteExpiredSessions(ctx context.Context, ttl time.Duratio
 
 			if sic.UpdatedAt.Before(expirationThreshold) {
 				pipe.HDel(ctx, key, sessionId)
+				count++
 			}
 		}
+	}
+
+	if count == 0 {
+		pipe.Discard()
+		return nil
 	}
 
 	_, err = pipe.Exec(ctx)
@@ -234,6 +244,7 @@ func (c *redisCache) deleteExpiredSessions(ctx context.Context, ttl time.Duratio
 		return fmt.Errorf("failed to execute Redis pipeline for deleting expired sessions: %v", err)
 	}
 
+	c.l.Debug(fmt.Sprintf("deleted %d expired sessions at: '%s'", count, time.Now().Format("2006-01-02 15:04:05")))
 	return nil
 }
 

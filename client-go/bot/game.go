@@ -200,7 +200,7 @@ func (g *game) run() error {
 		fmt.Printf("%d: game started between %s and %s\n", g.gamesCount.Load(), g.b.ID(), g.opponentId)
 
 		randSleep(g.defaultDelay)
-		fmt.Println(g.b.Email(), g.board.Position().Turn(), g.color)
+		// fmt.Println(g.b.Email(), g.board.Position().Turn(), g.color)
 		m, err := g.randMove()
 		if err != nil {
 			g.stop()

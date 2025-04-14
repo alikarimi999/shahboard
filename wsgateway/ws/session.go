@@ -92,7 +92,7 @@ func (s *session) start() {
 func (s *session) consume(e event.Event) {
 	if s.isStopped() {
 		s.l.Debug(fmt.Sprintf("attempted to send event to stopped session '%s': %s",
-			s.id, string(e.Encode())))
+			s.id, e.GetTopic().String()))
 		return
 	}
 
@@ -290,7 +290,7 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req DataResumeGa
 			}.Encode(),
 		}
 
-		s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
+		// s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s'", s.id, req.GameId))
 		return
 	}
 
@@ -310,7 +310,11 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 		}
 	}()
 
-	s.addViewGame(req.GameId)
+	emsg := s.addViewGame(req.GameId)
+	if emsg != "" {
+		errMsg = emsg
+		return
+	}
 	game, err := s.game.GetLiveGamePGN(context.Background(), req.GameId)
 	if err != nil {
 		s.l.Error(err.Error())
@@ -344,7 +348,7 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 		s.l.Error(err.Error())
 	}
 
-	s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
+	// s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
 }
 
 func (s *session) handleMoveRequest(msgId types.ObjectId, req DataGamePlayerMoveRequest) {
@@ -404,7 +408,7 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
 func (s *session) send(msg *Msg) {
 	if s.isStopped() {
 		s.l.Debug(fmt.Sprintf("attempted to send msg to stopped session '%s' : %s",
-			s.id, string(msg.Encode())))
+			s.id, msg.Type))
 		return
 	}
 
@@ -462,6 +466,9 @@ func (s *session) isStopped() bool {
 func (s *session) stop() {
 	s.once.Do(func() {
 		s.stopped.Store(true)
+		if err := s.Conn.Close(); err != nil {
+			s.l.Error(err.Error())
+		}
 		close(s.eventCh)
 		close(s.msgCh)
 		close(s.stopCh)
@@ -485,6 +492,8 @@ func (s *session) stop() {
 		if !s.matchId.Load().IsZero() {
 			s.h.unsubscribeFromMatch(s)
 		}
+
+		s.l.Debug(fmt.Sprintf("session '%s' stopped for user '%s'", s.id, s.userId))
 	})
 }
 

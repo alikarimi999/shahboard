@@ -36,9 +36,11 @@ func SetupApplication(cfg Config) (*application, error) {
 		return nil, err
 	}
 
-	gin.SetMode(gin.ReleaseMode)
-	e := gin.Default()
-	e.Use(middleware.Cors())
+	// gin.SetMode(gin.ReleaseMode)
+	// e := gin.Default()
+
+	e := gin.New()
+	e.Use(gin.Recovery(), middleware.Cors())
 
 	c := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,

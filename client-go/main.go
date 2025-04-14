@@ -72,7 +72,7 @@ func startBot(cfg *config.Config, bc Bot, sp *stockfish.Stockfish) {
 		fmt.Printf("bot '%s' stopped\n", b.Email())
 	}()
 
-	_, err = b.Login()
+	ok, err := b.Login()
 	if err != nil {
 		fmt.Printf("bot '%s' login error: %v\n", b.Email(), err)
 		return
@@ -80,16 +80,16 @@ func startBot(cfg *config.Config, bc Bot, sp *stockfish.Stockfish) {
 
 	fmt.Printf("bot '%s' login success\n", b.Email())
 
-	// if !ok {
-	go func() {
-		randSleep(20)
-		if err := b.UpdateProfile(strings.Split(b.Email(), "@")[0],
-			fmt.Sprintf("https://robohash.org/%s.png", b.Email())); err != nil {
-			fmt.Printf("bot '%s' update profile error: %v\n", b.Email(), err)
-			return
-		}
-	}()
-	// }
+	if !ok {
+		go func() {
+			randSleep(20)
+			if err := b.UpdateProfile(strings.Split(b.Email(), "@")[0],
+				fmt.Sprintf("https://robohash.org/%s.png", b.Email())); err != nil {
+				fmt.Printf("bot '%s' update profile error: %v\n", b.Email(), err)
+				return
+			}
+		}()
+	}
 
 	if err := b.SetupWS(); err != nil {
 		fmt.Printf("bot '%s' ws error: %v\n", b.Email(), err)

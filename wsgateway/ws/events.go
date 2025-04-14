@@ -281,6 +281,7 @@ func (m *sessionsEventsHandler) unsubscribeFromMatch(s *session) {
 }
 
 func (m *sessionsEventsHandler) unsubscribeFromGameWithChat(s *session, gamesId ...types.ObjectId) {
+	// not sure if RLock will cause erroro or not
 	m.gcmu.RLock()
 	defer m.gcmu.RUnlock()
 
@@ -288,6 +289,14 @@ func (m *sessionsEventsHandler) unsubscribeFromGameWithChat(s *session, gamesId 
 		if ss, ok := m.gameWithChatSubSessions[gameId]; ok {
 			ss.remove(s)
 		}
+	}
+}
+
+func (m *sessionsEventsHandler) deleteGameSubscribers(gamesId ...types.ObjectId) {
+	m.gcmu.Lock()
+	defer m.gcmu.Unlock()
+	for _, gameId := range gamesId {
+		delete(m.gameWithChatSubSessions, gameId)
 	}
 }
 

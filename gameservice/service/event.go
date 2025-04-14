@@ -16,7 +16,7 @@ import (
 // This function is idempotent and safe to call concurrently from multiple
 // instances of the GameService.
 func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
-	s.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
+	// s.l.Debug(fmt.Sprintf("handling event users matched: '%s' and '%s'", d.User1.ID, d.User2.ID))
 	// check if player is already in a game
 	if s.gm.checkByPlayer(d.User1.ID) || s.gm.checkByPlayer(d.User2.ID) {
 		s.l.Debug("player is already in a game")
@@ -51,10 +51,10 @@ func (s *Service) handleEventUsersMatched(d *event.EventUsersMatchCreated) {
 	}); err != nil {
 		s.l.Error(err.Error())
 	}
-	s.l.Debug(fmt.Sprintf("published game created event: '%s'", game.ID()))
+	// s.l.Debug(fmt.Sprintf("published game created event: '%s'", game.ID()))
 
-	s.l.Info(fmt.Sprintf("game '%s' created by player '%s' as '%s' and player '%s' as '%s'",
-		game.ID(), game.Player1().ID, game.Player1().Color, game.Player2().ID, game.Player2().Color))
+	// s.l.Info(fmt.Sprintf("game '%s' created by player '%s' as '%s' and player '%s' as '%s'",
+	// 	game.ID(), game.Player1().ID, game.Player1().Color, game.Player2().ID, game.Player2().Color))
 
 	// TODO: add to repository concurrency control
 }
@@ -101,7 +101,7 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			return
 		}
 
-		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
+		// s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
 		s.l.Debug(fmt.Sprintf("published game ended event: '%s'", game.ID()))
 
 		s.gm.removeGame(game.ID())
@@ -112,17 +112,20 @@ func (s *Service) handleEventGamePlayerMoved(d *event.EventGamePlayerMoved) {
 			return
 		}
 
-		s.l.Debug(fmt.Sprintf("player '%s' made move '%s' on game '%s'", d.PlayerID, d.Move, game.ID()))
+		// s.l.Debug(fmt.Sprintf("player '%s' made move '%s' on game '%s'", d.PlayerID, d.Move, game.ID()))
 
-		s.pub.Publish(event.EventGameMoveApproved{
+		if err := s.pub.Publish(event.EventGameMoveApproved{
 			ID:        types.NewObjectId(),
 			PlayerID:  d.PlayerID,
 			GameID:    d.GameID,
 			Move:      d.Move,
 			Index:     d.Index,
 			Timestamp: time.Now().Unix(),
-		})
-		s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
+		}); err != nil {
+			s.l.Error(err.Error())
+			return
+		}
+		// s.l.Debug(fmt.Sprintf("published game move approved event: '%s'", game.ID()))
 	}
 
 	// TODO: think about how to update the database

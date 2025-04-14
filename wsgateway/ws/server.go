@@ -100,7 +100,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 		go server.sessionWriter(sess)
 		sess.sendWelcome()
 
-		l.Debug(fmt.Sprintf("session '%s' created for user '%s'", sess.id, user.ID))
+		l.Debug(fmt.Sprintf("session '%s' created for '%s'", sess.id, user.ID))
 
 	})
 
@@ -148,15 +148,21 @@ func (s *Server) stopSessions(ss ...*session) {
 }
 
 func (s *Server) sessionReader(se *session) {
-	defer func() {
-		s.l.Debug(fmt.Sprintf("session '%s' reader stopped", se.id))
-	}()
+	// defer func() {
+	// 	s.l.Debug(fmt.Sprintf("session '%s' reader stopped", se.id))
+	// }()
 
 	for {
+		if se.isStopped() {
+			// this sholudn't happen
+			s.l.Debug(fmt.Sprintf("read from stopped session: %s", se.id))
+			return
+		}
+
 		mt, recievedMsg, err := se.ReadMessage()
 		if err != nil {
 			if !se.isStopped() {
-				s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", se.id, err))
+				// s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", se.id, err))
 				s.stopSessions(se)
 			}
 			return
@@ -179,18 +185,22 @@ func (s *Server) sessionReader(se *session) {
 }
 
 func (s *Server) sessionWriter(se *session) {
-	defer func() {
-		s.l.Debug(fmt.Sprintf("session '%s' writer stopped", se.id))
-	}()
+	// defer func() {
+	// 	s.l.Debug(fmt.Sprintf("session '%s' writer stopped", se.id))
+	// }()
 
 	for {
 		select {
 		case <-se.stopCh:
 			return
 		case message := <-se.msgCh:
+			if message == nil || se.isStopped() {
+				return
+			}
+
 			if err := se.WriteMessage(websocket.TextMessage, message); err != nil {
 				if !se.isStopped() {
-					s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", se.id, err))
+					// s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", se.id, err))
 					s.stopSessions(se)
 				}
 				return

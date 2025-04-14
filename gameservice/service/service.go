@@ -1,12 +1,9 @@
 package game
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
-	"github.com/alikarimi999/shahboard/gameservice/entity"
 	"github.com/alikarimi999/shahboard/pkg/log"
 	"github.com/redis/go-redis/v9"
 )
@@ -55,31 +52,31 @@ func NewGameService(cfg Config, redis *redis.Client, pub event.Publisher, sub ev
 	s.sm.AddSubscription(s.sub.Subscribe(event.TopicUsersMatchedCreated))
 	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGame))
 
-	if err := s.init(); err != nil {
-		return nil, err
-	}
+	// if err := s.init(); err != nil {
+	// 	return nil, err
+	// }
 
 	return s, nil
 }
 
-func (s *Service) init() error {
+// func (s *Service) init() error {
 
-	// load games from cache
-	games, err := s.cache.getGamesByServiceID(context.Background(), s.cfg.InstanceID)
-	if err != nil {
-		return err
-	}
+// 	// load games from cache
+// 	games, err := s.cache.getGamesByServiceID(context.Background(), s.cfg.InstanceID)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	for _, g := range games {
-		if g.Status() == entity.GameStatusActive {
-			if s.gm.addGame(g) {
-				sub := s.sub.Subscribe(event.TopicGame.SetResource(g.ID().String()))
-				s.sm.AddSubscription(sub)
-				s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
-			}
+// 	for _, g := range games {
+// 		if g.Status() == entity.GameStatusActive {
+// 			if s.gm.addGame(g) {
+// 				sub := s.sub.Subscribe(event.TopicGame.SetResource(g.ID().String()))
+// 				s.sm.AddSubscription(sub)
+// 				s.l.Debug(fmt.Sprintf("subscribed to topic: '%s'", sub.Topic().String()))
+// 			}
 
-		}
-	}
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

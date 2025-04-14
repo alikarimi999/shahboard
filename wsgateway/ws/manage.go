@@ -15,7 +15,7 @@ import (
 // This function needs some improvements and maybe separate each task into its own function
 // for better modularity and maintainability.
 func (s *Server) manageSessionsState() {
-	sessionCacheTTL := time.Minute * 3
+	sessionCacheTTL := time.Minute * 1
 	cleanCachTicker := time.NewTicker(time.Minute * 1)
 	pingTicker := time.NewTicker(time.Second * 5)
 	pingIntervalDisconnectedSession := time.Second * 10
@@ -86,10 +86,14 @@ func (s *Server) manageSessionsState() {
 
 		case <-cleanCachTicker.C:
 
+			// clean event handler from ended games
 			// remove list of viewers of games that ended
 			// it's better to be done in only one instance of wsGateway with a master/slave mechanism!
 			gamesId := s.em.getAll()
 			if len(gamesId) > 0 {
+
+				s.h.deleteGameSubscribers(gamesId...)
+
 				err := s.cache.removeGamesViewersLists(context.Background(), gamesId)
 				if err != nil {
 					s.l.Error(err.Error())
@@ -109,7 +113,7 @@ func (s *Server) manageSessionsState() {
 				continue
 			}
 
-			// remove sessions that have not updated their timestamp in the last 3 minutes
+			// remove sessions that have not updated their timestamp in the last 1 minute
 			// it's better to be done in only one instance of wsGateway with a master/slave mechanism!
 			//
 			// this is a simple approach to clean cache from expired sessions

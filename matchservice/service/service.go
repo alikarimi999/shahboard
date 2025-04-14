@@ -72,7 +72,7 @@ func (s *Service) NewMatchRequest(ctx context.Context, userId types.ObjectId) (*
 		return nil, fmt.Errorf("user '%s' already has a match request", userId)
 	}
 
-	s.l.Debug(fmt.Sprintf("New match request for user '%s' with level %d", userId, score))
+	// s.l.Debug(fmt.Sprintf("New match request for user '%s' with level %d", userId, score))
 	select {
 	case <-ctx.Done():
 		s.e.cancelRequest(req)
@@ -98,10 +98,13 @@ func (s *Service) run() {
 				}
 				events := make([]event.Event, 0, len(ms))
 				for _, m := range ms {
+					s.l.Debug(fmt.Sprintf("match '%s' for user '%s' and '%s'", m.ID, m.User1.ID, m.User2.ID))
 					events = append(events, m)
 				}
 
-				s.p.Publish(events...)
+				if err := s.p.Publish(events...); err != nil {
+					s.l.Error(err.Error())
+				}
 
 			case <-s.stopCh:
 				s.e.stop()

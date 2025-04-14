@@ -59,17 +59,17 @@ func (s *Service) handleGameCreated(e *event.EventGameCreated) {
 func (s *Service) handleMsgSent(e *event.EventGameChatMsgeSent) {
 	c := s.cm.getChat(e.GameID)
 	if c == nil {
-		s.l.Debug(fmt.Sprintf("chat not found, gameID: %s", e.GameID))
+		// s.l.Debug(fmt.Sprintf("chat not found, gameID: %s", e.GameID))
 		return
 	}
 
 	if !c.IsOwner(e.SenderID) {
-		s.l.Debug(fmt.Sprintf("invalid sender, gameID: %s, senderID: %s", e.GameID, e.SenderID))
+		// s.l.Debug(fmt.Sprintf("invalid sender, gameID: %s, senderID: %s", e.GameID, e.SenderID))
 		return
 	}
 
 	if e.Content == "" {
-		s.l.Debug(fmt.Sprintf("empty message, gameID: %s, senderID: %s", e.GameID, e.SenderID))
+		// s.l.Debug(fmt.Sprintf("empty message, gameID: %s, senderID: %s", e.GameID, e.SenderID))
 		return
 	}
 
@@ -93,7 +93,7 @@ func (s *Service) handleMsgSent(e *event.EventGameChatMsgeSent) {
 		return
 	}
 
-	s.l.Debug(fmt.Sprintf("message sent, gameID: %s, senderID: %s", e.GameID, e.SenderID))
+	// s.l.Debug(fmt.Sprintf("message sent, gameID: %s, senderID: %s", e.GameID, e.SenderID))
 }
 
 func (s *Service) handleGameEnded(e *event.EventGameEnded) {

@@ -28,7 +28,7 @@ func (v *viewManager) add(id types.ObjectId) {
 	defer v.mu.Unlock()
 
 	v.list[id] = struct{}{}
-	fmt.Printf("bot '%s' add game %s to view list\n", v.email, id)
+	// fmt.Printf("bot '%s' add game %s to view list\n", v.email, id)
 }
 
 func (v *viewManager) remove(id types.ObjectId) {
@@ -37,7 +37,7 @@ func (v *viewManager) remove(id types.ObjectId) {
 	_, ok := v.list[id]
 	if ok {
 		delete(v.list, id)
-		fmt.Printf("bot '%s' remove game %s from view list\n", v.email, id)
+		// fmt.Printf("bot '%s' remove game %s from view list\n", v.email, id)
 	}
 }
 
@@ -50,7 +50,7 @@ func (v *viewManager) exists(id types.ObjectId) bool {
 }
 
 func (b *Bot) RandomView() {
-	t := time.NewTicker(time.Second * time.Duration(rand.Intn(10)+30))
+	t := time.NewTicker(time.Second * time.Duration(rand.Intn(60)+30))
 
 	for {
 		select {
