@@ -166,6 +166,17 @@ func (sm *subscriptionManager) removeSub(sub *feedSub) {
 }
 
 // Sends an event to all subscribers of the event's topic.
+//
+// In the last update, I removed both the `default` case from the `select`
+// and the buffered channels from subscribers to ensure the consumer only
+// pulls events as fast as the system can process them. This prevents event
+// drops and enforces natural backpressure.
+//
+// However, the downside is that a single slow subscriber can block the entire
+// system, stalling Kafka consumption and reducing overall throughput.
+//
+// TODO: We need a more robust solution that maintains reliability and backpressure,
+// without letting one slow subscriber stall the whole pipeline.
 func (sm *subscriptionManager) send(events ...event.Event) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -174,11 +185,12 @@ func (sm *subscriptionManager) send(events ...event.Event) {
 		if subs, exists := sm.subs[e.GetTopic().Domain()]; exists {
 			for _, sub := range subs {
 				if e.GetTopic().Match(sub.topic) {
-					select {
-					case sub.ch <- e:
-					default:
-						fmt.Println("event dropped: ", e.GetTopic().String())
-					}
+					sub.ch <- e
+					// select {
+					// case sub.ch <- e:
+					// default:
+					// 	fmt.Println("event dropped: ", e.GetTopic().String())
+					// }
 				}
 			}
 		}
@@ -202,8 +214,10 @@ func newFeedSub(topic event.Topic, kc *kafkaSubscriber) *feedSub {
 		topic: topic,
 		kc:    kc,
 
-		ch:  make(chan event.Event, 1000),
-		err: make(chan error, 1000),
+		ch:  make(chan event.Event),
+		err: make(chan error),
+		// ch:  make(chan event.Event, 1000),
+		// err: make(chan error, 1000),
 	}
 }
 

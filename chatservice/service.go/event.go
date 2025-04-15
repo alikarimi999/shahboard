@@ -36,7 +36,7 @@ func (s *Service) handleGameCreated(e *event.EventGameCreated) {
 	}
 
 	if !ok {
-		s.l.Debug("failed to create game chat, ERR: chat already exists")
+		// game chat already exists
 		return
 	}
 
@@ -52,7 +52,6 @@ func (s *Service) handleGameCreated(e *event.EventGameCreated) {
 		return
 	}
 
-	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameChat.SetResource(e.GameID.String())))
 	s.l.Debug(fmt.Sprintf("game chat created, gameID: %s", e.GameID))
 }
 

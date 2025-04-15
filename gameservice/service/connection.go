@@ -111,5 +111,5 @@ func (p *playersConnectionTracker) add(gameId types.ObjectId, playerId types.Obj
 		p.list[gameId] = make(map[types.ObjectId]time.Time)
 	}
 	p.list[gameId][playerId] = time.Now()
-	p.l.Debug(fmt.Sprintf("player '%s' left game '%s'", playerId, gameId))
+	// p.l.Debug(fmt.Sprintf("player '%s' left game '%s'", playerId, gameId))
 }

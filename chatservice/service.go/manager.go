@@ -44,6 +44,14 @@ func (m *chatsManager) getChat(gameId types.ObjectId) *entity.Chat {
 	return m.chats[gameId]
 }
 
+func (m *chatsManager) exists(gameId types.ObjectId) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	_, ok := m.chats[gameId]
+	return ok
+}
+
 // removeChat removes the chat for the game with the provided ID.
 func (m *chatsManager) removeChat(gameId types.ObjectId) {
 	m.mu.Lock()

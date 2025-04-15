@@ -35,13 +35,17 @@ func NewService(cfg Config, pub event.Publisher, sub event.Subscriber, rc *redis
 		l:     l,
 	}
 	s.sm = event.NewManager(l, s.handleEvents)
-	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameCreated))
-	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameEnded))
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGame))
+	s.sm.AddSubscription(s.sub.Subscribe(event.TopicGameChat))
 
 	return s
 }
 
 func (s *Service) CreateGameChat(ctx context.Context, gameId types.ObjectId, player1, player2 types.Player) (bool, error) {
+	if s.cm.exists(gameId) {
+		return false, nil
+	}
+
 	gameChat := s.cm.createChat(gameId, player1, player2)
 	if gameChat == nil {
 		return false, nil
