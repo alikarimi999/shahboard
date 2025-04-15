@@ -9,7 +9,6 @@ import (
 
 	"github.com/alikarimi999/shahboard/client-go/bot"
 	"github.com/alikarimi999/shahboard/client-go/config"
-	"github.com/alikarimi999/shahboard/client-go/stockfish"
 	"github.com/alikarimi999/shahboard/pkg/utils"
 )
 
@@ -37,21 +36,21 @@ func main() {
 		panic("server is required")
 	}
 
-	if cfg.StockfishPath == "" {
-		panic("stockfish path is required")
-	}
+	// if cfg.StockfishPath == "" {
+	// 	panic("stockfish path is required")
+	// }
 
 	bots := generateBots(900, 900+cfg.BotsNum)
 
-	sp, err := stockfish.NewStockfish(cfg.StockfishPath)
-	if err != nil {
-		panic(err)
-	}
+	// sp, err := stockfish.NewStockfish(cfg.StockfishPath)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	for _, bc := range bots {
 		go func() {
 			for {
-				startBot(cfg, bc, sp)
+				startBot(cfg, bc)
 			}
 		}()
 	}
@@ -59,9 +58,9 @@ func main() {
 	select {}
 }
 
-func startBot(cfg *config.Config, bc Bot, sp *stockfish.Stockfish) {
+func startBot(cfg *config.Config, bc Bot) {
 	randSleep(10)
-	b, err := bot.NewBot(cfg, bc.Email, bc.Password, randSkill(), sp)
+	b, err := bot.NewBot(cfg, bc.Email, bc.Password, randSkill())
 	if err != nil {
 		fmt.Printf("bot '%s' error: %v\n", bc.Email, err)
 		return

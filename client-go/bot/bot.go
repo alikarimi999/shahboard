@@ -32,14 +32,12 @@ type Bot struct {
 	stopCh chan struct{}
 }
 
-func NewBot(cfg *config.Config, email, password string,
-	skill int, sp *stockfish.Stockfish) (*Bot, error) {
+func NewBot(cfg *config.Config, email, password string, skill int) (*Bot, error) {
 	b := &Bot{
 		cfg:      cfg,
 		email:    email,
 		password: password,
 		skill:    skill,
-		sp:       sp,
 		subs:     make(map[Topic]*Subscription),
 		ps:       NewPubSub(),
 		vm:       NewViewManager(email),
