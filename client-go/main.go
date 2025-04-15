@@ -91,7 +91,7 @@ func startBot(cfg *config.Config, bc Bot) {
 		return
 	}
 
-	fmt.Printf("%d: bot '%s' ws connected\n", b.Email())
+	fmt.Printf("bot '%s' ws connected\n", b.Email())
 
 	go func() {
 		b.RandomView()
