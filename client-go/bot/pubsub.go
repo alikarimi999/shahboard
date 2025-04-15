@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -89,9 +88,10 @@ func (s *Subscription) Consume() <-chan Event {
 }
 
 func (s *Subscription) send(e Event) {
-	select {
-	case s.ch <- e:
-	default:
-		fmt.Println("Dropped message due to slow consumer:", e.Topic)
-	}
+	s.ch <- e
+	// select {
+	// case s.ch <- e:
+	// default:
+	// 	fmt.Println("Dropped message due to slow consumer:", e.Topic)
+	// }
 }
