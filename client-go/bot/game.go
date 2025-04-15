@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/alikarimi999/shahboard/event"
@@ -29,12 +28,11 @@ type game struct {
 
 	defaultDelay int
 
-	gamesCount *atomic.Int32
-	once       sync.Once
-	stopCh     chan struct{}
+	once   sync.Once
+	stopCh chan struct{}
 }
 
-func (b *Bot) Resume(gameId types.ObjectId, counter *atomic.Int32) error {
+func (b *Bot) Resume(gameId types.ObjectId) error {
 	if b.g != nil {
 		return fmt.Errorf("game already exists")
 	}
@@ -76,7 +74,6 @@ func (b *Bot) Resume(gameId types.ObjectId, counter *atomic.Int32) error {
 
 		board:        chess.NewGame(f),
 		subs:         make(map[Topic]*Subscription),
-		gamesCount:   counter,
 		defaultDelay: defaultDelay,
 		stopCh:       make(chan struct{}),
 	}
@@ -106,7 +103,7 @@ func (b *Bot) Resume(gameId types.ObjectId, counter *atomic.Int32) error {
 	return g.run()
 }
 
-func (b *Bot) Create(ec event.EventUsersMatchCreated, counter *atomic.Int32) error {
+func (b *Bot) Create(ec event.EventUsersMatchCreated) error {
 	if b.g != nil {
 		return fmt.Errorf("game already exists")
 	}
@@ -140,7 +137,6 @@ func (b *Bot) Create(ec event.EventUsersMatchCreated, counter *atomic.Int32) err
 		id:           msg.GameID,
 		board:        chess.NewGame(),
 		subs:         make(map[Topic]*Subscription),
-		gamesCount:   counter,
 		defaultDelay: defaultDelay,
 		stopCh:       make(chan struct{}),
 	}
@@ -196,8 +192,7 @@ func (g *game) run() error {
 
 	// first move
 	if types.Color(g.board.Position().Turn()) == g.color {
-		g.gamesCount.Add(1)
-		fmt.Printf("%d: game started between %s and %s\n", g.gamesCount.Load(), g.b.ID(), g.opponentId)
+		fmt.Printf("game started between %s and %s\n", g.b.ID(), g.opponentId)
 
 		randSleep(g.defaultDelay)
 		// fmt.Println(g.b.Email(), g.board.Position().Turn(), g.color)
@@ -235,7 +230,6 @@ func (g *game) run() error {
 
 func (g *game) stop() {
 	g.once.Do(func() {
-		g.gamesCount.Add(-1)
 		for _, s := range g.subs {
 			s.Unsubscribe()
 		}

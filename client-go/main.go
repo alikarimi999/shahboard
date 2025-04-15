@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/alikarimi999/shahboard/client-go/bot"
@@ -16,9 +15,6 @@ type Bot struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
-
-var wsCounter atomic.Int32
-var gameCounter *atomic.Int32 = &atomic.Int32{}
 
 func main() {
 	// http.DefaultClient.Transport = &http.Transport{
@@ -40,7 +36,7 @@ func main() {
 	// 	panic("stockfish path is required")
 	// }
 
-	bots := generateBots(900, 900+cfg.BotsNum)
+	bots := generateBots(0, cfg.BotsNum)
 
 	// sp, err := stockfish.NewStockfish(cfg.StockfishPath)
 	// if err != nil {
@@ -95,8 +91,7 @@ func startBot(cfg *config.Config, bc Bot) {
 		return
 	}
 
-	wsCounter.Add(1)
-	fmt.Printf("%d: bot '%s' ws connected\n", wsCounter.Load(), b.Email())
+	fmt.Printf("%d: bot '%s' ws connected\n", b.Email())
 
 	go func() {
 		b.RandomView()
@@ -109,7 +104,7 @@ func startBot(cfg *config.Config, bc Bot) {
 	}
 
 	if !gameId.IsZero() {
-		if err := b.Resume(gameId, gameCounter); err != nil {
+		if err := b.Resume(gameId); err != nil {
 			fmt.Printf("bot '%s' resume error: %v\n", b.Email(), err)
 			return
 		}
@@ -122,7 +117,7 @@ func startBot(cfg *config.Config, bc Bot) {
 		return
 	}
 
-	if err := b.Create(e, gameCounter); err != nil {
+	if err := b.Create(e); err != nil {
 		fmt.Printf("bot '%s' play error: %v\n", b.Email(), err)
 		return
 	}
