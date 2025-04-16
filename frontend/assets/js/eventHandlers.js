@@ -132,10 +132,7 @@ export function handleGameEnded(base64Data) {
         return;
     }
 
-    var desc = "";
-    if (result == "win" && gameData.desc == "player_left") {
-        desc = "Opponent left the game!";
-    }
+    var desc = gameData.desc;
 
     // Dispatch a custom event with the game result
     const event = new CustomEvent("game_ended", {

@@ -36,7 +36,9 @@ func main() {
 	// 	panic("stockfish path is required")
 	// }
 
-	bots := generateBots(0, cfg.BotsNum)
+	firstBot := 0
+	lastBot := 100
+	bots := generateBots(firstBot, lastBot)
 
 	// sp, err := stockfish.NewStockfish(cfg.StockfishPath)
 	// if err != nil {
