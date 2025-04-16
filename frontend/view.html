@@ -89,6 +89,7 @@
         import { sendGameChatMsg } from './assets/js/chat.js';
         import { showUserProfile } from "./assets/js/profile-summary.js";
         import { getUserProfile } from './assets/js/user_info.js';
+        import { showGameResult } from "./assets/js/result.js";
 
         const moveSound = new Audio('./assets/sounds/move2.mp3');
         const playerNameBoard = document.querySelector("#player-name");
@@ -345,138 +346,39 @@
         });
 
 
-
-        function triggerWin(desc) {
-            const winEffect = document.createElement("div");
-            winEffect.classList.add("win-effect");
-
-            const winTitle = document.createElement("div");
-            winTitle.classList.add("win-title");
-            winTitle.innerText = "You Won!";
-
-            const winMessage = document.createElement("div");
-            winMessage.classList.add("win-message");
-
-            // use desc to display if desc is null then use default message
-            winMessage.innerText = desc ? desc : "congratulations! You won the game!";
-
-            winEffect.appendChild(winTitle);
-            winEffect.appendChild(winMessage);
-            document.body.appendChild(winEffect);
-
-            // Delay message fade-in
-            setTimeout(() => {
-                winMessage.style.opacity = "1";
-                winMessage.style.transform = "translateY(0)";
-            }, 1200);
-
-            // Add sparkles inside winEffect instead of document.body
-            for (let i = 0; i < 30; i++) {
-                const sparkle = document.createElement("div");
-                sparkle.classList.add("sparkle");
-                sparkle.style.left = Math.random() * 100 + "%";
-                sparkle.style.top = Math.random() * 100 + "%";
-                sparkle.style.animationDuration = (Math.random() * 1.5 + 0.5) + "s";
-                sparkle.style.width = sparkle.style.height = Math.random() * 15 + "px";
-                winEffect.appendChild(sparkle);
-
-                setTimeout(() => sparkle.remove(), 2900);
-            }
-
-            setTimeout(() => winEffect.remove(), 3000);
-        }
-
-
-        function triggerLoss(desc) {
-            const loseEffect = document.createElement("div");
-            loseEffect.classList.add("lose-effect");
-
-            const loseTitle = document.createElement("div");
-            loseTitle.classList.add("lose-title");
-            loseTitle.innerText = "You Lost!";
-
-            const loseMessage = document.createElement("div");
-            loseMessage.classList.add("lose-message");
-            loseMessage.innerText = desc ? desc : "You lost the game! Better luck next time!";
-
-            loseEffect.appendChild(loseTitle);
-            loseEffect.appendChild(loseMessage);
-            document.body.appendChild(loseEffect);
-
-            // Delay message fade-in
-            setTimeout(() => {
-                loseMessage.style.opacity = "1";
-                loseMessage.style.transform = "translateY(0)";
-            }, 2900);
-
-            setTimeout(() => loseEffect.remove(), 3000);
-        }
-
-        function triggerDraw() {
-            const drawEffect = document.createElement("div");
-            drawEffect.classList.add("draw-effect");
-
-            const drawTitle = document.createElement("div");
-            drawTitle.classList.add("draw-title");
-            drawTitle.innerText = "Draw!";
-
-            const drawMessage = document.createElement("div");
-            drawMessage.classList.add("draw-message");
-            drawMessage.innerText = "The game ended in a draw!";
-
-            drawEffect.appendChild(drawTitle);
-            drawEffect.appendChild(drawMessage);
-            document.body.appendChild(drawEffect);
-
-            // Fade-in message
-            setTimeout(() => {
-                drawMessage.style.opacity = "1";
-                drawMessage.style.transform = "translateY(0)";
-            }, 1200);
-
-            // Add sparkles
-            for (let i = 0; i < 30; i++) {
-                const sparkle = document.createElement("div");
-                sparkle.classList.add("draw-sparkle");
-                sparkle.style.left = Math.random() * 100 + "%";
-                sparkle.style.top = Math.random() * 100 + "%";
-                sparkle.style.animationDuration = (Math.random() * 1.5 + 0.5) + "s";
-                sparkle.style.width = sparkle.style.height = Math.random() * 12 + "px";
-                drawEffect.appendChild(sparkle);
-
-                setTimeout(() => sparkle.remove(), 2900);
-            }
-
-            setTimeout(() => drawEffect.remove(), 3000);
-        }
-
         document.addEventListener("game_ended", function (event) {
-            const { gameId, result, desc } = event.detail;
-            if (result === "win") {
-                triggerWin(desc);
-            } else if (result === "lose") {
-                triggerLoss(desc);
-            } else if (result === "draw") {
-                triggerDraw();
-            }
+            const loadingSpinner = document.getElementById("loading-spinner");
+            loadingSpinner.classList.remove("active");
 
-            // hidden player info
-            document.querySelector(".player-info").classList.add("hidden");
-            // hidden opponent info
-            document.querySelector(".opponent-info").classList.add("hidden");
+            // Hide player and opponent info
+            document.querySelector(".player-info")?.classList.add("hidden");
+            document.querySelector(".opponent-info")?.classList.add("hidden");
 
-            // clear chat box
-            const chatContainer = document.querySelector(".chat-input-container");
-            chatContainer.classList.add("disabled");
+            // Disable and clear chat
+            document.querySelector(".chat-input-container")?.classList.add("disabled");
             document.getElementById("chat-input").disabled = true;
             document.querySelector(".messages").innerHTML = "";
 
             // Clear move list
             document.querySelector(".moves").innerHTML = "";
+
+            const result = event.detail.result;
+            const desc = event.detail.desc;
+
+            const player = currentGame.player.profile;
+            const opponent = currentGame.opponent.profile;
+
+            if (result === "draw") {
+                showGameResult(player, opponent, "draw", desc);
+            } else if (result === "win") {
+                showGameResult(player, opponent, "win", desc);
+            } else {
+                showGameResult(opponent, player, "win", desc);
+            }
         });
 
-
     </script>
+
 </body>
 
 </html>

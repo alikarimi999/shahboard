@@ -14,7 +14,7 @@ export function showUserProfile(id, profile, element, connected, disconnected_at
     }
 
     if (connected) {
-        element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">✅ ${profile.name} (${profile.score})</a>`;
+        element.innerHTML = `<a href="/profile.html?userId=${id}" class="profile-link" target="_blank" rel="noopener noreferrer">${profile.name} (${profile.score})</a>`;
     } else {
         const validDisconnectedAt = (typeof disconnected_at === 'number' && !isNaN(disconnected_at))
             ? disconnected_at

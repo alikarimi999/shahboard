@@ -92,6 +92,7 @@
         import { sendGameChatMsg } from './assets/js/chat.js';
         import { showUserProfile } from "./assets/js/profile-summary.js";
         import { getUserProfile } from './assets/js/user_info.js';
+        import { showGameResult } from './assets/js/result.js';
 
         const playerNameBoard = document.querySelector("#player-name");
         const opponentNameBoard = document.querySelector("#opponent-name");
@@ -517,15 +518,6 @@
             const loadingSpinner = document.getElementById("loading-spinner");
             loadingSpinner.classList.remove("active");
 
-            const { gameId, result, desc } = event.detail;
-            if (result === "win") {
-                triggerWin(desc);
-            } else if (result === "lose") {
-                triggerLoss(desc);
-            } else if (result === "draw") {
-                triggerDraw();
-            }
-
             document.querySelector(".player-info").classList.add("hidden");
             document.querySelector(".opponent-info").classList.add("hidden");
             document.getElementById("find-match-btn").classList.remove("hidden");
@@ -542,12 +534,20 @@
             // Clear move list
             document.querySelector(".moves").innerHTML = "";
 
-            // reload page
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
-        });
+            const result = event.detail.result;
+            const desc = event.detail.desc;
 
+            const player = currentGame.player.profile;
+            const opponent = currentGame.opponent.profile;
+
+            if (result === "draw") {
+                showGameResult(player, opponent, "draw", desc);
+            } else if (result === "win") {
+                showGameResult(player, opponent, "win", desc);
+            } else {
+                showGameResult(opponent, player, "win", desc);
+            }
+        });
 
     </script>
 </body>

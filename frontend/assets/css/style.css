@@ -37,6 +37,19 @@
           align-items: stretch;
       }
 
+      .error-message {
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(255, 0, 0, 0.8);
+          color: white;
+          padding: 10px 20px;
+          border-radius: 5px;
+          font-size: 16px;
+          display: none;
+      }
+
       .default-button {
           background: linear-gradient(to right, #D4AF37, #FFD700);
           border: none;
@@ -204,7 +217,8 @@
           font-size: 14px;
           font-weight: bold;
           color: #FFD700;
-          margin-bottom: 8px;
+          margin-top: 20px;
+          margin-bottom: 10px;
           border-bottom: 1px solid rgba(212, 175, 55, 0.4);
       }
 
@@ -748,311 +762,164 @@
       }
 
 
-      /* ----- WIN ANIMATION ----- */
-      @keyframes winGlow {
-          0% {
-              transform: scale(0.8);
-              opacity: 0;
-          }
 
-          50% {
-              transform: scale(1.2);
-              opacity: 1;
-              box-shadow: 0px 0px 30px rgba(255, 215, 0, 0.9);
-          }
+      /* Game Result Modal */
 
-          100% {
-              transform: scale(1);
-              opacity: 1;
-          }
-      }
+      /* Modal base */
 
-      @keyframes sparkleEffect {
-          0% {
-              opacity: 0;
-              transform: translateY(0) scale(0.5) rotate(0deg);
-          }
 
-          50% {
-              opacity: 1;
-              transform: translateY(-30px) scale(1.2) rotate(180deg);
-          }
-
-          100% {
-              opacity: 0;
-              transform: translateY(0) scale(0.5) rotate(360deg);
-          }
-      }
-
-      @keyframes goldShine {
-          0% {
-              text-shadow: 0px 0px 10px gold;
-          }
-
-          50% {
-              text-shadow: 0px 0px 30px rgba(255, 215, 0, 1);
-          }
-
-          100% {
-              text-shadow: 0px 0px 10px gold;
-          }
-      }
-
-      /* Explanation Message Animation */
-      @keyframes fadeInUp {
-          0% {
-              opacity: 0;
-              transform: translateY(20px);
-          }
-
-          100% {
-              opacity: 1;
-              transform: translateY(0);
-          }
-      }
-
-      .win-effect {
+      #resultModal {
           position: fixed;
-          width: 100%;
-          height: 100%;
-          background: radial-gradient(circle, rgba(255, 215, 0, 0.3), transparent);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          opacity: 0;
-          animation: winGlow 1.5s ease-in-out forwards;
-      }
-
-      .win-title {
-          font-size: 4rem;
-          font-weight: bold;
-          color: white;
-          text-shadow: 0px 0px 10px gold;
-          animation: goldShine 1.5s infinite alternate;
-      }
-
-      /* Explanation Message */
-      .win-message {
-          font-size: 1.5rem;
-          color: white;
-          margin-top: 10px;
-          opacity: 0;
-          animation: fadeInUp 1s ease-in-out 1.2s forwards;
-      }
-
-      /* Sparkle Elements */
-      .sparkle {
-          position: absolute;
-          width: 12px;
-          height: 12px;
-          background: gold;
-          border-radius: 50%;
-          box-shadow: 0px 0px 10px rgba(255, 215, 0, 0.9);
-          animation: sparkleEffect 1.2s infinite alternate ease-in-out;
-      }
-
-      /* ----- LOSS ANIMATION ----- */
-      @keyframes loseFlash {
-          0% {
-              opacity: 1;
-              transform: scale(1);
-          }
-
-          50% {
-              opacity: 0.4;
-              transform: scale(0.9);
-          }
-
-          100% {
-              opacity: 0;
-              transform: scale(0.8);
-          }
-      }
-
-      @keyframes glitchText {
-          0% {
-              transform: translateX(0);
-          }
-
-          20% {
-              transform: translateX(-2px);
-          }
-
-          40% {
-              transform: translateX(2px);
-          }
-
-          60% {
-              transform: translateX(-3px);
-          }
-
-          80% {
-              transform: translateX(3px);
-          }
-
-          100% {
-              transform: translateX(0);
-          }
-      }
-
-      @keyframes redPulse {
-          0% {
-              box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.5);
-          }
-
-          100% {
-              box-shadow: 0px 0px 30px rgba(255, 0, 0, 1);
-          }
-      }
-
-      .lose-effect {
-          position: fixed;
-          width: 100%;
-          height: 100%;
-          background: rgba(139, 0, 0, 0.8);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          opacity: 0;
-          animation: loseFlash 1.5s ease-in-out forwards;
-      }
-
-      .lose-title {
-          font-size: 4rem;
-          font-weight: bold;
-          color: white;
-          text-shadow: 0px 0px 10px red;
-          animation: glitchText 0.2s infinite alternate, redPulse 1s infinite alternate;
-          text-align: center;
-      }
-
-      .lose-message {
-          font-size: 1.5rem;
-          font-weight: bold;
-          color: white;
-          /* text-shadow: 0px 0px 5px rgba(255, 0, 0, 0.8); */
-          opacity: 0;
-          animation: fadeInUp ease-in-out forwards;
-          text-align: center;
-          margin-top: 10px;
-      }
-
-      /* Draw Event Animation */
-      @keyframes drawGlow {
-          0% {
-              transform: scale(0.8);
-              opacity: 0;
-          }
-
-          50% {
-              transform: scale(1.2);
-              opacity: 1;
-              box-shadow: 0px 0px 30px rgba(192, 192, 192, 0.9);
-          }
-
-          100% {
-              transform: scale(1);
-              opacity: 1;
-          }
-      }
-
-      @keyframes silverShine {
-          0% {
-              text-shadow: 0px 0px 10px silver;
-          }
-
-          50% {
-              text-shadow: 0px 0px 30px rgba(192, 192, 192, 1);
-          }
-
-          100% {
-              text-shadow: 0px 0px 10px silver;
-          }
-      }
-
-      @keyframes sparkleEffect {
-          0% {
-              opacity: 0;
-              transform: translateY(0) scale(0.5) rotate(0deg);
-          }
-
-          50% {
-              opacity: 1;
-              transform: translateY(-30px) scale(1.2) rotate(180deg);
-          }
-
-          100% {
-              opacity: 0;
-              transform: translateY(0) scale(0.5) rotate(360deg);
-          }
-      }
-
-      /* Draw Effect Container */
-      .draw-effect {
-          position: fixed;
-          width: 100%;
-          height: 100%;
-          background: radial-gradient(circle, rgba(192, 192, 192, 0.3), transparent);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          opacity: 0;
-          animation: drawGlow 1.5s ease-in-out forwards;
-      }
-
-      /* Draw Title */
-      .draw-title {
-          font-size: 4rem;
-          font-weight: bold;
-          color: white;
-          text-shadow: 0px 0px 10px silver;
-          animation: silverShine 1.5s infinite alternate;
-      }
-
-      /* Explanation Message */
-      .draw-message {
-          font-size: 1.5rem;
-          color: white;
-          margin-top: 10px;
-          opacity: 0;
-          animation: fadeInUp 1s ease-in-out 1.2s forwards;
-      }
-
-      /* Sparkles */
-      .draw-sparkle {
-          position: absolute;
-          width: 12px;
-          height: 12px;
-          background: silver;
-          border-radius: 50%;
-          box-shadow: 0px 0px 10px rgba(192, 192, 192, 0.9);
-          animation: sparkleEffect 1.2s infinite alternate ease-in-out;
-      }
-
-      .error-message {
-          position: fixed;
-          top: 20px;
+          top: 50%;
           left: 50%;
-          transform: translateX(-50%);
-          background: rgba(255, 0, 0, 0.8);
-          color: white;
-          padding: 10px 20px;
-          border-radius: 5px;
-          font-size: 16px;
-          display: none;
+          transform: translate(-50%, -50%);
+          background: rgba(29, 28, 28, 0.6);
+          backdrop-filter: blur(10px);
+          color: #f5f5f5;
+          border-radius: 12px;
+          padding: 24px;
+          width: 90%;
+          max-width: 500px;
+          z-index: 1000;
+          box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
       }
 
-      .small-swal {
-          width: 200px !important;
-          /* Reduce width */
-          font-size: 12px !important;
-          /* Smaller text */
-          padding: 8px !important;
-          /* Less padding */
+      #resultModal h2 {
+          text-align: center;
+          margin-bottom: 20px;
+          color: gold;
+      }
+
+      #resultModal .players {
+          display: flex;
+          justify-content: space-around;
+          align-items: center;
+          margin-bottom: 16px;
+      }
+
+      #resultModal .player {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+      }
+
+      #resultModal .avatar {
+          width: 64px;
+          height: 64px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid gold;
+          margin-bottom: 8px;
+      }
+
+      #resultModal .vs {
+          font-size: 1.5rem;
+          color: #ccc;
+      }
+
+      #resultModal .name {
+          font-weight: bold;
+          font-size: 1rem;
+          text-align: center;
+      }
+
+      #result-description {
+          text-align: center;
+          font-style: italic;
+          margin-bottom: 20px;
+          color: #ccc;
+      }
+
+      #resultModal button {
+          display: block;
+          margin: 0 auto;
+          background: linear-gradient(to right, #D4AF37, #FFD700);
+          color: black;
+          border: none;
+          padding: 10px 20px;
+          font-weight: bold;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+      }
+
+      #resultModal button:hover {
+          background: linear-gradient(to right, #FFD700, #FFA500);
+          box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+          transform: scale(1.05);
+      }
+
+      .result-avatar {
+          width: 100px;
+          height: 100px;
+          border-radius: 50%;
+          background-size: cover;
+          background-position: center;
+          margin: 0 auto 10px;
+          border: 4px solid transparent;
+          box-shadow: none;
+      }
+
+      .result-avatar.winner {
+          border-color: #00ff88;
+          box-shadow: 0 0 10px 4px rgba(0, 255, 136, 0.6);
+          animation: winnerPulse 2s infinite;
+      }
+
+      .result-avatar.loser {
+          border-color: #ff3b3b;
+          box-shadow: 0 0 10px 4px rgba(255, 59, 59, 0.5);
+          filter: grayscale(40%);
+          opacity: 0.7;
+          animation: loserPulse 2s infinite;
+      }
+
+      .result-avatar.draw {
+          border-color: #808080;
+          box-shadow: 0 0 10px 4px rgba(128, 128, 128, 0.6);
+          animation: drawPulse 2s infinite;
+      }
+
+      @keyframes drawPulse {
+          0% {
+              box-shadow: 0 0 10px 4px rgba(128, 128, 128, 0.5);
+          }
+
+          50% {
+              box-shadow: 0 0 15px 8px rgba(128, 128, 128, 0.9);
+          }
+
+          100% {
+              box-shadow: 0 0 10px 4px rgba(128, 128, 128, 0.5);
+          }
+      }
+
+
+      @keyframes winnerPulse {
+          0% {
+              box-shadow: 0 0 10px 4px rgba(0, 255, 136, 0.5);
+          }
+
+          50% {
+              box-shadow: 0 0 15px 8px rgba(0, 255, 136, 0.9);
+          }
+
+          100% {
+              box-shadow: 0 0 10px 4px rgba(0, 255, 136, 0.5);
+          }
+      }
+
+      @keyframes loserPulse {
+          0% {
+              box-shadow: 0 0 10px 4px rgba(255, 59, 59, 0.5);
+          }
+
+          50% {
+              box-shadow: 0 0 15px 8px rgba(255, 59, 59, 0.8);
+          }
+
+          100% {
+              box-shadow: 0 0 10px 4px rgba(255, 59, 59, 0.5);
+          }
+
       }
