@@ -95,7 +95,7 @@ func (c *sessionCleaner) removeSessionsInBatch(ctx context.Context, sesstions []
 	}
 	wg.Wait()
 
-	if counter > 0 {
+	if counter >= c.batchSize {
 		c.s.l.Info(fmt.Sprintf("a batch of '%d' sessions cleaned from cache", counter))
 	}
 }
