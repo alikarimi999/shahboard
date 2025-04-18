@@ -120,10 +120,8 @@ func (h *sessionsEventsHandler) startEventListener() {
 						h.em.add(gameID)
 					}
 
-					var gs *gameSubscribers
-					var ok bool
 					h.gcmu.RLock()
-					gs, ok = h.gameWithChatSubSessions[gameID]
+					gs, ok := h.gameWithChatSubSessions[gameID]
 					h.gcmu.RUnlock()
 
 					if ok {
@@ -137,10 +135,8 @@ func (h *sessionsEventsHandler) startEventListener() {
 					continue
 				}
 
-				var gs *gameSubscribers
-				var ok bool
 				h.gcmu.RLock()
-				gs, ok = h.gameWithChatSubSessions[gameID]
+				gs, ok := h.gameWithChatSubSessions[gameID]
 				h.gcmu.RUnlock()
 
 				if ok {
@@ -214,6 +210,34 @@ func (h *sessionsEventsHandler) startBroadcastRoutine() {
 	}()
 }
 
+// publishGameCreatedEvent publishes a game viewers list like an event to all subscribers
+// for simplicity, i didn't implement a new manager to handle this
+func (h *sessionsEventsHandler) publishGamesViewersList(
+	list map[types.ObjectId][]types.ObjectId, // gameId -> viewers
+) {
+
+	for gameId, viewers := range list {
+		h.gcmu.RLock()
+		gs, ok := h.gameWithChatSubSessions[gameId]
+		h.gcmu.RUnlock()
+
+		if ok {
+			gs.sendMsg(&Msg{
+				MsgBase: MsgBase{
+					ID:        types.NewObjectId(),
+					Type:      MsgTypeViewersList,
+					Timestamp: time.Now().Unix(),
+				},
+				Data: DataViwersListResponse{
+					GameId: gameId,
+					List:   viewers,
+				}.Encode(),
+			})
+		}
+	}
+
+}
+
 func (m *sessionsEventsHandler) stop() {
 	close(m.stopCh)
 	m.broadcastTicker.Stop()
@@ -281,14 +305,18 @@ func (m *sessionsEventsHandler) unsubscribeFromMatch(s *session) {
 }
 
 func (m *sessionsEventsHandler) unsubscribeFromGameWithChat(s *session, gamesId ...types.ObjectId) {
-	// not sure if RLock will cause erroro or not
-	m.gcmu.RLock()
-	defer m.gcmu.RUnlock()
+	toRemove := make([]*gameSubscribers, 0, len(gamesId))
 
+	m.gcmu.RLock()
 	for _, gameId := range gamesId {
 		if ss, ok := m.gameWithChatSubSessions[gameId]; ok {
-			ss.remove(s)
+			toRemove = append(toRemove, ss)
 		}
+	}
+	m.gcmu.RUnlock()
+
+	for _, ss := range toRemove {
+		ss.remove(s)
 	}
 }
 
@@ -329,5 +357,14 @@ func (g *gameSubscribers) sendEvent(e event.Event) {
 
 	for _, s := range g.subscribers {
 		s.consume(e)
+	}
+}
+
+func (g *gameSubscribers) sendMsg(msg *Msg) {
+	g.RLock()
+	defer g.RUnlock()
+
+	for _, s := range g.subscribers {
+		s.send(msg)
 	}
 }

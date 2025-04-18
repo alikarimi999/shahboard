@@ -48,6 +48,25 @@ return 1
 
 		return count
 	`
+
+	removeGameSessionScript = `
+	local key = KEYS[1]
+	local sessionId = ARGV[1]
+
+	redis.call("HDEL", key, sessionId)
+
+	local sessions = redis.call("HVALS", key)
+	local count = 0
+
+	for _, v in ipairs(sessions) do
+		local ok, parsed = pcall(cjson.decode, v)
+		if ok and parsed["gameId"] and parsed["gameId"] ~= "" and parsed["gameId"] ~= "" then
+			count = count + 1
+			end
+		end
+
+		return count
+	`
 )
 
 type redisCache struct {
@@ -180,27 +199,28 @@ func (c *redisCache) updateSessionsTimestamp(ctx context.Context, ss ...*session
 	return nil
 }
 
-// deleteUsersSessions removes multiple sessions from their respective user hashes
-// replace lua script with pipeline execution, because multiple key operations with lua script
-// is not supported in redis cluster
-func (c *redisCache) deleteUsersSessions(ctx context.Context, ss ...*session) error {
-	if len(ss) == 0 {
-		return nil
-	}
+// deleteUserSession deletes a session from the user's hash
+func (c *redisCache) deleteUserSession(ctx context.Context, userId, sessId types.ObjectId) error {
+	key := fmt.Sprintf("%s:%s", c.userSessions, userId.String())
+	return c.c.HDel(ctx, key, sessId.String()).Err()
+}
 
-	pipe := c.c.Pipeline()
+// deleteUserGameSession deletes a session from the user's hash and return the number of sessions left
+// that are subscribed to a game
+func (c *redisCache) deleteUserGameSession(ctx context.Context, userId, sessId types.ObjectId) (int64, error) {
+	key := fmt.Sprintf("%s:%s", c.userSessions, userId.String())
 
-	for _, s := range ss {
-		key := fmt.Sprintf("%s:%s", c.userSessions, s.userId.String())
-		pipe.HDel(ctx, key, s.id.String())
-	}
-
-	_, err := pipe.Exec(ctx)
+	res, err := c.c.Eval(ctx, removeGameSessionScript, []string{key}, sessId.String()).Result()
 	if err != nil {
-		return fmt.Errorf("failed to execute Redis pipeline for removing sessions: %v", err)
+		return 0, fmt.Errorf("lua script failed: %v", err)
 	}
 
-	return nil
+	count, ok := res.(int64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected result type from lua script")
+	}
+
+	return count, nil
 }
 
 func (c *redisCache) deleteExpiredSessions(ctx context.Context, ttl time.Duration) error {

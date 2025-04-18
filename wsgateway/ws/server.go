@@ -2,7 +2,6 @@ package ws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -35,11 +34,12 @@ type Server struct {
 	p     event.Publisher
 	cache *redisCache
 
-	stopCh chan struct{}
+	cleaner *sessionCleaner
 
 	jwtValidator *jwt.Validator
 
-	l log.Logger
+	l      log.Logger
+	stopCh chan struct{}
 }
 
 func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameService,
@@ -56,10 +56,13 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 		em:           em,
 		h:            newSessionsEventsHandler(s, em, l),
 		p:            p,
-		stopCh:       make(chan struct{}),
 		jwtValidator: v,
 		l:            l,
+		stopCh:       make(chan struct{}),
 	}
+
+	// TODO: make this configurable
+	server.cleaner = newSessionCleaner(server, 10, 500*time.Millisecond)
 
 	go server.manageSessionsState()
 
@@ -93,12 +96,12 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 			return
 		}
 
-		sess := newSession(id, conn, server.h, server.cache, user.ID, types.ObjectZero, p, game, l)
+		sess := newSession(id, conn, server.h, server.cache, user.ID,
+			types.ObjectZero, p, game, l, server.sessionCleanUp)
 		server.sm.add(sess)
 
-		go server.sessionReader(sess)
-		go server.sessionWriter(sess)
-		sess.sendWelcome()
+		// go server.sessionReader(sess)
+		// go server.sessionWriter(sess)
 
 		l.Debug(fmt.Sprintf("session '%s' created for '%s'", sess.id, user.ID))
 
@@ -107,171 +110,177 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 	return server, nil
 }
 
-func (s *Server) stopSessions(ss ...*session) {
-	s.sm.remove(ss...)
-	events := []event.Event{}
-	usersGameId := make(map[types.ObjectId]types.ObjectId)
-
-	for _, se := range ss {
-		se.stop()
-
-		if !se.playGameId.Load().IsZero() {
-			counter, err := s.cache.removeGameIdFromUserSessions(context.Background(), se.userId, se.id)
-			if err != nil {
-				// TODO: need to handle this error
-				s.l.Error(err.Error())
-
-			} else if counter == 0 {
-				// this is the last session for this user that is playing the game
-				// so we need to notify other parts of system
-				usersGameId[se.userId] = se.playGameId.Load()
-			}
-		}
-	}
-
-	if err := s.cache.deleteUsersSessions(context.Background(), ss...); err != nil {
-		s.l.Error(err.Error())
-	}
-
-	for u, g := range usersGameId {
-		events = append(events, event.EventGamePlayerLeft{
-			GameID:    g,
-			PlayerID:  u,
-			Timestamp: time.Now().Unix(),
-		})
-	}
-	if len(events) > 0 {
-		if err := s.p.Publish(events...); err != nil {
-			s.l.Error(err.Error())
-		}
-	}
+func (s *Server) sessionCleanUp(sess *session) {
+	s.cleaner.clean(sess)
 }
 
-func (s *Server) sessionReader(se *session) {
-	// defer func() {
-	// 	s.l.Debug(fmt.Sprintf("session '%s' reader stopped", se.id))
-	// }()
+// func (s *Server) stopSessions(ss ...*session) {
+// 	s.sm.remove(ss...)
+// 	events := []event.Event{}
+// 	usersGameId := make(map[types.ObjectId]types.ObjectId)
 
-	for {
-		if se.isStopped() {
-			// this sholudn't happen
-			s.l.Debug(fmt.Sprintf("read from stopped session: %s", se.id))
-			return
-		}
+// 	for _, se := range ss {
+// 		se.stop()
 
-		mt, recievedMsg, err := se.ReadMessage()
-		if err != nil {
-			if !se.isStopped() {
-				// s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", se.id, err))
-				s.stopSessions(se)
-			}
-			return
-		}
+// 		if !se.playGameId.Load().IsZero() {
+// 			counter, err := s.cache.removeGameIdFromUserSessions(context.Background(), se.userId, se.id)
+// 			if err != nil {
+// 				// TODO: need to handle this error
+// 				s.l.Error(err.Error())
 
-		if mt == websocket.BinaryMessage && len(recievedMsg) > 0 && recievedMsg[0] == 0x0 {
-			se.lastHeartBeat.Store(time.Now())
-			se.sendPong()
-			continue
-		}
+// 			} else if counter == 0 {
+// 				// this is the last session for this user that is playing the game
+// 				// so we need to notify other parts of system
+// 				usersGameId[se.userId] = se.playGameId.Load()
+// 			}
+// 		}
+// 	}
 
-		if mt == websocket.TextMessage && len(recievedMsg) > 0 {
-			var msg Msg
-			if err := json.Unmarshal(recievedMsg, &msg); err != nil {
-				continue
-			}
-			s.handleMsg(se, &msg)
-		}
-	}
-}
+// 	if err := s.cache.deleteUsersSessions(context.Background(), ss...); err != nil {
+// 		s.l.Error(err.Error())
+// 	}
 
-func (s *Server) sessionWriter(se *session) {
-	// defer func() {
-	// 	s.l.Debug(fmt.Sprintf("session '%s' writer stopped", se.id))
-	// }()
+// 	for u, g := range usersGameId {
+// 		events = append(events, event.EventGamePlayerLeft{
+// 			GameID:    g,
+// 			PlayerID:  u,
+// 			Timestamp: time.Now().Unix(),
+// 		})
+// 	}
+// 	if len(events) > 0 {
+// 		if err := s.p.Publish(events...); err != nil {
+// 			s.l.Error(err.Error())
+// 		}
+// 	}
+// }
 
-	for {
-		select {
-		case <-se.stopCh:
-			return
-		case message := <-se.msgCh:
-			if message == nil || se.isStopped() {
-				return
-			}
+// func (s *Server) sessionReader(se *session) {
+// 	// defer func() {
+// 	// 	s.l.Debug(fmt.Sprintf("session '%s' reader stopped", se.id))
+// 	// }()
+// 	se.wg.Add(1)
+// 	defer se.wg.Done()
+// 	for {
+// 		if se.isStopped() {
+// 			// this sholudn't happen
+// 			s.l.Debug(fmt.Sprintf("read from stopped session: %s", se.id))
+// 			return
+// 		}
 
-			if err := se.WriteMessage(websocket.TextMessage, message); err != nil {
-				if !se.isStopped() {
-					// s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", se.id, err))
-					s.stopSessions(se)
-				}
-				return
-			}
-		case <-se.pongCh:
-			if err := se.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
-				if !se.isStopped() {
-					s.l.Debug(fmt.Sprintf("session '%s' write pong message error: %v", se.id, err))
-					s.stopSessions(se)
-				}
-				return
-			}
-		}
-	}
-}
+// 		mt, recievedMsg, err := se.ReadMessage()
+// 		if err != nil {
+// 			if !se.isStopped() {
+// 				// s.l.Debug(fmt.Sprintf("session '%s' read message error: %v", se.id, err))
+// 				s.stopSessions(se)
+// 			}
+// 			return
+// 		}
 
-func (s *Server) handleMsg(sess *session, msg *Msg) {
-	switch msg.Type {
-	case MsgTypeFindMatch:
-		var d DataFindMatchRequest
-		if err := json.Unmarshal(msg.Data, &d); err != nil {
-			sess.sendErr(msg.ID, "invalid data")
-			return
-		}
+// 		if mt == websocket.BinaryMessage && len(recievedMsg) > 0 && recievedMsg[0] == 0x0 {
+// 			se.lastHeartBeat.Store(time.Now())
+// 			se.sendPong()
+// 			continue
+// 		}
 
-		sess.handleFindMatchRequest(msg.ID, d)
-	case MsgTypeResumeGame:
-		var d DataResumeGameRequest
-		if err := json.Unmarshal(msg.Data, &d); err != nil {
-			sess.sendErr(msg.ID, "invalid data")
-			return
-		}
+// 		if mt == websocket.TextMessage && len(recievedMsg) > 0 {
+// 			var msg Msg
+// 			if err := json.Unmarshal(recievedMsg, &msg); err != nil {
+// 				continue
+// 			}
+// 			s.handleMsg(se, &msg)
+// 		}
+// 	}
+// }
 
-		sess.handleResumeGameRequest(msg.ID, d)
-	case MsgTypeViewGame:
-		var d DataGameViewRequest
-		if err := json.Unmarshal(msg.Data, &d); err != nil {
-			sess.sendErr(msg.ID, "invalid data")
-			return
-		}
+// func (s *Server) sessionWriter(se *session) {
+// 	// defer func() {
+// 	// 	s.l.Debug(fmt.Sprintf("session '%s' writer stopped", se.id))
+// 	// }()
+// 	se.wg.Add(1)
+// 	defer se.wg.Done()
+// 	for {
+// 		select {
+// 		case <-se.stopCh:
+// 			return
+// 		case message := <-se.msgCh:
+// 			if message == nil || se.isStopped() {
+// 				return
+// 			}
 
-		sess.handleViewGameRequest(msg.ID, d)
-	case MsgTypePlayerMove:
-		var d DataGamePlayerMoveRequest
-		if err := json.Unmarshal(msg.Data, &d); err != nil {
-			sess.sendErr(msg.ID, "invalid data")
-			return
-		}
+// 			if err := se.WriteMessage(websocket.TextMessage, message); err != nil {
+// 				if !se.isStopped() {
+// 					// s.l.Debug(fmt.Sprintf("session '%s' write message error: %v", se.id, err))
+// 					s.stopSessions(se)
+// 				}
+// 				return
+// 			}
+// 		case <-se.pongCh:
+// 			if err := se.WriteMessage(websocket.BinaryMessage, []byte{0x1}); err != nil {
+// 				if !se.isStopped() {
+// 					s.l.Debug(fmt.Sprintf("session '%s' write pong message error: %v", se.id, err))
+// 					s.stopSessions(se)
+// 				}
+// 				return
+// 			}
+// 		}
+// 	}
+// }
 
-		sess.handleMoveRequest(msg.ID, d)
-	case MsgTypePlayerResigned:
-		var d DataGamePlayerResignRequest
-		if err := json.Unmarshal(msg.Data, &d); err != nil {
-			sess.sendErr(msg.ID, "invalid data")
-			return
-		}
+// func (s *Server) handleMsg(sess *session, msg *Msg) {
+// 	switch msg.Type {
+// 	case MsgTypeFindMatch:
+// 		var d DataFindMatchRequest
+// 		if err := json.Unmarshal(msg.Data, &d); err != nil {
+// 			sess.sendErr(msg.ID, "invalid data")
+// 			return
+// 		}
 
-		sess.handlePlayerResignRequest(msg.ID, d)
-	case MsgTypeChatMsgSend:
-		var d DataGameChatMsgSend
-		if err := json.Unmarshal(msg.Data, &d); err != nil {
-			sess.sendErr(msg.ID, "invalid data")
-			return
-		}
+// 		sess.handleFindMatchRequest(msg.ID, d)
+// 	case MsgTypeResumeGame:
+// 		var d DataResumeGameRequest
+// 		if err := json.Unmarshal(msg.Data, &d); err != nil {
+// 			sess.sendErr(msg.ID, "invalid data")
+// 			return
+// 		}
 
-		sess.handleSendMsg(msg.ID, d)
-	case MsgTypeData:
+// 		sess.handleResumeGameRequest(msg.ID, d)
+// 	case MsgTypeViewGame:
+// 		var d DataGameViewRequest
+// 		if err := json.Unmarshal(msg.Data, &d); err != nil {
+// 			sess.sendErr(msg.ID, "invalid data")
+// 			return
+// 		}
 
-		// handle data message
-	}
-}
+// 		sess.handleViewGameRequest(msg.ID, d)
+// 	case MsgTypePlayerMove:
+// 		var d DataGamePlayerMoveRequest
+// 		if err := json.Unmarshal(msg.Data, &d); err != nil {
+// 			sess.sendErr(msg.ID, "invalid data")
+// 			return
+// 		}
+
+// 		sess.handleMoveRequest(msg.ID, d)
+// 	case MsgTypePlayerResigned:
+// 		var d DataGamePlayerResignRequest
+// 		if err := json.Unmarshal(msg.Data, &d); err != nil {
+// 			sess.sendErr(msg.ID, "invalid data")
+// 			return
+// 		}
+
+// 		sess.handlePlayerResignRequest(msg.ID, d)
+// 	case MsgTypeChatMsgSend:
+// 		var d DataGameChatMsgSend
+// 		if err := json.Unmarshal(msg.Data, &d); err != nil {
+// 			sess.sendErr(msg.ID, "invalid data")
+// 			return
+// 		}
+
+// 		sess.handleSendMsg(msg.ID, d)
+// 	case MsgTypeData:
+
+// 		// handle data message
+// 	}
+// }
 
 func (s *Server) GetLiveGamesViewersNumber(ctx context.Context) (map[types.ObjectId]int64, error) {
 	games, err := s.cache.countAllGamesViewers(ctx)

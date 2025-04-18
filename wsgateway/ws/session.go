@@ -17,6 +17,7 @@ const (
 	defaultViewGamesCap = 5
 )
 
+// TODO: implement session in a separate package for better modularity
 type session struct {
 	*websocket.Conn
 	id     types.ObjectId
@@ -40,19 +41,20 @@ type session struct {
 	h             *sessionsEventsHandler
 	lastHeartBeat *atomic.Time
 
-	stopCh chan struct{}
-
 	p event.Publisher
 	l log.Logger
 
 	game GameService
 
+	cleanUP func(*session)
 	once    sync.Once
-	stopped *atomic.Bool
+	wg      sync.WaitGroup
+	stopCh  chan struct{}
 }
 
 func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandler, rc *redisCache,
-	userId types.ObjectId, gameId types.ObjectId, p event.Publisher, game GameService, l log.Logger) *session {
+	userId types.ObjectId, gameId types.ObjectId, p event.Publisher,
+	game GameService, l log.Logger, cleanUP func(*session)) *session {
 	s := &session{
 		Conn:   conn,
 		id:     id,
@@ -61,8 +63,8 @@ func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandle
 		matchId:    types.NewAtomicObjectId(types.ObjectZero),
 		playGameId: types.NewAtomicObjectId(gameId),
 
-		eventCh: make(chan event.Event, 1000),
-		msgCh:   make(chan []byte, 1000),
+		eventCh: make(chan event.Event, 10),
+		msgCh:   make(chan []byte, 10),
 		pongCh:  make(chan struct{}),
 
 		viewGamesId: make(map[types.ObjectId]struct{}),
@@ -72,12 +74,13 @@ func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandle
 		h:             h,
 		lastHeartBeat: atomic.NewTime(time.Now()),
 
-		stopCh: make(chan struct{}),
-		p:      p,
-		l:      l,
+		p: p,
+		l: l,
 
-		game:    game,
-		stopped: atomic.NewBool(false),
+		game: game,
+
+		stopCh:  make(chan struct{}),
+		cleanUP: cleanUP,
 	}
 	go s.start()
 	h.subscribeToBasicEvents(s)
@@ -86,37 +89,42 @@ func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandle
 }
 
 func (s *session) start() {
+	go s.readLoop()
+	go s.writeLoop()
 	go s.handleEvent()
+	s.sendWelcome()
 }
 
 func (s *session) consume(e event.Event) {
-	if s.isStopped() {
-		s.l.Debug(fmt.Sprintf("attempted to send event to stopped session '%s': %s",
-			s.id, e.GetTopic().String()))
-		return
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			s.l.Warn(fmt.Sprintf("session '%s' consume(e event.Event) panicked: %v", s.id, r))
+		}
+	}()
 
-	select {
-	case s.eventCh <- e:
-	default:
-		s.l.Error(fmt.Sprintf("session consume event failed: '%s'", e.GetTopic()))
-	}
+	s.eventCh <- e
 }
 
 func (s *session) handleEvent() {
-	for e := range s.eventCh {
-		var msg *Msg
-		switch e.GetTopic().Domain() {
-		case event.DomainGame:
-			msg = s.handleGameEvent(e)
-		case event.DomainGameChat:
-			msg = s.handleGameChatEvent(e)
-		}
+	s.wg.Add(1)
+	defer s.wg.Done()
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case e := <-s.eventCh:
+			var msg *Msg
+			switch e.GetTopic().Domain() {
+			case event.DomainGame:
+				msg = s.handleGameEvent(e)
+			case event.DomainGameChat:
+				msg = s.handleGameChatEvent(e)
+			}
 
-		if msg != nil {
-			s.send(msg)
+			if msg != nil {
+				s.send(msg)
+			}
 		}
-
 	}
 }
 
@@ -344,9 +352,12 @@ func (s *session) handleViewGameRequest(msgId types.ObjectId, req DataGameViewRe
 
 	s.h.subscribeToGameWithChat(s, req.GameId)
 
-	if err := s.rc.addToGameViwersList(context.Background(), s.userId, req.GameId); err != nil {
-		s.l.Error(err.Error())
-	}
+	// Offload adding game viewer lists to the cache to a server-side worker using batching,
+	// instead of handling it here for every individual connection.
+
+	// if err := s.rc.addToGameViwersList(context.Background(), s.userId, req.GameId); err != nil {
+	// 	s.l.Error(err.Error())
+	// }
 
 	// s.l.Debug(fmt.Sprintf("session '%s' subscribed to game '%s' as viewer", s.id, req.GameId))
 }
@@ -406,17 +417,13 @@ func (s *session) handleSendMsg(msgId types.ObjectId, req DataGameChatMsgSend) {
 }
 
 func (s *session) send(msg *Msg) {
-	if s.isStopped() {
-		s.l.Debug(fmt.Sprintf("attempted to send msg to stopped session '%s' : %s",
-			s.id, msg.Type))
-		return
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			s.l.Warn(fmt.Sprintf("session '%s' send(msg *Msg) panicked: %v", s.id, r))
+		}
+	}()
 
-	select {
-	case s.msgCh <- msg.Encode():
-	default:
-		s.l.Error("failed to send message: channel is full")
-	}
+	s.msgCh <- msg.Encode()
 }
 
 func (s *session) sendErr(id types.ObjectId, err string) {
@@ -441,59 +448,54 @@ func (s *session) sendWelcome() {
 	})
 }
 
-func (s *session) sendViwersList(gameId types.ObjectId, viewers []types.ObjectId) {
-	s.send(&Msg{
-		MsgBase: MsgBase{
-			ID:        types.NewObjectId(),
-			Type:      MsgTypeViewersList,
-			Timestamp: time.Now().Unix(),
-		},
-		Data: DataViwersListResponse{
-			GameId: gameId,
-			List:   viewers,
-		}.Encode(),
-	})
-}
+// func (s *session) sendViwersList(gameId types.ObjectId, viewers []types.ObjectId) {
+// 	s.send(&Msg{
+// 		MsgBase: MsgBase{
+// 			ID:        types.NewObjectId(),
+// 			Type:      MsgTypeViewersList,
+// 			Timestamp: time.Now().Unix(),
+// 		},
+// 		Data: DataViwersListResponse{
+// 			GameId: gameId,
+// 			List:   viewers,
+// 		}.Encode(),
+// 	})
+// }
 
 func (s *session) sendPong() {
 	s.pongCh <- struct{}{}
 }
 
-func (s *session) isStopped() bool {
-	return s.stopped.Load()
-}
-
-func (s *session) stop() {
+func (s *session) Stop() {
 	s.once.Do(func() {
-		s.stopped.Store(true)
-		if err := s.Conn.Close(); err != nil {
-			s.l.Error(err.Error())
-		}
-		close(s.eventCh)
-		close(s.msgCh)
-		close(s.stopCh)
+		go func() {
+			s.h.unsubscribeFromBasicEvents(s)
+			if !s.matchId.Load().IsZero() {
+				s.h.unsubscribeFromMatch(s)
+			}
 
-		var gamesId []types.ObjectId
-		if !s.playGameId.Load().IsZero() {
-			gamesId = append(gamesId, s.playGameId.Load())
-		}
+			var gamesId []types.ObjectId
+			if !s.playGameId.Load().IsZero() {
+				gamesId = append(gamesId, s.playGameId.Load())
+			}
 
-		ids := s.removeAllViewGames()
-		if len(ids) > 0 {
-			if err := s.rc.removeFromGameViewersList(context.Background(), s.userId, ids...); err != nil {
+			gamesId = append(gamesId, s.getAllViewGames()...)
+			s.h.unsubscribeFromGameWithChat(s, gamesId...)
+
+			if err := s.Conn.Close(); err != nil {
 				s.l.Error(err.Error())
 			}
-			gamesId = append(gamesId, ids...)
-		}
 
-		s.h.unsubscribeFromBasicEvents(s)
-		s.h.unsubscribeFromGameWithChat(s, gamesId...)
+			close(s.stopCh)
 
-		if !s.matchId.Load().IsZero() {
-			s.h.unsubscribeFromMatch(s)
-		}
+			s.wg.Wait()
+			close(s.eventCh)
+			close(s.msgCh)
 
-		s.l.Debug(fmt.Sprintf("session '%s' stopped for user '%s'", s.id, s.userId))
+			s.l.Debug(fmt.Sprintf("session '%s' stopped for user '%s'", s.id, s.userId))
+
+			s.cleanUP(s)
+		}()
 	})
 }
 
@@ -531,17 +533,4 @@ func (s *session) removeViewGames(gameId types.ObjectId) {
 	defer s.vmu.Unlock()
 
 	delete(s.viewGamesId, gameId)
-}
-
-func (s *session) removeAllViewGames() []types.ObjectId {
-	s.vmu.Lock()
-	defer s.vmu.Unlock()
-
-	var gamesId []types.ObjectId
-	for id := range s.viewGamesId {
-		gamesId = append(gamesId, id)
-	}
-
-	s.viewGamesId = make(map[types.ObjectId]struct{})
-	return gamesId
 }

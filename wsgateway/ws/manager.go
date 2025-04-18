@@ -27,12 +27,27 @@ func (m *sessionsManager) add(s *session) {
 	m.sessions[s.userId][s.id] = s
 }
 
-func (m *sessionsManager) remove(ss ...*session) {
+func (m *sessionsManager) get(userId, sessId types.ObjectId) *session {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m, ok := m.sessions[userId]; ok {
+		return m[sessId]
+	}
+
+	return nil
+}
+
+func (m *sessionsManager) remove(userId, sessId types.ObjectId) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, s := range ss {
-		delete(m.sessions[s.userId], s.id)
+	if l, ok := m.sessions[userId]; ok {
+		delete(l, sessId)
+
+		if len(l) == 0 {
+			delete(m.sessions, userId)
+		}
 	}
 }
 

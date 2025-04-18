@@ -35,13 +35,15 @@ func (s *Server) manageSessionsState() {
 			}
 
 			if len(disconnectedSessions) > 0 {
-				s.stopSessions(disconnectedSessions...)
+				for _, se := range disconnectedSessions {
+					se.Stop()
+				}
 			}
 
 			// add userId of sessions that are viewing a game
 			// there are multiple approaches to do this, but this approach
 			// balances efficiency and scalability and minimizes the need for complex logic.
-			viewGamesUsers := make(map[types.ObjectId][]types.ObjectId)
+			viewGamesUsers := make(map[types.ObjectId][]types.ObjectId) // gameId -> list of userIds
 			ss := s.sm.getAll()
 			for _, se := range ss {
 				gamesId := se.getAllViewGames()
@@ -65,24 +67,28 @@ func (s *Server) manageSessionsState() {
 				continue
 			}
 
-			for _, se := range ss {
-				viewers := viewersList[se.playGameId.Load()]
-				if len(viewers) > 0 {
-					se.sendViwersList(se.playGameId.Load(), viewers)
-				}
-
-				gamesId := se.getAllViewGames()
-
-				if len(gamesId) > 0 {
-					for _, gameId := range gamesId {
-						viewers := viewersList[gameId]
-						if len(viewers) > 0 {
-							se.sendViwersList(gameId, viewers)
-						}
-					}
-				}
-
+			if len(viewersList) > 0 {
+				s.h.publishGamesViewersList(viewersList)
 			}
+
+			// for _, se := range ss {
+			// 	viewers := viewersList[se.playGameId.Load()]
+			// 	if len(viewers) > 0 {
+			// 		se.sendViwersList(se.playGameId.Load(), viewers)
+			// 	}
+
+			// 	gamesId := se.getAllViewGames()
+
+			// 	if len(gamesId) > 0 {
+			// 		for _, gameId := range gamesId {
+			// 			viewers := viewersList[gameId]
+			// 			if len(viewers) > 0 {
+			// 				se.sendViwersList(gameId, viewers)
+			// 			}
+			// 		}
+			// 	}
+
+			// }
 
 		case <-cleanCachTicker.C:
 
