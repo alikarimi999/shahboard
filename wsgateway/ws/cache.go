@@ -194,7 +194,7 @@ func (c *redisCache) updateSessionsTimestamp(ctx context.Context, ss ...*session
 		return fmt.Errorf("failed to execute Redis pipeline for updating sessions: %v", err)
 	}
 
-	c.l.Debug(fmt.Sprintf("update timestamp for %d sessions at: '%s'", count, t.Format("2006-01-02 15:04:05")))
+	c.l.Info(fmt.Sprintf("update timestamp for %d sessions at: '%s'", count, t.Format("2006-01-02 15:04:05")))
 
 	return nil
 }
@@ -264,7 +264,7 @@ func (c *redisCache) deleteExpiredSessions(ctx context.Context, ttl time.Duratio
 		return fmt.Errorf("failed to execute Redis pipeline for deleting expired sessions: %v", err)
 	}
 
-	c.l.Debug(fmt.Sprintf("deleted %d expired sessions at: '%s'", count, time.Now().Format("2006-01-02 15:04:05")))
+	c.l.Info(fmt.Sprintf("deleted %d expired sessions at: '%s'", count, time.Now().Format("2006-01-02 15:04:05")))
 	return nil
 }
 

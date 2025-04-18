@@ -10,7 +10,7 @@
     },
     "log": {
         "file": "logs/wsgateway.log",
-        "verbose": true
+        "verbose": false
     },
     "http": {
         "port": 8080
