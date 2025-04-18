@@ -24,7 +24,7 @@ type application struct {
 }
 
 func SetupApplication(cfg Config) (*application, error) {
-	l := log.NewLogger(cfg.Log.File, false)
+	l := log.NewLogger(cfg.Log.File, cfg.Log.Verbose)
 
 	v, err := jwt.NewValidator(cfg.JwtValidator)
 	if err != nil {

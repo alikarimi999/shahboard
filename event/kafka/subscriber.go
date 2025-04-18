@@ -84,11 +84,11 @@ func newConsumerGroupHandler(cg *consumerGroup, kc *kafkaSubscriber, topics []st
 
 // No-op methods for the Sarama consumer group interface.
 func (ch *consumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
-	ch.l.Debug(fmt.Sprintf("consumer group handler setup for topics: %v", ch.topics))
+	ch.l.Info(fmt.Sprintf("consumer group handler setup for topics: %v", ch.topics))
 	return nil
 }
 func (ch *consumerGroupHandler) Cleanup(s sarama.ConsumerGroupSession) error {
-	ch.l.Debug(fmt.Sprintf("consumer group handler cleanup for topics %v", ch.topics))
+	ch.l.Info(fmt.Sprintf("consumer group handler cleanup for topics %v", ch.topics))
 
 	// When not in the process of adding new topics, a disconnection likely indicates
 	// a network issue. Hence, we schedule a reconnection by calling reConsume() in a new goroutine.
@@ -106,7 +106,7 @@ func (ch *consumerGroupHandler) Cleanup(s sarama.ConsumerGroupSession) error {
 
 // Consumes messages from Kafka, decodes events, and broadcasts them to subscribers.
 func (ch *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	ch.l.Debug(fmt.Sprintf("starting to consume messages for topics %v", claim.Topic()))
+	ch.l.Info(fmt.Sprintf("starting to consume messages for topics %v", claim.Topic()))
 	for message := range claim.Messages() {
 
 		// needs to handle better

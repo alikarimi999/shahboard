@@ -1,3 +1,4 @@
 data
 deploy/game/development/data/
 letsencrypt/
+/logs/

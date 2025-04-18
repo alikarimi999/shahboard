@@ -2,6 +2,7 @@ package log
 
 import (
 	"os"
+	"path/filepath"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -25,7 +26,15 @@ func NewLogger(logfile string, verbose bool) Logger {
 	config.EncodeTime = zapcore.ISO8601TimeEncoder
 	fileEncoder := zapcore.NewJSONEncoder(config)
 	consoleEncoder := zapcore.NewConsoleEncoder(config)
-	logFile, _ := os.OpenFile(logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err := os.MkdirAll(filepath.Dir(logfile), 0755); err != nil {
+		panic("failed to create log directory: " + err.Error())
+	}
+
+	logFile, err := os.OpenFile(logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic("failed to open or create log file: " + err.Error())
+	}
 	writer := zapcore.AddSync(logFile)
 
 	var core zapcore.Core
@@ -37,7 +46,10 @@ func NewLogger(logfile string, verbose bool) Logger {
 			zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), zapcore.DebugLevel),
 		)
 	case false:
-		core = zapcore.NewCore(fileEncoder, writer, zapcore.WarnLevel)
+		core = zapcore.NewTee(
+			zapcore.NewCore(fileEncoder, writer, zapcore.InfoLevel),
+			zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
+		)
 	}
 
 	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.AddStacktrace(zapcore.ErrorLevel))
