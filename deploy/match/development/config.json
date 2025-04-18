@@ -10,7 +10,7 @@
         "group_id": "match_service_0"
     },
     "log": {
-        "file": "./data/log/match_service.log",
+        "file": "logs/match_service.log",
         "verbose": true
     },
     "http": {

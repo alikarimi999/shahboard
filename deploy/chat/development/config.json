@@ -12,7 +12,7 @@
         "group_id": "chat_service_0"
     },
     "log": {
-        "file": "./data/log/chat_service.log",
+        "file": "logs/chat_service.log",
         "verbose": true
     }
 }

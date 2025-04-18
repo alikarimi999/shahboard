@@ -17,7 +17,7 @@
         "group_id": "game_service_0"
     },
     "log": {
-        "file": "./data/log/game_service.log",
+        "file": "logs/game_service.log",
         "verbose": true
     },
     "http": {

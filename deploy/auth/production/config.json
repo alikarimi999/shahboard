@@ -28,7 +28,7 @@
         "port": 8080
     },
     "log": {
-        "file": "./data/log/auth_service.log",
+        "file": "logs/auth_service.log",
         "verbose": true
     }
 }

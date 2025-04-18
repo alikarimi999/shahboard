@@ -37,7 +37,7 @@ func main() {
 	// }
 
 	firstBot := 0
-	lastBot := 100
+	lastBot := 1000
 	bots := generateBots(firstBot, lastBot)
 
 	// sp, err := stockfish.NewStockfish(cfg.StockfishPath)

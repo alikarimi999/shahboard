@@ -38,7 +38,7 @@ func newGameManager(cache *redisGameCache, pub event.Publisher, ct *playersConne
 }
 
 func (gm *gameManager) run() {
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(2 * time.Second)
 	go func() {
 		for {
 			select {
@@ -52,6 +52,8 @@ func (gm *gameManager) run() {
 	}()
 }
 
+// checkPlayersConnection find games that their players are disconnected are disconnected for more than disconnectThreshold
+// and remove them from cache and publish game ended event.
 func (gm *gameManager) checkPlayersConnection() {
 	games := gm.getList()
 	needToEnd := gm.ct.getGamesNeedsToRemove()

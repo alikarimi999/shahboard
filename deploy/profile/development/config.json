@@ -43,7 +43,7 @@
         "port": 9095
     },
     "log": {
-        "file": "./data/log/profile_service.log",
+        "file": "logs/profile_service.log",
         "verbose": true
     }
 }
