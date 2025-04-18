@@ -2,3 +2,5 @@ data
 deploy/game/development/data/
 letsencrypt/
 /logs/
+/client-go/bot-runner
+/client-go/*.log
