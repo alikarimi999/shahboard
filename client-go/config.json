@@ -1,13 +1,12 @@
 {
     "server": "",
     "stockfish_path": "./stockfish_engine",
-    "bots_num": 1000,
-    "local": true,
+    "local": false,
     "auth_service": "http://localhost:8084",
     "match_service": "http://localhost:8082",
     "game_service": "http://localhost:8081",
     "profile_service": "http://localhost:8085",
     "ws_service": "http://localhost:8083",
-    "stop_chance": 10,
-    "resign_chance": 10
+    "stop_chance": 5,
+    "resign_chance": 15
 }

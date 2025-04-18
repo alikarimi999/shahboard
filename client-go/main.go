@@ -1,13 +1,16 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/alikarimi999/shahboard/client-go/bot"
 	"github.com/alikarimi999/shahboard/client-go/config"
+
 	"github.com/alikarimi999/shahboard/pkg/utils"
 )
 
@@ -17,11 +20,14 @@ type Bot struct {
 }
 
 func main() {
-	// http.DefaultClient.Transport = &http.Transport{
-	// 	TLSClientConfig: &tls.Config{
-	// 		InsecureSkipVerify: true,
-	// 	},
-	// }
+
+	firstBot := flag.Int("firstBot", 0, "Index of the first bot")
+	lastBot := flag.Int("lastBot", 100, "Index of the last bot")
+	flag.Parse()
+
+	if *firstBot >= *lastBot {
+		log.Fatalf("firstBot (%d) must be less than lastBot (%d)", *firstBot, *lastBot)
+	}
 
 	cfg := &config.Config{}
 	if err := utils.LoadConfigs("./config.json", cfg); err != nil {
@@ -36,9 +42,7 @@ func main() {
 	// 	panic("stockfish path is required")
 	// }
 
-	firstBot := 0
-	lastBot := 1000
-	bots := generateBots(firstBot, lastBot)
+	bots := generateBots(*firstBot, *lastBot)
 
 	// sp, err := stockfish.NewStockfish(cfg.StockfishPath)
 	// if err != nil {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/alikarimi999/shahboard/client-go/config"
 	"github.com/alikarimi999/shahboard/client-go/stockfish"
+
 	"github.com/alikarimi999/shahboard/event"
 	"github.com/alikarimi999/shahboard/wsgateway/ws"
 

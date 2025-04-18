@@ -29,14 +29,30 @@ func (g *game) resign() error {
 func (g *game) resigner() {
 	if chance(g.b.cfg.ResignChance) {
 		go func() {
-			randSleep(60)
+			randSleep0(60, 60)
 			if err := g.resign(); err != nil {
 				fmt.Printf("resign error: %v\n", err)
 				return
 			}
 			fmt.Printf("bot %s resigned from game '%s'\n", g.b.Email(), g.id)
 		}()
+	} else {
+		go func() {
+			randSleep0(60, 60)
+
+			t := time.NewTicker(15 * time.Minute)
+			<-t.C
+			defer t.Stop()
+			if err := g.resign(); err != nil {
+				fmt.Printf("resign error: %v\n", err)
+				return
+			}
+		}()
 	}
+}
+
+func randSleep0(min, max int) {
+	time.Sleep(time.Duration((rand.Intn(max))+min) * time.Second)
 }
 
 func chance(c int) bool {
