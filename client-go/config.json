@@ -1,5 +1,5 @@
 {
-    "server": "",
+    "server": "http://shahboard",
     "stockfish_path": "./stockfish_engine",
     "local": false,
     "auth_service": "http://localhost:8084",
