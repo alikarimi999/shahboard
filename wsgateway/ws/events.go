@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	defaultMatchAndGameExpireTime = 5 * time.Minute
-	defaultBroadcastInterval      = 1 * time.Second
+	defaultfindMatchExpireTreshold = 1 * time.Minute
+	defaultBroadcastInterval       = 500 * time.Millisecond
 )
 
 type sessionsEventsHandler struct {
@@ -21,6 +21,8 @@ type sessionsEventsHandler struct {
 	gameChatSub event.Subscription
 
 	em *endedGamesList
+
+	findMatchExpireTreshold time.Duration
 
 	gmu               sync.RWMutex
 	createdGameEvents map[types.ObjectId]event.Event // map by matchId
@@ -32,17 +34,14 @@ type sessionsEventsHandler struct {
 	direchtChatSubSessions map[types.ObjectId]*session // map by userId
 
 	mmu              sync.Mutex
-	matchSubSessions map[types.ObjectId][]struct {
-		*session
-		addedAt time.Time
-	}
+	matchSubSessions map[types.ObjectId][]*matchSubscription
 
 	gcmu                    sync.RWMutex
 	gameWithChatSubSessions map[types.ObjectId]*gameSubscribers
 
-	gameExpireTime time.Duration
-	l              log.Logger
-	stopCh         chan struct{}
+	// gameExpireTime time.Duration
+	l      log.Logger
+	stopCh chan struct{}
 }
 
 func newSessionsEventsHandler(s event.Subscriber, em *endedGamesList, l log.Logger) *sessionsEventsHandler {
@@ -52,17 +51,14 @@ func newSessionsEventsHandler(s event.Subscriber, em *endedGamesList, l log.Logg
 		em:            em,
 		directChatSub: s.Subscribe(event.TopicDirectChat),
 
-		gameExpireTime:    defaultMatchAndGameExpireTime,
-		createdGameEvents: make(map[types.ObjectId]event.Event),
+		findMatchExpireTreshold: defaultfindMatchExpireTreshold,
+		createdGameEvents:       make(map[types.ObjectId]event.Event),
 
 		broadcastTicker: time.NewTicker(defaultBroadcastInterval),
-		cleanupTicker:   time.NewTicker(defaultMatchAndGameExpireTime),
+		cleanupTicker:   time.NewTicker(defaultfindMatchExpireTreshold),
 
-		direchtChatSubSessions: make(map[types.ObjectId]*session),
-		matchSubSessions: make(map[types.ObjectId][]struct {
-			*session
-			addedAt time.Time
-		}),
+		direchtChatSubSessions:  make(map[types.ObjectId]*session),
+		matchSubSessions:        make(map[types.ObjectId][]*matchSubscription),
 		gameWithChatSubSessions: make(map[types.ObjectId]*gameSubscribers),
 
 		l:      l,
@@ -101,7 +97,6 @@ func (h *sessionsEventsHandler) startEventListener() {
 					for _, s := range h.matchSubSessions[eve.MatchID] {
 						s.consume(e)
 					}
-					delete(h.matchSubSessions, eve.MatchID)
 					h.mmu.Unlock()
 
 					// store created game events for situations where the user websocket connection
@@ -155,33 +150,8 @@ func (h *sessionsEventsHandler) startCleanupRoutine() {
 				h.l.Debug("cleanup routine stopped")
 				return
 			case <-h.cleanupTicker.C:
-				h.gmu.Lock()
-				for k, v := range h.createdGameEvents {
-					if time.Since(time.Unix(v.TimeStamp(), 0)) > h.gameExpireTime {
-						delete(h.createdGameEvents, k)
-					}
-				}
-				h.gmu.Unlock()
-
-				h.mmu.Lock()
-				for key, ss := range h.matchSubSessions {
-					newSessions := make([]struct {
-						*session
-						addedAt time.Time
-					}, 0, len(ss))
-					for _, s := range ss {
-						if time.Since(s.addedAt) < h.gameExpireTime {
-							newSessions = append(newSessions, s)
-						}
-					}
-
-					if len(newSessions) == 0 {
-						delete(h.matchSubSessions, key)
-					} else {
-						h.matchSubSessions[key] = newSessions
-					}
-				}
-				h.mmu.Unlock()
+				h.removeExpiredGameCreatedEvents()
+				h.removeExpiredMatchSubscriptions()
 			}
 		}
 	}()
@@ -199,9 +169,11 @@ func (h *sessionsEventsHandler) startBroadcastRoutine() {
 				h.gmu.RLock()
 				for matchId, e := range h.createdGameEvents {
 					for _, s := range h.matchSubSessions[matchId] {
-						s.consume(e)
+						if !s.broadcasted {
+							s.broadcasted = true
+							s.consume(e)
+						}
 					}
-					delete(h.createdGameEvents, matchId)
 				}
 				h.gmu.RUnlock()
 				h.mmu.Unlock()
@@ -254,10 +226,7 @@ func (h *sessionsEventsHandler) subscribeToMatch(s *session) {
 	h.mmu.Lock()
 	defer h.mmu.Unlock()
 	h.matchSubSessions[s.matchId.Load()] = append(h.matchSubSessions[s.matchId.Load()],
-		struct {
-			*session
-			addedAt time.Time
-		}{
+		&matchSubscription{
 			session: s,
 			addedAt: time.Now(),
 		})
@@ -285,22 +254,23 @@ func (m *sessionsEventsHandler) unsubscribeFromMatch(s *session) {
 	m.mmu.Lock()
 	defer m.mmu.Unlock()
 
-	sessions := m.matchSubSessions[s.matchId.Load()]
-	newSessions := make([]struct {
-		*session
-		addedAt time.Time
-	}, 0, len(sessions))
+	if s.matchId.Load().IsZero() {
+		return
+	}
 
-	for _, ses := range sessions {
+	subs := m.matchSubSessions[s.matchId.Load()]
+	newSubs := make([]*matchSubscription, 0, len(subs))
+
+	for _, ses := range subs {
 		if ses.id != s.id {
-			newSessions = append(newSessions, ses)
+			newSubs = append(newSubs, ses)
 		}
 	}
 
-	if len(newSessions) == 0 {
+	if len(newSubs) == 0 {
 		delete(m.matchSubSessions, s.matchId.Load())
 	} else {
-		m.matchSubSessions[s.matchId.Load()] = newSessions
+		m.matchSubSessions[s.matchId.Load()] = newSubs
 	}
 }
 
@@ -366,5 +336,42 @@ func (g *gameSubscribers) sendMsg(msg *Msg) {
 
 	for _, s := range g.subscribers {
 		s.send(msg)
+	}
+}
+
+type matchSubscription struct {
+	*session
+	addedAt     time.Time
+	broadcasted bool
+}
+
+func (h *sessionsEventsHandler) removeExpiredGameCreatedEvents() {
+	h.gmu.Lock()
+	defer h.gmu.Unlock()
+
+	for k, v := range h.createdGameEvents {
+		if time.Since(time.Unix(v.TimeStamp(), 0)) > h.findMatchExpireTreshold {
+			delete(h.createdGameEvents, k)
+		}
+	}
+}
+
+func (h *sessionsEventsHandler) removeExpiredMatchSubscriptions() {
+	h.mmu.Lock()
+	defer h.mmu.Unlock()
+
+	for matchId, subs := range h.matchSubSessions {
+		newSubs := make([]*matchSubscription, 0, len(subs))
+		for _, s := range subs {
+			if time.Since(s.addedAt) < h.findMatchExpireTreshold {
+				newSubs = append(newSubs, s)
+			}
+		}
+
+		if len(newSubs) == 0 {
+			delete(h.matchSubSessions, matchId)
+		} else {
+			h.matchSubSessions[matchId] = newSubs
+		}
 	}
 }
