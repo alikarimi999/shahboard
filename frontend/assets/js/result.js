@@ -1,6 +1,6 @@
 import { showUserProfile } from "./profile-summary.js";
 
-export function showGameResult(winner, loser, result, desc) {
+export function showGameResult(winnerId, loserId, winnerProfile, loserProfile, result, desc) {
     document.getElementById('resultModal').style.display = 'block';
 
     const winnerAvatar = document.getElementById('winner-avatar');
@@ -10,28 +10,28 @@ export function showGameResult(winner, loser, result, desc) {
     const resultDescription = document.getElementById('result-description');
 
 
-    winnerAvatar.src = winner.avatar_url;
-    winnerAvatar.alt = `${winner.name}'s Avatar`;
-    winnerName.textContent = winner.name;
-    winnerAvatar.style.backgroundImage = `url(${winner.avatar_url})`;
+    winnerAvatar.src = winnerProfile.avatar_url;
+    winnerAvatar.alt = `${winnerProfile.name}'s Avatar`;
+    winnerName.textContent = winnerProfile.name;
+    winnerAvatar.style.backgroundImage = `url(${winnerProfile.avatar_url})`;
     if (result == "draw") {
         winnerAvatar.className = "result-avatar draw";
     } else {
         winnerAvatar.className = "result-avatar winner";
     }
 
-    loserAvatar.src = loser.avatar_url;
-    loserAvatar.alt = `${loser.name}'s Avatar`;
-    loserName.textContent = loser.name;
-    loserAvatar.style.backgroundImage = `url(${loser.avatar_url})`;
+    loserAvatar.src = loserProfile.avatar_url;
+    loserAvatar.alt = `${loserProfile.name}'s Avatar`;
+    loserName.textContent = loserProfile.name;
+    loserAvatar.style.backgroundImage = `url(${loserProfile.avatar_url})`;
     if (result == "draw") {
         loserAvatar.className = "result-avatar draw";
     } else {
         loserAvatar.className = "result-avatar loser";
     }
 
-    showUserProfile(winner.id, winner, winnerName, true);
-    showUserProfile(loser.id, loser, loserName, true);
+    showUserProfile(winnerId, winnerProfile, winnerName, true);
+    showUserProfile(loserId, loserProfile, loserName, true);
 
     if (result == "draw") {
         resultDescription.textContent = "It's a draw!";

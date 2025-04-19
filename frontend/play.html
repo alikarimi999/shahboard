@@ -539,14 +539,16 @@
             const desc = event.detail.desc;
 
             const player = currentGame.player.profile;
+            const playerId = currentGame.player.id;
             const opponent = currentGame.opponent.profile;
+            const opponentId = currentGame.opponent.id;
 
             if (result === "draw") {
-                showGameResult(player, opponent, "draw", desc);
+                showGameResult(playerId, opponentId, player, opponent, "draw", desc);
             } else if (result === "win") {
-                showGameResult(player, opponent, "win", desc);
+                showGameResult(playerId, opponentId, player, opponent, "win", desc);
             } else {
-                showGameResult(opponent, player, "win", desc);
+                showGameResult(opponentId, playerId, opponent, player, "win", desc);
             }
         });
 
