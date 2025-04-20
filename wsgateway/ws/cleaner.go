@@ -84,18 +84,18 @@ func (c *sessionCleaner) removeSessionsInBatch(ctx context.Context, sesstions []
 		wg.Add(1)
 		sem <- struct{}{}
 
-		go func() {
+		go func(s *session) {
 			defer func() {
 				wg.Done()
 				<-sem
 			}()
 
-			c.s.removeSession(ctx, sess)
-		}()
+			c.s.removeSession(ctx, s)
+		}(sess)
 	}
 	wg.Wait()
 
-	if counter > c.batchSize {
+	if counter > 0 {
 		c.s.l.Info(fmt.Sprintf("a batch of '%d' sessions cleaned from cache", counter))
 	}
 }
