@@ -463,7 +463,18 @@ func (s *session) sendWelcome() {
 // }
 
 func (s *session) sendPong() {
-	s.pongCh <- struct{}{}
+	// not sure recover is needed (just for test and expriment!)
+	defer func() {
+		if r := recover(); r != nil {
+			s.l.Warn(fmt.Sprintf("session '%s' sendPong() panicked: %v", s.id, r))
+		}
+	}()
+
+	// to make sure it won't cause deadlock in stopping session which is a rare deadlock
+	select {
+	case s.pongCh <- struct{}{}:
+	default:
+	}
 }
 
 func (s *session) Stop() {
@@ -491,6 +502,7 @@ func (s *session) Stop() {
 			s.wg.Wait()
 			close(s.eventCh)
 			close(s.msgCh)
+			close(s.pongCh)
 
 			s.l.Debug(fmt.Sprintf("session '%s' stopped for user '%s'", s.id, s.userId))
 

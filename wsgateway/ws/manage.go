@@ -30,7 +30,6 @@ func (s *Server) manageSessionsState() {
 				lh := se.lastHeartBeat.Load()
 				if lh.Before(expireTreshold) {
 					disconnectedSessions = append(disconnectedSessions, se)
-					continue
 				}
 			}
 
