@@ -2,7 +2,6 @@
 
 ShahBoard is a modern, scalable chess platform built with Go — designed for real-time multiplayer games, live game watching, and bot battles. It uses a microservices architecture and event-driven design to ensure high performance, flexibility, and easy scaling.
 
----
 
 ## 🚀 Features
 - 🔄 Real-time gameplay via WebSocket  
@@ -11,8 +10,7 @@ ShahBoard is a modern, scalable chess platform built with Go — designed for re
 - 👀 Live Watching with viewer counts   
 - 🔐 Secure Google OAuth login
 
----
-
+<br><br>
 ## 🏗️ Architecture Overview
 
 ShahBoard is built on a **microservices architecture** with an **event-driven design**, ensuring high scalability, modularity, and real-time responsiveness. Services communicate using **Kafka** as a central event bus, while WebSocket connections provide interactive game and chat experiences. Services also interact through **gRPC** for synchronous operations.
@@ -75,11 +73,8 @@ ShahBoard is built on a **microservices architecture** with an **event-driven de
 - Central event broker for inter-service communication.
 - Handles high-throughput, fault-tolerant messaging between services.
 
----
-
+<br><br>
 ## ♟ Game Lifecycle Flow
-
----
 
 ## 🔍 Phase 1: Matchmaking and Game Creation
 
@@ -183,3 +178,75 @@ This phase involves players making moves, validating them, and updating everyone
 
 ---
 
+<br><br>
+
+## ✅ Things Done So Far
+
+- Set up project structure with Docker, config, and logging
+- Built core services:
+  - **Auth Service** with Google OAuth login
+  - **Match Service** for matchmaking
+  - **Game Service** for game creation, move validation, and state tracking
+  - **WS Gateway** for WebSocket connections and real-time updates
+  - **Chat Service** for in-game messaging
+  - **Profile Service** for ELO and account data
+- Integrated **Kafka** for event-driven architecture
+- Designed and documented **game lifecycle flow** (matchmaking → gameplay → game end)
+- Enabled **live game watching** with viewers list
+- WebSocket event relays and client subscription management
+
+
+## 🧩 Next Steps
+
+1. **🧱 Error Package**
+   - Create a shared `error` package
+   - Define standard error types with codes (e.g. `ErrUnauthorized`, `ErrInvalidMove`)
+   - Add helper funcs for wrapping, logging, and translating to gRPC/HTTP errors
+
+2. **🏆 Leaderboard**
+   - Track top players based on ELO or win stats
+   - Endpoint/service to fetch global or regional rankings
+   - Cache leaderboard with Redis for performance
+
+3. **🔔 Notification Service**
+   - Event-based notification system (e.g., “You’ve been challenged” or “Game started”)
+   - WebSocket or push message support
+
+4. **🧑‍🤝‍🧑 Invite Feature**
+   - Let players directly invite others to a game
+   - Support pending invite states
+   - Event: `invite.sent`, `invite.accepted`, `invite.declined`
+   - Use Notification Service to deliver invites via WebSocket
+   - Integrate with Match and Game services on acceptance
+
+5. **💬 Direct Message Feature**
+   - Implement a private messaging system between users
+   - Enable real-time chat between users (outside of games)
+   - Support persistent message history
+   - Integrate with Notification Service to alert users of new messages
+
+6. **📥 Idempotent Kafka Subscribers**  
+   - Add unique event IDs to all Events  
+   - Store processed event IDs in-memory with TTL (e.g., 10 minutes) to avoid duplicates  
+   - Use a concurrent map with expiration 
+   - Ensure consumers (e.g., WS Gateway, Chat, Profile) are idempotent 
+
+7. **📤 Reliable & Async Kafka Publisher**  
+   - Make Kafka publishing asynchronous to decouple it from service layer  
+   - Store unacknowledged events in a bounded in-memory queue  
+   - When memory limit is reached, offload extra events to Redis (e.g., pending:events)
+   - Implement retry logic with exponential backoff or fixed intervals
+   - Remove event from queue only after Kafka acknowledgment
+
+8. **⏱️ Time Control Support**
+   - Add time control types: blitz, rapid, classical, custom
+   - Modify game creation to accept time settings
+   - Add time countdown logic in Game Service
+
+9. **📽️ Game Replay**
+   - Store full move history of each game
+   - Build frontend playback system (step-through, autoplay, etc.)
+   - API to fetch PGN-style game history
+
+10. **📱 Mobile-Compatible Frontend**
+   - Make the frontend responsive and optimized for phones
