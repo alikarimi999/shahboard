@@ -51,8 +51,8 @@ async function displayGames(games) {
         sortedGames.sort((a, b) => b.viewers_number - a.viewers_number);
     } else if (sortOption === 'viewers-asc') {
         sortedGames.sort((a, b) => a.viewers_number - b.viewers_number);
-    } else if (sortOption === 'time-desc') {
-        sortedGames.sort((a, b) => b.started_at.localeCompare(a.started_at));
+    } else if (sortOption === 'started-desc') {
+        sortedGames.sort((a, b) => (b.started_at || 0) - (a.started_at || 0));
     }
 
     container.innerHTML = '';
