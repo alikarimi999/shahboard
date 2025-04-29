@@ -15,6 +15,9 @@ ShahBoard is a modern, scalable chess platform built with Go — designed for re
 
 ShahBoard is built on a **microservices architecture** with an **event-driven design**, ensuring high scalability, modularity, and real-time responsiveness. Services communicate using **Kafka** as a central event bus, while WebSocket connections provide interactive game and chat experiences. Services also interact through **gRPC** for synchronous operations.
 
+<img width="816" alt="Screenshot 2025-04-29 at 3 59 10 PM" src="https://github.com/user-attachments/assets/e5b637bf-fd08-4148-ab3d-2c120281e6da" />
+
+
 ---
 
 ### 🔁 Traefik — Reverse Proxy
