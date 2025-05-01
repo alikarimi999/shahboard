@@ -24,3 +24,8 @@ type PasswordAuthResponse struct {
 	JwtToken string `json:"jwt_token"`
 	Exists   bool   `json:"exists"`
 }
+
+type GuestLoginResponse struct {
+	Id       string `json:"id"`
+	JwtToken string `json:"jwt_token"`
+}

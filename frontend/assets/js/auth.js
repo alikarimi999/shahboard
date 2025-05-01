@@ -95,6 +95,27 @@ async function sendTokenToBackend(token) {
     }
 }
 
+
+async function continueAsGuest() {
+    try {
+        const response = await fetch(`${config.baseUrl}/auth/guest`);
+
+        if (!response.ok) {
+            throw new Error(`Guest login failed: ${await response.text()}`);
+        }
+
+        const userData = await response.json();
+        userData.picture = `https://api.dicebear.com/9.x/bottts/svg?seed=${userData.id}`;
+        userData.is_guest = true;
+        localStorage.setItem("user", JSON.stringify(userData));
+        user.update();
+        window.location.reload();
+    } catch (error) {
+        console.error("Error during guest login:", error);
+        alert("Failed to continue as guest. Please try again.");
+    }
+}
+
 // Function to decode JWT token
 function parseJwt(token) {
     let base64Url = token.split('.')[1];
@@ -134,3 +155,5 @@ function checkUserStatus() {
 document.addEventListener("DOMContentLoaded", function () {
     loadLoginUI();
 });
+
+window.continueAsGuest = continueAsGuest;

@@ -96,7 +96,7 @@ func NewServer(e *gin.Engine, s event.Subscriber, p event.Publisher, game GameSe
 			return
 		}
 
-		sess := newSession(id, conn, server.h, server.cache, user.ID,
+		sess := newSession(id, conn, server.h, server.cache, user.ID, user.IsGuest,
 			types.ObjectZero, p, game, l, server.sessionCleanUp)
 		server.sm.add(sess)
 

@@ -103,6 +103,29 @@ func (s *AuthService) GoogleAuth(ctx context.Context, req GoogleAuthRequest) (Go
 
 }
 
+func (s *AuthService) GuestLogin(ctx context.Context) (GuestLoginResponse, error) {
+	id := types.NewObjectId()
+	email := fmt.Sprintf("guest_%s", id)
+	res := GuestLoginResponse{
+		Id:       id.String(),
+		JwtToken: s.jwtGenerator.GenerateJWT(types.User{ID: id, Email: email, IsGuest: true}),
+	}
+
+	if err := s.pub.Publish(event.EventUserCreated{
+		ID:        types.NewObjectId(),
+		UserID:    types.ObjectId(res.Id),
+		Email:     email,
+		IsGuest:   true,
+		Timestamp: time.Now().Unix(),
+	}); err != nil {
+		s.l.Error(err.Error())
+	}
+
+	s.l.Debug(fmt.Sprintf("guest logged in: %s", res.Id))
+
+	return res, nil
+}
+
 func (s *AuthService) PasswordAuth(ctx context.Context, req PasswordAuthRequest) (PasswordAuthResponse, error) {
 	if req.Email == "" || req.Password == "" {
 		return PasswordAuthResponse{}, errors.New("email and password are required")
@@ -141,7 +164,7 @@ func (s *AuthService) PasswordAuth(ctx context.Context, req PasswordAuthRequest)
 			return PasswordAuthResponse{}, errors.New("invalid password")
 		}
 
-		s.l.Debug(fmt.Sprintf("user logged in: %s", user.Email))
+		// s.l.Debug(fmt.Sprintf("user logged in: %s", user.Email))
 	}
 
 	return PasswordAuthResponse{

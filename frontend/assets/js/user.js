@@ -11,7 +11,8 @@ export const user = {
             const parsed = JSON.parse(storedUser);
             this.id = parsed.id || null;
             this.email = parsed.email || null;
-            this.name = parsed.name || null;
+            this.name = parsed.name || "guest";
+            this.is_guest = parsed.is_guest || false;
             this.avatar_url = parsed.picture || null;
             this.jwt_token = parsed.jwt_token || null;
         }

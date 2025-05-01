@@ -95,19 +95,39 @@ func (s *Service) handleEvent(e event.Event) {
 }
 
 func (s *Service) handleUserCreated(e *event.EventUserCreated) {
-	t := time.Now()
-	if err := s.repo.Create(context.Background(), &entity.UserInfo{
-		ID:           e.UserID,
-		Email:        e.Email,
-		Name:         e.Name,
-		AvatarUrl:    e.Picture,
-		CreatedAt:    t,
-		LastActiveAt: t,
-	}); err != nil {
+	var u *entity.UserInfo
+	if e.IsGuest {
+		u = wrapUserInfoForGuest(e)
+	} else {
+		t := time.Now()
+		u = &entity.UserInfo{
+			ID:           e.UserID,
+			Email:        e.Email,
+			Name:         e.Name,
+			AvatarUrl:    e.Picture,
+			CreatedAt:    t,
+			LastActiveAt: t,
+		}
+	}
+
+	if err := s.repo.Create(context.Background(), u); err != nil {
 		s.l.Error(err.Error())
 		return
 	}
 	s.l.Debug(fmt.Sprintf("user created with UID: '%s' Email: '%s'", e.UserID, e.Email))
+}
+
+func wrapUserInfoForGuest(e *event.EventUserCreated) *entity.UserInfo {
+	t := time.Now()
+
+	return &entity.UserInfo{
+		ID:           e.UserID,
+		Email:        e.Email,
+		Name:         fmt.Sprintf("guest_%s", e.UserID.String()),
+		CreatedAt:    t,
+		LastActiveAt: t,
+	}
+
 }
 
 func (s *Service) handleUserLoggedIn(e *event.EventUserLoggedIn) {

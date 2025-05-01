@@ -22,7 +22,10 @@ export async function getUserProfile(userId) {
         }
 
         const data = await response.json();
-        return data; // Return profile data for reuse
+        if (data.avatar_url == "") {
+            data.avatar_url = `https://api.dicebear.com/9.x/bottts/svg?seed=${userId}`
+        }
+        return data;
     } catch (error) {
         console.error('Error fetching user profile:', error);
         return null;

@@ -23,6 +23,7 @@ var (
 type EventUserCreated struct {
 	ID        types.ObjectId `json:"id"`
 	UserID    types.ObjectId `json:"user_id"`
+	IsGuest   bool           `json:"is_guest"`
 	Email     string         `json:"email"`
 	Name      string         `json:"name"`
 	Picture   string         `json:"picture"`

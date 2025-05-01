@@ -28,7 +28,7 @@ func NewHandler(cfg router.Config, s *service.AuthService) (*Handler, error) {
 
 func (h *Handler) setup() error {
 	h.Handle(http.MethodPost, "/", h.passwordLogin)
-
+	h.Handle(http.MethodGet, "/guest", h.guestLogin)
 	auth := h.Group("/oauth")
 	{
 		auth.POST("/google", h.googleLogin)
@@ -61,6 +61,16 @@ func (h *Handler) passwordLogin(c *gin.Context) {
 	}
 
 	res, err := h.s.PasswordAuth(c, req)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, res)
+}
+
+func (h *Handler) guestLogin(c *gin.Context) {
+	res, err := h.s.GuestLogin(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

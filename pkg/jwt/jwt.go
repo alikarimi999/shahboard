@@ -42,10 +42,11 @@ func (g *Generator) GenerateJWT(u types.User) string {
 	t := time.Now()
 
 	claims := jwt.MapClaims{
-		"id":    u.ID.String(),
-		"email": u.Email,
-		"exp":   t.Add(g.expiration).Unix(),
-		"iat":   t.Unix(),
+		"id":       u.ID.String(),
+		"email":    u.Email,
+		"is_guest": u.IsGuest,
+		"exp":      t.Add(g.expiration).Unix(),
+		"iat":      t.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -105,9 +106,15 @@ func (v *Validator) ValidateJWT(tokenString string) (types.User, error) {
 		return types.User{}, errors.New("missing or invalid id or email claim")
 	}
 
+	var isGuest bool
+	if _, ok := claims["is_guest"]; ok {
+		isGuest = claims["is_guest"].(bool)
+	}
+
 	return types.User{
-		ID:    types.ObjectId(id),
-		Email: email,
+		ID:      types.ObjectId(id),
+		Email:   email,
+		IsGuest: isGuest,
 	}, nil
 }
 

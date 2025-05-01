@@ -20,8 +20,9 @@ const (
 // TODO: implement session in a separate package for better modularity
 type session struct {
 	*websocket.Conn
-	id     types.ObjectId
-	userId types.ObjectId
+	id      types.ObjectId
+	userId  types.ObjectId
+	isGuest bool
 
 	eventCh chan event.Event
 	msgCh   chan []byte
@@ -53,12 +54,13 @@ type session struct {
 }
 
 func newSession(id types.ObjectId, conn *websocket.Conn, h *sessionsEventsHandler, rc *redisCache,
-	userId types.ObjectId, gameId types.ObjectId, p event.Publisher,
+	userId types.ObjectId, isGuest bool, gameId types.ObjectId, p event.Publisher,
 	game GameService, l log.Logger, cleanUP func(*session)) *session {
 	s := &session{
-		Conn:   conn,
-		id:     id,
-		userId: userId,
+		Conn:    conn,
+		id:      id,
+		userId:  userId,
+		isGuest: isGuest,
 
 		matchId:    types.NewAtomicObjectId(types.ObjectZero),
 		playGameId: types.NewAtomicObjectId(gameId),
@@ -232,6 +234,11 @@ func (s *session) handleFindMatchRequest(msgId types.ObjectId, data DataFindMatc
 		}
 	}()
 
+	// if s.isGuest {
+	// 	errMsg = guestNotAllowed
+	// 	return
+	// }
+
 	if s.playGameId.Load().IsZero() && s.matchId.Load().IsZero() &&
 		(s.userId == data.User1.ID || s.userId == data.User2.ID) {
 		s.matchId.Store(data.ID)
@@ -254,6 +261,11 @@ func (s *session) handleResumeGameRequest(msgId types.ObjectId, req DataResumeGa
 			s.send(msg)
 		}
 	}()
+
+	// if s.isGuest {
+	// 	errMsg = guestNotAllowed
+	// 	return
+	// }
 
 	if s.matchId.Load().IsZero() && s.playGameId.Load().IsZero() {
 		g, err := s.game.GetUserLiveGamePGN(context.Background(), s.userId)
